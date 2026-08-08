@@ -1,0 +1,436 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Manual de rol — Persona B · Cresco</title>
+<style>
+:root{--teal:#106b58;--teal-dark:#0b4f41;--cream:#fdf1e0;--gray-bg:#f4f5f3;--border:#d8ddd9;--text:#1a1a1a;}
+*{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+@page{size:letter;margin:0.85in 0.9in;@bottom-center{content:counter(page);font-family:Arial,Helvetica,sans-serif;font-size:9pt;color:#666;}}
+body{font-family:Georgia,'Times New Roman',serif;color:var(--text);font-size:11pt;line-height:1.55;margin:0;}
+h1,h2,h3,h4{font-family:Arial,Helvetica,sans-serif;font-weight:700;color:var(--teal);margin-top:0;}
+h1{font-size:22pt;border-bottom:2px solid var(--teal);padding-bottom:8px;margin-bottom:14px;}
+h2{font-size:15pt;margin-top:26px;margin-bottom:10px;}
+h3{font-size:12.5pt;color:#333;margin-top:18px;margin-bottom:6px;}
+p{margin:0 0 10px 0;}
+ul,ol{margin:0 0 12px 0;padding-left:22px;}
+li{margin-bottom:4px;}
+hr{border:none;border-top:1.5px solid var(--teal);margin:16px 0;}
+.part{page-break-before:always;}
+.brand{font-family:Arial,Helvetica,sans-serif;font-weight:700;font-size:13pt;color:var(--teal);letter-spacing:1px;}
+table{border-collapse:collapse;width:100%;margin:12px 0 16px 0;font-family:Arial,Helvetica,sans-serif;font-size:9.5pt;}
+th{background:var(--teal);color:#fff;text-align:left;padding:6px 8px;font-weight:600;}
+td{padding:6px 8px;border-bottom:1px solid var(--border);vertical-align:top;}
+tr:nth-child(even) td{background:#f7f8f7;}
+code.inline{font-family:'Consolas','Courier New',monospace;background:var(--gray-bg);padding:1px 5px;border-radius:3px;color:#0b4f41;font-size:9.5pt;}
+pre.code{font-family:'Consolas','Courier New',monospace;font-size:9.5pt;background:var(--gray-bg);border-left:4px solid var(--teal);padding:10px 14px;margin:12px 0;white-space:pre-wrap;color:#1f4a3f;overflow-wrap:break-word;}
+.callout{background:var(--cream);border-left:4px solid var(--teal);padding:10px 14px;margin:14px 0;font-size:10pt;}
+.callout b{color:var(--teal-dark);}
+.meta{font-family:Arial,Helvetica,sans-serif;font-size:9.5pt;color:#444;}
+.small{font-size:9pt;color:#555;}
+.footer-note{font-family:Arial,Helvetica,sans-serif;font-size:9pt;color:#666;margin-top:30px;border-top:1px solid var(--border);padding-top:8px;}
+</style>
+</head>
+<body>
+
+<div>
+<p class="brand">CRESCO</p>
+<hr>
+<h1 style="margin-top:60px;border:none;font-size:26pt;">Manual de rol — Persona B<br>Conducta y Reportes</h1>
+<p class="meta">Cresco · Versión 1.2 · 8 de agosto de 2026 · Envío del equipo: 28 de septiembre</p>
+<hr>
+<p class="small">Corrige la v1.0 del 3 de agosto de 2026. Ver <code class="inline">docs/99-archivo/ERRATA-2026-08.md</code> para el detalle de cada cambio. Esta versión 1.2 reinicia el calendario (tu semana 1 empieza el 9 de agosto) y fija dónde vive <code class="inline">lib/puntaje.ts</code>: dentro de <code class="inline">servidor/</code>.</p>
+<h2 style="margin-top:30px;">Tu rol en una frase</h2>
+<p><b>Tú construyes el corazón funcional del producto.</b></p>
+<p>Todo lo que hace que Cresco sea Cresco y no otra app de mensajería pasa por tu módulo: el puntaje, las acciones, los reportes. Eres quien más lógica de negocio escribe y quien más pruebas necesita, porque un error tuyo no se ve como un error — se ve como un estudiante con el puntaje equivocado, y eso es exactamente lo que un padre va a reclamar.</p>
+<p>Ventaja de tu rol: <b>puedes empezar el día 1 sin depender de nadie.</b> El motor de puntaje es lógica pura y se prueba sin base de datos ni servidor.</p>
+</div>
+
+<div class="part">
+<h1>Parte 1 — Contexto del proyecto</h1>
+<h2>1.1 Qué construimos</h2>
+<p>App Android de comunicación entre docentes y representantes legales de escuelas del Ecuador, para seguimiento de conducta. El estudiante nunca usa la app.</p>
+<h2>1.2 Decisiones ya tomadas</h2>
+<table>
+<tr><th>#</th><th>Decisión</th></tr>
+<tr><td>ADR-001</td><td>PostgreSQL + Drizzle ORM</td></tr>
+<tr><td>ADR-002</td><td>Next.js como servidor, Expo para las apps</td></tr>
+<tr><td>ADR-003</td><td>BetterAuth con plugin de organización</td></tr>
+<tr><td>ADR-004</td><td>Permisos en dos capas: código + RLS</td></tr>
+<tr><td>ADR-005</td><td><b>El puntaje es derivado, nunca un contador ← tu ADR</b></td></tr>
+<tr><td>ADR-006</td><td>RevenueCat es la fuente de verdad de pagos</td></tr>
+<tr><td>ADR-007</td><td>Entrega sin tienda, repositorio abierto bajo AGPL-3.0</td></tr>
+</table>
+</div>
+
+<div class="part">
+<h1>Parte 2 — Las reglas que debes saber de memoria</h1>
+<h2>2.1 El puntaje</h2>
+<table>
+<tr><th>Concepto</th><th>Valor</th></tr>
+<tr><td>Base al iniciar el parcial</td><td>60</td></tr>
+<tr><td>Piso</td><td>0</td></tr>
+<tr><td>Techo</td><td>100</td></tr>
+<tr><td>Se reinicia</td><td>Cada parcial, siempre vuelve a 60</td></tr>
+</table>
+<p><b>La regla más importante de tu módulo (ADR-005):</b></p>
+<pre class="code">puntaje = clamp(60 + Σ puntos de acciones VIGENTES del período, 0, 100)</pre>
+<p>El puntaje <b>nunca se incrementa</b>: se <b>recalcula</b> desde cero cada vez. La tabla <code class="inline">puntaje_periodo</code> es una caché reconstruible. La verdad son las acciones.</p>
+<div class="callout"><b>Por qué importa:</b> si fuera un contador, cualquier fallo lo desincronizaría de la bitácora de forma permanente y sin manera de detectarlo. Un padre vería un puntaje que no cuadra con la lista de acciones y tendría razón en reclamar.</div>
+
+<h2>2.2 Valores de las acciones</h2>
+<table>
+<tr><th>Tipo</th><th>Puntos</th><th>Quién ajusta</th></tr>
+<tr><td>Positiva</td><td>+1 por defecto, hasta +2</td><td>El docente elige</td></tr>
+<tr><td>Negativa · responsabilidad</td><td><b>siempre −1</b></td><td>Fijo, no se ajusta</td></tr>
+<tr><td>Negativa · disciplina</td><td>−1 por defecto, hasta −3</td><td>El docente elige</td></tr>
+<tr><td>Nota</td><td>0</td><td>—</td></tr>
+</table>
+
+<h2>2.3 Topes diarios</h2>
+<ul><li>Máximo <b>+4</b> por estudiante por día</li><li>Máximo <b>−5</b> por estudiante por día</li></ul>
+<div class="callout">Esto no lo valida la base de datos. Va en tu función de servidor, antes de insertar. Si se excede, devuelves <code class="inline">422</code> con código <code class="inline">TOPE_DIARIO_ALCANZADO</code>.</div>
+
+<h2>2.4 Los cinco tipos de acción</h2>
+<table>
+<tr><th>Tipo</th><th>Tabla</th><th>Alcance</th><th>Bitácora</th><th>Reclamable</th></tr>
+<tr><td>Positiva</td><td>accion_registrada</td><td>Un estudiante</td><td>Sí</td><td>No</td></tr>
+<tr><td>Negativa</td><td>accion_registrada</td><td>Un estudiante</td><td>Sí</td><td><b>Sí</b></td></tr>
+<tr><td>Nota</td><td>accion_registrada</td><td>Un estudiante</td><td><b>No</b></td><td>No</td></tr>
+<tr><td>Anuncio</td><td>comunicado_curso</td><td>Todo el curso</td><td>No</td><td>No</td></tr>
+<tr><td>Evento</td><td>comunicado_curso</td><td>Todo el curso</td><td>No</td><td>No</td></tr>
+</table>
+
+<h2>2.5 Estados de una acción</h2>
+<table>
+<tr><th>Estado</th><th>Puntos que cuenta</th><th>Se muestra como</th></tr>
+<tr><td>VIGENTE</td><td>Los aplicados</td><td>Normal</td></tr>
+<tr><td>ANULADA</td><td>0</td><td>"Anulada por el docente"</td></tr>
+<tr><td>MODIFICADA</td><td>0</td><td>"Resuelta con el representante"</td></tr>
+</table>
+<p>Solo <code class="inline">VIGENTE</code> cuenta en el recálculo. Las otras dos valen 0 pero se muestran distinto al padre. <b>Solo las negativas se pueden anular.</b></p>
+
+<h2>2.6 Las seis franjas</h2>
+<table>
+<tr><th>Rango</th><th>Franja</th></tr>
+<tr><td>0 – 15</td><td>Situación crítica</td></tr>
+<tr><td>16 – 30</td><td>Muy por debajo</td></tr>
+<tr><td>31 – 50</td><td>Por debajo de lo esperado</td></tr>
+<tr><td>51 – 60</td><td>En el punto de partida</td></tr>
+<tr><td>61 – 80</td><td>Buen desempeño</td></tr>
+<tr><td>81 – 100</td><td>Excelente</td></tr>
+</table>
+
+<h2>2.7 Reportes</h2>
+<ul>
+<li>El reporte general es <b>opcional</b>. Ningún campo es obligatorio.</li>
+<li>Si el docente no lo llena pero hubo acciones, <b>igual se genera</b> el reporte del estudiante con solo sus acciones.</li>
+<li>Solo el <b>más reciente</b> es visible en la pantalla principal del representante.</li>
+<li>Historial: plan gratuito <b>2</b> reportes anteriores, premium <b>7</b>.</li>
+<li>El representante <b>sí ve</b> los puntos de cada acción.</li>
+<li>Las <b>notas no entran</b> en la bitácora del acumulado.</li>
+</ul>
+
+<h2>2.8 Eventos</h2>
+<p>Aparecen como bloque expandible al final del reporte diario, desde hasta 7 días antes de su fecha y hasta el día siguiente. Alcanzan a todo el curso.</p>
+</div>
+
+<div class="part">
+<h1>Parte 3 — Tu territorio</h1>
+<h2>3.1 Tus tablas</h2>
+<p>Archivo: <code class="inline">db/schema/conducta.ts</code></p>
+<p><code class="inline">categoria_accion</code> · <code class="inline">tipo_accion</code> · <code class="inline">accion_registrada</code> · <code class="inline">comunicado_curso</code> · <code class="inline">franja_conducta</code> · <code class="inline">puntaje_periodo</code> · <code class="inline">registro_asistencia</code> · <code class="inline">plantilla_reporte</code> · <code class="inline">plantilla_campo</code> · <code class="inline">reporte_general</code> · <code class="inline">reporte_general_valor</code> · <code class="inline">reporte_estudiante</code> · <code class="inline">reporte_estudiante_item</code> · <code class="inline">entrega_reporte</code></p>
+<div class="callout"><code class="inline">pregunta_reporte</code> existe en tu archivo pero está <b>diferida a la v2</b>. No la uses.<br><br><b>Nuevo desde el 8 de agosto:</b> <code class="inline">categoria_accion.aplica_a</code> queda <b>reservado sin CHECK</b> hasta que se retome el rol <code class="inline">DOCENTE_COLABORADOR</code> en v2 (fue diferido). No generes datos semilla asumiendo valores más allá del default <code class="inline">'AMBAS'</code>.</div>
+
+<h2>3.2 Tus pantallas</h2>
+<table>
+<tr><th>#</th><th>Pantalla</th><th>App</th><th>Semana</th></tr>
+<tr><td>D11</td><td>Asignar acción</td><td>Docente</td><td>2</td></tr>
+<tr><td>D13</td><td>Redactar reporte general</td><td>Docente</td><td>3</td></tr>
+<tr><td>P4</td><td><b>Reporte del día</b> (pantalla principal)</td><td>Representante</td><td>3</td></tr>
+<tr><td>P5</td><td>Reportes anteriores</td><td>Representante</td><td>4</td></tr>
+<tr><td>P6</td><td>Reporte acumulado con gráfico</td><td>Representante</td><td>4</td></tr>
+<tr><td>D12</td><td>Tomar asistencia</td><td>Docente</td><td>5</td></tr>
+<tr><td>D14</td><td>Publicar anuncio o evento</td><td>Docente</td><td>5</td></tr>
+</table>
+
+<h2>3.3 Tus endpoints</h2>
+<pre class="code">GET  /docente/catalogo-acciones
+POST /docente/acciones
+POST /docente/acciones/{id}/resolver
+POST /docente/cursos/{id}/comunicados
+PUT  /docente/cursos/{id}/asistencia
+GET  /docente/cursos/{id}/reporte-general
+POST /docente/cursos/{id}/reporte-general
+GET  /representante/reporte-diario
+GET  /representante/reportes-anteriores
+GET  /representante/reporte-acumulado</pre>
+
+<h2>3.4 Lo que NO tocas</h2>
+<p><code class="inline">db/schema/nucleo.ts</code> (de A) · <code class="inline">db/schema/interaccion.ts</code> (de C) · las pantallas de registro, curso, citas, alertas o pagos.</p>
+<p><b>Regla crítica que debes respetar:</b> está prohibido usar <code class="inline">db.select()</code> suelto sobre <code class="inline">estudiante</code>, <code class="inline">matricula</code>, <code class="inline">accion_registrada</code> o <code class="inline">reporte_estudiante</code>. Toda consulta pasa por las funciones de <code class="inline">db/acceso/</code> que construye A. Si no existe la que necesitas, se la pides.</p>
+
+<h2>3.5 Dónde vive tu código</h2>
+<p><code class="inline">lib/puntaje.ts</code> vive <b>dentro de <code class="inline">servidor/</code></b> — el proyecto Next que C scaffoldea el domingo 9 de agosto (día 1 de la semana 1). No es una carpeta que tú creas ni que existe hoy; nace ese día. Tus pruebas de la semana 1 (martes y miércoles, "La función de cálculo") son lógica pura y no necesitan que <code class="inline">servidor/</code> exista todavía para escribirse y correr con <code class="inline">node --test</code>, pero el archivo final se guarda ahí una vez que la carpeta nace.</p>
+<p class="small">No hace falta compartir este archivo con <code class="inline">movil/</code>: el servidor calcula el puntaje y lo devuelve ya resuelto en <code class="inline">puntaje_actual</code> dentro de la respuesta de <code class="inline">POST /docente/acciones</code>. El móvil nunca recalcula, solo muestra el número que llega.</p>
+</div>
+
+<div class="part">
+<h1>Parte 4 — Preparación (semana 1, 4 de agosto en adelante)</h1>
+<h2>4.1 Instalar</h2>
+<p>Node.js 20+, Git, VS Code con ESLint y Prettier.</p>
+<pre class="code">node --version   # v20 o superior
+git config --global user.name "Tu Nombre"
+git config --global user.email "tu@correo.com"</pre>
+
+<h2>4.2 Conceptos que necesitas</h2>
+<p><b>¿Qué es una prueba unitaria?</b> Código que verifica que otro código hace lo que debe. Tú vas a escribir muchas, porque tu módulo tiene reglas numéricas exactas que un error silencioso puede romper sin que nadie lo note.</p>
+<p><b>¿Qué es una función pura?</b> Una que solo depende de sus argumentos y no toca base de datos ni red. El cálculo del puntaje debe ser una función pura: recibe una lista de acciones y devuelve un número. Así la pruebas sin levantar nada.</p>
+<p><b>¿Qué es el servidor simulado?</b> Mientras A construye la base de datos real, tú puedes trabajar tus pantallas contra datos falsos:</p>
+<pre class="code">npx @stoplight/prism-cli mock api/openapi.yaml</pre>
+
+<h2>4.3 Clonar</h2>
+<pre class="code">git clone &lt;url-del-repo&gt;
+cd cresco
+npm ci                       # versiones exactas del lockfile</pre>
+</div>
+
+<div class="part">
+<h1>Parte 5 — Semana a semana</h1>
+<h2>Semana 1 · 9 al 15 de agosto — El motor</h2>
+<div class="callout">No necesitas esperar a nadie esta semana. Todo lo tuyo es lógica pura.</div>
+
+<h3>Domingo 9 y lunes 10 — La función de cálculo</h3>
+<p>Crea <code class="inline">lib/puntaje.ts</code> (va dentro de <code class="inline">servidor/</code> en cuanto C lo scaffoldee el domingo — ver §3.5) con una función pura:</p>
+<pre class="code">type AccionParaCalculo = {
+  puntosAplicados: number;
+  estado: "VIGENTE" | "ANULADA" | "MODIFICADA";
+};
+
+export function calcularPuntaje(
+  acciones: AccionParaCalculo[],
+  base = 60,
+  minimo = 0,
+  maximo = 100,
+): number {
+  const suma = acciones
+    .filter((a) =&gt; a.estado === "VIGENTE")
+    .reduce((total, a) =&gt; total + a.puntosAplicados, 0);
+  return Math.min(maximo, Math.max(minimo, base + suma));
+}</pre>
+
+<h3>Martes 11 — Los topes diarios</h3>
+<p>Crea la función que decide si una acción se puede registrar:</p>
+<pre class="code">export function puedeRegistrar(
+  accionesDelDia: AccionParaCalculo[],
+  puntosNuevos: number,
+  topePositivo = 4,
+  topeNegativo = 5,
+): { permitido: boolean; motivo?: string } {
+  // suma solo VIGENTE, separa positivos de negativos,
+  // verifica que sumar puntosNuevos no exceda el tope correspondiente
+}</pre>
+
+<h3>Miércoles 12 — Pruebas</h3>
+<p>Escribe al menos estas ocho:</p>
+<table>
+<tr><th>#</th><th>Caso</th><th>Esperado</th></tr>
+<tr><td>1</td><td>Sin acciones</td><td>60</td></tr>
+<tr><td>2</td><td>Una positiva de +2</td><td>62</td></tr>
+<tr><td>3</td><td>Una negativa de −3</td><td>57</td></tr>
+<tr><td>4</td><td>Acciones que suman −70</td><td>0, no negativo</td></tr>
+<tr><td>5</td><td>Acciones que suman +50</td><td>100, no 110</td></tr>
+<tr><td>6</td><td>Una acción ANULADA</td><td>No cuenta</td></tr>
+<tr><td>7</td><td>Ya perdió −5 hoy, intenta otra −1</td><td>Rechazado</td></tr>
+<tr><td>8</td><td>Ya ganó +4 hoy, intenta otra +1</td><td>Rechazado</td></tr>
+</table>
+<p><b>Éxito de la semana 1:</b> <code class="inline">npm test</code> pasa las ocho.</p>
+
+<h3>Jueves 13 y viernes 14 — Catálogo semilla</h3>
+<p>Coordina con A, que está armando <code class="inline">db/seeds/</code>. Tú defines los tipos de acción con sus puntos exactos. Como mínimo:</p>
+<ul>
+<li><b>Positivas:</b> excelente taller, excelente lección, excelente examen, participación destacada, ayudó a un compañero</li>
+<li><b>Responsabilidad (−1 fijo):</b> no trajo la tarea, no trajo materiales, tarea incompleta</li>
+<li><b>Disciplina (−1 a −3):</b> interrumpió la clase, no acató indicaciones, falta de respeto a un compañero, falta de respeto al docente</li>
+<li><b>Notas (0):</b> observación general</li>
+</ul>
+
+<h2>Semana 2 · 16 al 22 de agosto — Asignar acción</h2>
+<h3>Pantalla D11</h3>
+<p>El flujo del docente, pensado para hacerse en segundos entre clase y clase:</p>
+<ol><li>Elige el tipo de acción</li><li>Busca al estudiante (barra de búsqueda, la lista puede tener 40 nombres)</li><li>Ajusta los puntos si el tipo lo permite</li><li>Confirma</li></ol>
+<div class="callout"><b>Trampa:</b> valida en el servidor, no solo en la pantalla. Un cliente modificado no debe poder registrar −10 puntos.</div>
+<h3>Endpoint <code class="inline">POST /docente/acciones</code></h3>
+<p>Debe verificar, en este orden:</p>
+<ol>
+<li>¿El docente tiene asignación vigente en ese curso? Si no → <code class="inline">403</code></li>
+<li>¿El período está abierto y es día de clase? Si no → <code class="inline">409</code></li>
+<li>¿Los puntos están dentro del rango del tipo? Si no → <code class="inline">422</code></li>
+<li>¿Se excede el tope diario? Si sí → <code class="inline">422 TOPE_DIARIO_ALCANZADO</code></li>
+<li>Insertar y recalcular</li>
+</ol>
+<p><b>Éxito de la semana 2:</b> asignar −1 a un estudiante actualiza su puntaje de 60 a 59 en pantalla, y un segundo intento que exceda −5 en el día es rechazado con un mensaje claro.</p>
+
+<h2>Semana 3 · 23 al 29 de agosto — Reportes</h2>
+<div class="callout">Semana del hito crítico del proyecto.</div>
+<h3>Pantalla D13 — Reporte general</h3>
+<p>Campos etiquetados que vienen de <code class="inline">plantilla_campo</code>. Propuesta inicial de campos:</p>
+<table>
+<tr><th>Código</th><th>Etiqueta</th></tr>
+<tr><td>ANUNCIOS</td><td>Anuncios</td></tr>
+<tr><td>NOVEDADES</td><td>Novedades del día</td></tr>
+<tr><td>TAREAS</td><td>Tareas enviadas</td></tr>
+<tr><td>CONSEJO</td><td>Consejo para casa</td></tr>
+</table>
+<p>Ninguno es obligatorio. El docente debe poder publicar con un solo campo lleno, o guardarlo como borrador.</p>
+<div class="callout"><b>Importante:</b> los campos vienen de la tabla, no están escritos en el código. Agregar "material para mañana" debe ser un <code class="inline">INSERT</code>, no un cambio de código.</div>
+<h3>Pantalla P4 — Reporte del día (la más importante del proyecto)</h3>
+<p>Es lo primero que ve el representante al abrir la app. Debe leerse en menos de un minuto.</p>
+<table>
+<tr><th>Situación</th><th>Qué muestra</th></tr>
+<tr><td>Hay reporte de hoy</td><td>El reporte completo</td></tr>
+<tr><td>Aún no se genera (204)</td><td>"Aún no tienes reporte nuevo, pero puedes ver el anterior" + botón</td></tr>
+<tr><td>Sin novedades</td><td>Solo el contenido general del curso</td></tr>
+<tr><td>Con acciones</td><td>Las acciones con sus puntos + puntaje nuevo + franja</td></tr>
+<tr><td>Hay evento vigente</td><td>Bloque expandible al final</td></tr>
+</table>
+<div class="callout"><b>Consejo:</b> el padre ecuatoriano promedio no lee gráficos estadísticos. Un número grande, una frase clara y colores que se entiendan sin leer. Nada de percentiles ni desviaciones.</div>
+<p><b>Éxito de la semana 3:</b> el docente publica el reporte desde su teléfono y el representante lo ve en el suyo.</p>
+
+<h2>Semana 4 · 30 de agosto al 5 de septiembre — Historial y acumulado</h2>
+<h3>Pantalla P5 — Reportes anteriores</h3>
+<p>Límite según plan: 2 en gratuito, 7 en premium. Al llegar al límite, muestra la invitación a premium. Coordina con C, que construye el paywall.</p>
+<h3>Pantalla P6 — Reporte acumulado</h3>
+<ul>
+<li>Puntaje actual grande, con su franja y frase</li>
+<li>Gráfico simple de evolución (una línea, sin ejes complicados)</li>
+<li>Bitácora: todas las acciones del parcial excepto las notas</li>
+<li>Resumen por categoría: cuántas de responsabilidad, cuántas de disciplina</li>
+<li>Inasistencias y atrasos</li>
+</ul>
+<div class="callout"><b>Consejo sobre el gráfico:</b> usa una librería simple de React Native. No intentes hacerlo desde cero con SVG. Que se entienda de un vistazo: una línea que sube es bueno, una que baja es malo. Nada más.</div>
+<p><b>Éxito de la semana 4:</b> el gráfico se dibuja con datos reales de dos semanas.</p>
+
+<h2>Semana 5 · 6 al 12 de septiembre — Asistencia y comunicados</h2>
+<h3>D12 — Asistencia</h3>
+<p>Una pantalla, toda la lista, un toque por estudiante. Por defecto todos presentes; el docente solo marca las excepciones.</p>
+<h3>D14 — Anuncios y eventos</h3>
+<p>El evento necesita: título, contenido, fecha y hora. La ventana de visibilidad se calcula sola (7 días antes, hasta el día siguiente).</p>
+<p><b>Éxito:</b> un evento aparece y desaparece en las fechas correctas.</p>
+
+<h2>Semana 6 · 13 al 19 de septiembre — Cierre</h2>
+<p>Trabajo conjunto: datos de demostración, corrección de errores, video.</p>
+<p>Tú aportas los datos que hacen creíble la demostración: un curso con dos semanas de historial, puntajes variados que muestren al menos cuatro franjas distintas, y una acción anulada para mostrar cómo se ve.</p>
+</div>
+
+<div class="part">
+<h1>Parte 6 — Trampas y consejos</h1>
+<p><b>Nunca incrementes el puntaje.</b> Recalcúlalo siempre. Si te descubres escribiendo <code class="inline">puntaje = puntaje - 1</code>, estás cometiendo el error que el ADR-005 existe para evitar.</p>
+<p><b>Los puntos aplicados son una fotografía.</b> <code class="inline">accion_registrada.puntosAplicados</code> guarda el valor del momento del registro. Si el catálogo cambia después, las acciones viejas conservan sus puntos.</p>
+<p><b>Recalcula en tres momentos:</b> al registrar una acción, al resolverla (anular o modificar), y al cerrar el período.</p>
+<p><b>Las notas no van a la bitácora.</b> Aparecen en el reporte del día pero no en el acumulado. Es fácil olvidarlo y llenar la bitácora de ruido.</p>
+<p><b>El reporte del estudiante es inmutable.</b> Una vez generado, es una fotografía del día. No lo regeneres si cambian las acciones después.</p>
+<p><b>Prueba con el caso vacío.</b> Un estudiante sin ninguna acción debe ver un reporte válido, no una pantalla rota. Es el caso más común: la mayoría de los días la mayoría de los niños no tienen novedades.</p>
+<p><b>No construyas nada para <code class="inline">DOCENTE_COLABORADOR</code>.</b> Está diferido a v2 — incluido cualquier valor de <code class="inline">categoria_accion.aplica_a</code> más allá de <code class="inline">'AMBAS'</code>.</p>
+</div>
+
+<div class="part">
+<h1>Parte 7 — Cuando te bloquees</h1>
+<ol>
+<li><b>Relee el contrato</b> en <code class="inline">api/openapi.yaml</code>.</li>
+<li><b>Revisa las reglas</b> en la parte 2 de este manual.</li>
+<li><b>Medio día máximo.</b> Si llevas más, avisa al grupo ese mismo día.</li>
+<li><b>Pregunta a una IA</b> pegando el bloque de la siguiente sección.</li>
+</ol>
+</div>
+
+<div class="part">
+<h1>Parte 8 — Bloque de contexto para IA</h1>
+<div class="callout">Copia todo esto y pégalo antes de tu pregunta.</div>
+<pre class="code">CONTEXTO — PROYECTO CRESCO, ROL: PERSONA B (CONDUCTA Y REPORTES)
+
+Soy uno de 3 estudiantes (equipo Neofix) construyendo una app Android
+para el hackathon RevenueCat Shipaton 2026, categoría Next Gen. Semana 1
+desde el 9 de agosto de 2026; deadline interno 20 de septiembre; envío
+real 28 de septiembre. Es mi primera app. Mi rol es el módulo de
+acciones, puntaje, asistencia y reportes.
+
+MI CÓDIGO VIVE EN servidor/lib/puntaje.ts — dentro del proyecto Next que
+C scaffoldea el día 1. No hace falta compartirlo con movil/: el servidor
+devuelve el puntaje ya calculado en la respuesta; el móvil solo lo
+muestra.
+
+EL PRODUCTO: app de comunicación entre docentes y representantes legales
+de escuelas del Ecuador, para seguimiento de conducta. El estudiante
+NUNCA es usuario. La interfaz del representante debe ser MUY simple:
+muchos padres ecuatorianos no leen gráficos estadísticos.
+
+STACK: PostgreSQL + Drizzle ORM. Next.js como servidor. Expo/React
+Native para las apps. NativeWind para estilos (shadcn NO funciona en
+React Native).
+
+MIS TABLAS: categoria_accion, tipo_accion, accion_registrada,
+comunicado_curso, franja_conducta, puntaje_periodo, registro_asistencia,
+plantilla_reporte, plantilla_campo, reporte_general,
+reporte_general_valor, reporte_estudiante, reporte_estudiante_item,
+entrega_reporte.
+
+REGLAS DEL PUNTAJE (las más importantes de mi rol):
+- Base 60 por parcial, piso 0, techo 100. Se reinicia cada parcial.
+- Positivas: +1 por defecto, ajustable a +2.
+- Negativas de responsabilidad: FIJO -1. De disciplina: -1 a -3.
+- Topes diarios: máximo +4 y máximo -5 por estudiante por día. Se
+  validan en el servidor, NO en la base de datos. Si se excede: 422
+  TOPE_DIARIO_ALCANZADO.
+- EL PUNTAJE ES DERIVADO, NUNCA UN CONTADOR:
+  puntaje = clamp(60 + suma de acciones VIGENTES del período, 0, 100)
+  La tabla puntaje_periodo es una CACHÉ recalculable. La verdad son las
+  acciones.
+- accion_registrada.puntos_aplicados es una fotografía inmutable:
+  cambiar el catálogo no altera acciones ya registradas.
+- Estados: VIGENTE (cuenta), ANULADA (0 puntos), MODIFICADA (0 puntos,
+  resuelta con el representante). Solo las NEGATIVAS se pueden anular.
+- Se recalcula al registrar, al resolver y al cerrar el período.
+- Al cerrar el parcial el puntaje se congela.
+
+5 TIPOS DE ACCIÓN:
+- Positiva, Negativa, Nota → tabla accion_registrada (por estudiante)
+- Anuncio, Evento → tabla comunicado_curso (por curso completo)
+- Las NOTAS no entran en la bitácora del acumulado.
+- Los EVENTOS aparecen en el reporte diario desde 7 días antes hasta el
+  día siguiente, como bloque expandible.
+
+6 FRANJAS: 0-15 crítica, 16-30 muy por debajo, 31-50 por debajo, 51-60
+punto de partida, 61-80 buen desempeño, 81-100 excelente.
+
+REPORTES:
+- El reporte general del curso es OPCIONAL y ningún campo es
+  obligatorio. Los campos vienen de la tabla plantilla_campo.
+- Si no hay reporte general pero hubo acciones, igual se genera el del
+  estudiante.
+- Si no hay reporte de hoy, el endpoint devuelve 204 y la app muestra
+  "Aún no tienes reporte nuevo, pero puedes ver el anterior".
+- Solo el más reciente es visible en pantalla principal. Historial: 2
+  reportes en plan gratuito, 7 en premium.
+- El representante SÍ ve los puntos de cada acción.
+- reporte_estudiante es una fotografía inmutable del día.
+
+DIFERIDO A V2: el rol DOCENTE_COLABORADOR no está activo en v1.
+categoria_accion.aplica_a queda reservado sin CHECK hasta entonces — no
+generar semillas asumiendo valores más allá de 'AMBAS'.
+
+SEGURIDAD: prohibido usar db.select() suelto sobre estudiante,
+matricula, accion_registrada o reporte_estudiante. Toda consulta pasa
+por funciones de db/acceso/ que garantizan el filtro por vínculo activo.
+
+CONVENCIONES: tablas y columnas en español snake_case. Estados en
+MAYUSCULA_SNAKE en db/schema/enums.ts. Timestamps UTC, zona
+America/Guayaquil.
+
+MI RESTRICCIÓN: 6 semanas, primera app, prefiero soluciones simples y
+probadas. Explícame los conceptos, no solo el código.</pre>
+<p class="footer-note">Versión 1.2 · Última revisión: 8 de agosto de 2026 · Dueño: Persona B · Corrige la v1.0 del 3 de agosto — detalle en <code class="inline">docs/99-archivo/ERRATA-2026-08.md</code></p>
+</div>
+
+</body>
+</html>

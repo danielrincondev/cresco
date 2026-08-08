@@ -1,0 +1,452 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Manual del equipo — Cresco</title>
+<style>
+:root{--teal:#106b58;--teal-dark:#0b4f41;--cream:#fdf1e0;--gray-bg:#f4f5f3;--border:#d8ddd9;--text:#1a1a1a;}
+*{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+@page{size:letter;margin:0.85in 0.9in;@bottom-center{content:counter(page);font-family:Arial,Helvetica,sans-serif;font-size:9pt;color:#666;}}
+body{font-family:Georgia,'Times New Roman',serif;color:var(--text);font-size:11pt;line-height:1.55;margin:0;}
+h1,h2,h3,h4{font-family:Arial,Helvetica,sans-serif;font-weight:700;color:var(--teal);margin-top:0;}
+h1{font-size:22pt;border-bottom:2px solid var(--teal);padding-bottom:8px;margin-bottom:14px;}
+h2{font-size:15pt;margin-top:26px;margin-bottom:10px;}
+h3{font-size:12.5pt;color:#333;margin-top:18px;margin-bottom:6px;}
+p{margin:0 0 10px 0;}
+ul,ol{margin:0 0 12px 0;padding-left:22px;}
+li{margin-bottom:4px;}
+hr{border:none;border-top:1.5px solid var(--teal);margin:16px 0;}
+.part{page-break-before:always;}
+.brand{font-family:Arial,Helvetica,sans-serif;font-weight:700;font-size:13pt;color:var(--teal);letter-spacing:1px;}
+table{border-collapse:collapse;width:100%;margin:12px 0 16px 0;font-family:Arial,Helvetica,sans-serif;font-size:9.5pt;}
+th{background:var(--teal);color:#fff;text-align:left;padding:6px 8px;font-weight:600;}
+td{padding:6px 8px;border-bottom:1px solid var(--border);vertical-align:top;}
+tr:nth-child(even) td{background:#f7f8f7;}
+code.inline{font-family:'Consolas','Courier New',monospace;background:var(--gray-bg);padding:1px 5px;border-radius:3px;color:#0b4f41;font-size:9.5pt;}
+pre.code{font-family:'Consolas','Courier New',monospace;font-size:9.5pt;background:var(--gray-bg);border-left:4px solid var(--teal);padding:10px 14px;margin:12px 0;white-space:pre-wrap;color:#1f4a3f;overflow-wrap:break-word;}
+.callout{background:var(--cream);border-left:4px solid var(--teal);padding:10px 14px;margin:14px 0;font-size:10pt;}
+.callout b{color:var(--teal-dark);}
+.meta{font-family:Arial,Helvetica,sans-serif;font-size:9.5pt;color:#444;}
+.small{font-size:9pt;color:#555;}
+.eyebrow{font-family:Arial,Helvetica,sans-serif;font-size:9pt;color:#666;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;}
+</style>
+</head>
+<body>
+
+<!-- COVER -->
+<div>
+  <p class="brand">CRESCO</p>
+  <hr>
+  <h1 style="margin-top:60px;border:none;font-size:28pt;">Manual del equipo — Cresco</h1>
+  <p class="meta">Versión 1.2 · 8 de agosto de 2026 · Equipo Neofix · RevenueCat Shipaton 2026, categoría Next Gen · Envío del equipo: 28 de septiembre</p>
+  <hr>
+  <p class="small">Corrige y reemplaza la versión 1.0 del 3 de agosto de 2026. Ver el detalle de cambios en <code class="inline">docs/99-archivo/ERRATA-2026-08.md</code>. Esta versión 1.2 reinicia el calendario (la semana 1 empieza el 9 de agosto) y fija dónde vive el código: <code class="inline">servidor/</code> y <code class="inline">movil/</code>. Ver <code class="inline">Contexto/DECISIONS.md</code>, decisiones S1-S6.</p>
+  <h2 style="margin-top:40px;">Cómo usar este manual</h2>
+  <p>Este es el documento maestro. Contiene todo el proyecto: qué construimos, quién hace qué, en qué fechas y cómo sabemos que una fase salió bien.</p>
+  <p>Cada persona tiene además <b>su propio manual de rol</b> con el detalle paso a paso. Léanlos en este orden: primero este completo, después el suyo.</p>
+  <p>La última sección es un <b>bloque de contexto para inteligencia artificial</b>. Si se traban y quieren preguntarle a una IA, peguen ese bloque antes de su pregunta y la respuesta llegará ajustada a este proyecto en vez de ser genérica.</p>
+</div>
+
+<!-- PARTE 1 -->
+<div class="part">
+<h1>Parte 1 — El proyecto</h1>
+
+<h2>1.1 Qué es Cresco</h2>
+<p>Una aplicación Android de comunicación entre <b>docentes</b> y <b>representantes legales</b> de escuelas del Ecuador, centrada en el seguimiento de responsabilidad y conducta del estudiante.</p>
+<p><b>El estudiante nunca es usuario de la aplicación.</b> Solo es sujeto de datos.</p>
+<p>Hay dos aplicaciones distintas dentro de una misma base de código:</p>
+<ul>
+<li><b>App del docente:</b> herramienta de trabajo diaria. Crea el curso, registra acciones, toma asistencia, redacta el reporte del día.</li>
+<li><b>App del representante:</b> informativa y simple. Abre y ve el reporte de hoy de su hijo, con opciones para reclamar una acción injusta o agendar una cita.</li>
+</ul>
+
+<h2>1.2 Qué problema resuelve</h2>
+<p>Hoy la comunicación escuela-familia vive en grupos de mensajería desordenados, donde lo importante se pierde. El docente no tiene tiempo de hablar con treinta familias y el representante se entera de la conducta de su hijo al final del parcial, cuando ya es tarde para ayudar.</p>
+
+<h2>1.3 El mecanismo central: el puntaje</h2>
+<p>Cada estudiante empieza cada parcial con 60 puntos. Sube y baja según su responsabilidad y su comportamiento.</p>
+<table>
+<tr><th>Concepto</th><th>Valor</th></tr>
+<tr><td>Puntaje base al iniciar el parcial</td><td>60</td></tr>
+<tr><td>Piso</td><td>0</td></tr>
+<tr><td>Techo</td><td>100</td></tr>
+<tr><td>Acción positiva</td><td>+1 por defecto, el docente puede subirla a +2</td></tr>
+<tr><td>Acción negativa de responsabilidad</td><td>siempre −1, fija</td></tr>
+<tr><td>Acción negativa de disciplina</td><td>−1 por defecto, hasta −3</td></tr>
+<tr><td>Tope de ganancia por día</td><td>+4</td></tr>
+<tr><td>Tope de pérdida por día</td><td>−5</td></tr>
+</table>
+<p><b>El puntaje nunca modifica calificaciones académicas.</b> Es un apoyo para cuando el docente califique conducta al cierre del parcial.</p>
+<p>Al terminar el parcial, el puntaje se congela y el estudiante vuelve a 60 en el siguiente.</p>
+
+<h3>Franjas de conducta</h3>
+<p>El puntaje se traduce a una frase orientadora para el representante:</p>
+<table>
+<tr><th>Rango</th><th>Franja</th></tr>
+<tr><td>0 – 15</td><td>Situación crítica</td></tr>
+<tr><td>16 – 30</td><td>Muy por debajo</td></tr>
+<tr><td>31 – 50</td><td>Por debajo de lo esperado</td></tr>
+<tr><td>51 – 60</td><td>En el punto de partida</td></tr>
+<tr><td>61 – 80</td><td>Buen desempeño</td></tr>
+<tr><td>81 – 100</td><td>Excelente</td></tr>
+</table>
+
+<h2>1.4 Los cinco tipos de acción</h2>
+<table>
+<tr><th>Tipo</th><th>Alcance</th><th>Puntos</th><th>¿Bitácora?</th><th>¿Reclamable?</th></tr>
+<tr><td>Positiva</td><td>Un estudiante</td><td>+1 a +2</td><td>Sí</td><td>No</td></tr>
+<tr><td>Negativa</td><td>Un estudiante</td><td>−1 a −3</td><td>Sí</td><td>Sí</td></tr>
+<tr><td>Nota</td><td>Un estudiante</td><td>0</td><td>No</td><td>No</td></tr>
+<tr><td>Anuncio</td><td>Todo el curso</td><td>0</td><td>No</td><td>No</td></tr>
+<tr><td>Evento</td><td>Todo el curso</td><td>0</td><td>No</td><td>No</td></tr>
+</table>
+<p>Las tres primeras van a la tabla <code class="inline">accion_registrada</code>. Las dos últimas van a <code class="inline">comunicado_curso</code>, porque alcanzan a todo el curso y no a un estudiante.</p>
+<p>El <b>evento</b> aparece como bloque expandible al final del reporte diario, desde hasta 7 días antes de su fecha y hasta el día siguiente.</p>
+
+<h2>1.5 El flujo completo</h2>
+<ol>
+<li>El docente se registra y crea su curso escribiendo el nombre de su escuela como texto libre. Define el año lectivo y de 2 a 3 parciales.</li>
+<li>El docente genera un <b>código de invitación al curso</b>, válido 30 días.</li>
+<li>El representante se registra, canjea el código, <b>registra los datos de su hijo</b> y acepta el consentimiento de tratamiento de datos.</li>
+<li>El estudiante queda <b>pendiente de aprobación</b>. El docente lo revisa, completa lo que falte y lo aprueba. Ahí nace la matrícula con 60 puntos.</li>
+<li>Durante el día, el docente asigna acciones y toma asistencia.</li>
+<li>Al terminar la clase, el docente llena el reporte general del curso —campos etiquetados, ninguno obligatorio— y lo publica.</li>
+<li>Se genera el reporte de cada estudiante y se notifica a su representante.</li>
+<li>El representante abre la app y ve el reporte del día. Si hay una acción negativa que le parece injusta, abre una inconformidad. Si quiere hablar, agenda una cita en un bloque de 15 minutos que el docente publicó.</li>
+</ol>
+
+<h2>1.6 Decisiones ya tomadas (no se rediscuten)</h2>
+<p>Cada una está registrada como ADR en <code class="inline">docs/01-arquitectura/adr/</code>.</p>
+<table>
+<tr><th>#</th><th>Decisión</th><th>Motivo corto</th></tr>
+<tr><td>ADR-001</td><td>PostgreSQL + Drizzle ORM</td><td>Modelo relacional normalizado; tipos derivados del esquema</td></tr>
+<tr><td>ADR-002</td><td>Next.js (servidor) + Expo (apps)</td><td>Tauri quedó descartado: no tiene SDK de RevenueCat</td></tr>
+<tr><td>ADR-003</td><td>BetterAuth con plugin de organización</td><td>La organización es la institución declarada por el docente</td></tr>
+<tr><td>ADR-004</td><td>Permisos en dos capas: código + RLS</td><td>Un bug de la app no debe poder filtrar datos de un menor</td></tr>
+<tr><td>ADR-005</td><td>El puntaje es derivado, nunca un contador</td><td>Se recalcula desde las acciones vigentes</td></tr>
+<tr><td>ADR-006</td><td>RevenueCat es la fuente de verdad de pagos</td><td>Requisito obligatorio del Shipaton</td></tr>
+<tr><td>ADR-007</td><td>Entrega sin publicación en tienda, con repositorio abierto</td><td>Next Gen evalúa por video y repositorio; reemplaza la consecuencia de ADR-002 sobre Play Console</td></tr>
+</table>
+<div class="callout"><b>Aviso importante sobre <code class="inline">shadcn/ui</code>:</b> solo funciona en web, no en React Native. Para las apps se usa NativeWind con componentes propios. shadcn queda reservado para el panel web de la dirección en la v2.</div>
+
+<h2>1.7 RevenueCat: el requisito que no se negocia</h2>
+<p>El Shipaton exige el SDK de RevenueCat integrado y funcionando. <b>Si esto falla, no importa qué tan buena esté la app.</b> Por eso:</p>
+<ul>
+<li>Es responsabilidad de <b>Persona C</b> y arranca en la <b>semana 1</b>, no al final.</li>
+<li>Debe estar probado en un <b>dispositivo Android real</b>, no solo en emulador.</li>
+<li>RevenueCat en Expo exige un <i>development build</i>; <b>no funciona en Expo Go</b>.</li>
+<li>La categoría <b>Next Gen del Shipaton no exige cuenta de Google Play Console ni publicación en tienda</b>: se evalúa por video de demostración (menos de 2 minutos) y repositorio de código abierto público. Sigue pendiente confirmar en la documentación oficial de RevenueCat qué modo de prueba de compras funciona sin una app publicada en tienda.</li>
+</ul>
+
+<h3>Planes</h3>
+<table>
+<tr><th>Código</th><th>Audiencia</th><th>Qué da</th></tr>
+<tr><td>REP_FREE</td><td>Representante</td><td>2 reportes anteriores, con publicidad</td></tr>
+<tr><td>REP_PREMIUM_MENSUAL</td><td>Representante</td><td>Sin publicidad, 7 reportes, PDF libre</td></tr>
+<tr><td>REP_PREMIUM_BIMESTRAL</td><td>Representante</td><td>Igual, ciclo de 2 meses ("por parcial")</td></tr>
+<tr><td>DOC_FREE</td><td>Docente</td><td>1 curso activo, 40 estudiantes</td></tr>
+<tr><td>DOC_PRO</td><td>Docente</td><td>5 cursos activos, 60 estudiantes, plantillas propias</td></tr>
+</table>
+
+<h2>1.8 Licencia y repositorio público</h2>
+<p>Next Gen exige un repositorio <b>público y de código abierto</b>, con un archivo <code class="inline">LICENSE</code> en la raíz, antes del envío. El equipo eligió <b>AGPL-3.0</b> con posibilidad de licenciar en paralelo en términos comerciales a colegios o clientes que lo requieran, ya que Neofix es titular único del copyright. El archivo <b>ya está en la raíz</b>; el repositorio arranca privado y se hace público solo antes de enviar.</p>
+<div class="callout"><b>Consecuencia práctica para los tres:</b> todo lo que commiteen va a ser público. Nunca suban claves, <code class="inline">.env</code>, keystore ni datos reales de estudiantes — ni siquiera "temporalmente", porque el historial de Git conserva lo que se borró después.</div>
+</div>
+
+<!-- PARTE 2 -->
+<div class="part">
+<h1>Parte 2 — Cómo trabajamos</h1>
+
+<h2>2.1 Los tres roles</h2>
+<table>
+<tr><th></th><th>Persona A — Núcleo</th><th>Persona B — Conducta</th><th>Persona C — Interacción e infra</th></tr>
+<tr><td>En una frase</td><td>Quién es quién y a qué tiene derecho</td><td>El corazón funcional del producto</td><td>Lo que rodea y sostiene la app</td></tr>
+<tr><td>Dueño de</td><td>Identidad, curso, estudiantes, vinculación, permisos</td><td>Acciones, puntaje, asistencia, reportes</td><td>Citas, alertas, RevenueCat, notificaciones, CI</td></tr>
+<tr><td>Archivo de esquema</td><td><code class="inline">db/schema/nucleo.ts</code></td><td><code class="inline">db/schema/conducta.ts</code></td><td><code class="inline">db/schema/interaccion.ts</code></td></tr>
+<tr><td>Pantallas</td><td>D1–D8, P1–P3</td><td>D9–D13, P4–P6</td><td>D14–D19, P7–P12</td></tr>
+<tr><td>Riesgo principal</td><td>Bloquea a los otros dos en semana 1</td><td>Es quien más lógica escribe</td><td>Depende de trámites externos</td></tr>
+</table>
+
+<h2>2.2 La regla de oro</h2>
+<p><b>Nadie edita el módulo de otro.</b></p>
+<p>Si B necesita un campo nuevo en <code class="inline">matricula</code>, no lo agrega: se lo pide a A en el grupo y A lo agrega en una migración. Esto evita el 90&nbsp;% de los conflictos de fusión, que es lo que hunde a los equipos de tres.</p>
+<p><b>Superficie compartida</b> (cambiarla exige acuerdo de los tres):</p>
+<ul><li><code class="inline">db/schema/enums.ts</code></li><li><code class="inline">api/openapi.yaml</code></li></ul>
+
+<h2>2.3 Cómo trabajamos en paralelo sin esperarnos</h2>
+<p>Tres piezas lo hacen posible:</p>
+<ol>
+<li><code class="inline">api/openapi.yaml</code> permite levantar un servidor falso:
+<pre class="code">npx @stoplight/prism-cli mock api/openapi.yaml</pre>
+Quien construye una pantalla recibe datos válidos aunque el backend no exista.</li>
+<li><code class="inline">db/schema/</code> da los tipos de TypeScript compartidos: los tres nombran los mismos campos.</li>
+<li><code class="inline">db/schema/enums.ts</code> garantiza que los valores de estado coincidan entre servidor y app.</li>
+</ol>
+<div class="callout"><b>Honestidad sobre la semana 1:</b> no es del todo paralela. Persona A debe dejar corriendo la base de datos y la autenticación antes de que los demás trabajen contra datos reales. Mientras tanto, B escribe el motor de puntaje con pruebas unitarias (no necesitan servidor) y C monta el repositorio, el CI y RevenueCat. Del día 4 en adelante sí es paralelo completo.</div>
+
+<h2>2.4 Ritmo semanal</h2>
+<ul>
+<li><b>Lunes, 20 minutos:</b> qué hizo cada uno, qué sigue, qué le bloquea.</li>
+<li><b>Viernes, 10 minutos:</b> riesgos y avance contra el plan.</li>
+<li><b>Regla del medio día:</b> si algo te bloquea más de medio día, lo dices ese mismo día. No el lunes. Lo que hunde un proyecto de seis semanas no es el atraso, es enterarse tarde.</li>
+</ul>
+
+<h2>2.5 Ramas y revisiones</h2>
+<pre class="code">main            &lt;- protegida, nadie empuja directo
+ └── develop  &lt;- integración
+      ├── feat/asignar-accion-tope-diario
+      ├── fix/reporte-diario-204
+      └── chore/configurar-ci</pre>
+<ul>
+<li>Commits en formato convencional: <code class="inline">feat(acciones): valida tope diario de -5</code></li>
+<li><b>Nadie fusiona su propio PR.</b> Se necesita una aprobación.</li>
+<li>Un PR que toque datos de estudiantes exige las tres verificaciones de <code class="inline">docs/01-arquitectura/matriz-permisos.md</code>.</li>
+</ul>
+
+<h2>2.6 Definición de "terminado"</h2>
+<p>Una tarea está terminada cuando cumple las cinco:</p>
+<ol>
+<li>El endpoint responde según <code class="inline">openapi.yaml</code>, incluidos sus códigos de error.</li>
+<li>La pantalla maneja los tres estados: cargando, vacío y error.</li>
+<li>Si toca datos de estudiantes, tiene una prueba de que un usuario sin vínculo recibe <code class="inline">403</code>.</li>
+<li>Fue revisada y aprobada por otra persona del equipo.</li>
+<li>Funciona en un dispositivo Android real, no solo en el emulador.</li>
+</ol>
+
+<h2>2.7 Nunca se sube al repositorio</h2>
+<p>Claves de RevenueCat · credenciales de base de datos · keystore de firma · archivos <code class="inline">.env</code> · <b>datos reales de estudiantes o representantes</b>.</p>
+<p>El Excel que les pase un profesor para probar la carga <b>no entra al repositorio</b>. Se usan datos ficticios generados.</p>
+<div class="callout"><b>Recordatorio de Next Gen:</b> el repositorio se hará <b>público</b> antes de enviar. Nunca subir claves, <code class="inline">.env</code>, keystore ni datos reales de estudiantes.</div>
+</div>
+
+<!-- PARTE 3 -->
+<div class="part">
+<h1>Parte 3 — Calendario y criterios de éxito</h1>
+
+<h2>3.1 Fechas</h2>
+<div class="callout"><b>Calendario reiniciado el 8 de agosto.</b> El plan original (semana 1 desde el 4 de agosto) había quedado atrás — sus tareas no se habían ejecutado. Se reinicia el reloj desde una fecha real: mañana. Ver decisiones S1-S6 en <code class="inline">Contexto/DECISIONS.md</code>.</div>
+<table>
+<tr><th>Fase</th><th>Fechas</th><th>Foco</th></tr>
+<tr><td>Día 0</td><td>hoy, sábado 8 de agosto</td><td>Leer manuales, instalar herramientas</td></tr>
+<tr><td>Semana 1</td><td>9 – 15 de agosto</td><td>Cimientos</td></tr>
+<tr><td>Semana 2</td><td>16 – 22 de agosto</td><td>Flujo del docente</td></tr>
+<tr><td>Semana 3</td><td>23 – 29 de agosto</td><td>Flujo del representante</td></tr>
+<tr><td>Semana 4</td><td>30 de agosto – 5 de septiembre</td><td>Punto de control</td></tr>
+<tr><td>Semana 5</td><td>6 – 12 de septiembre</td><td>Funciones de apoyo</td></tr>
+<tr><td>Semana 6</td><td>13 – 19 de septiembre</td><td>Cierre y demostración</td></tr>
+<tr><td>Deadline interno</td><td>20 de septiembre</td><td>No es la fecha real de envío — quedan 8 días de margen</td></tr>
+<tr><td><b>Envío del equipo</b></td><td><b>28 de septiembre</b></td><td>Fecha real de entrega — externa, no se movió con el reinicio del calendario</td></tr>
+<tr><td>Cierre oficial Shipaton</td><td>30 de septiembre, 23:45&nbsp;PDT</td><td>1 de octubre, 01:45 hora Ecuador — externa, no se movió</td></tr>
+</table>
+<div class="callout"><b>El colchón se comprimió:</b> era de 13 días (15→28 sep.), ahora son <b>8 días</b> (20→28 sep.). Las tres semanas de pulido y prueba con un profesor real siguen existiendo pero con menos margen de error. Ver <code class="inline">Contexto/NEXT_STEPS.md</code>, Paso 5. Siguen <b>sin ser</b> para ampliar alcance.</div>
+
+<h2>3.2 Semana 1 — Cimientos (9 al 15 de agosto)</h2>
+<p><b>Objetivo de la fase:</b> que exista una base de datos con datos de prueba, que alguien pueda iniciar sesión y que RevenueCat responda en sandbox.</p>
+<table>
+<tr><th>Rol</th><th>Tareas</th><th>Éxito de la fase</th></tr>
+<tr><td>A</td><td>Postgres corriendo (E1/E2 ya aplicadas), BetterAuth funcionando dentro de <code class="inline">servidor/</code>, capa <code class="inline">db/acceso/</code>, políticas RLS, datos semilla</td><td>Un usuario se registra, inicia sesión y la consulta sin <code class="inline">app.user_id</code> devuelve cero filas</td></tr>
+<tr><td>B</td><td>Catálogo de acciones semilla, función <code class="inline">recalcularPuntaje</code> en <code class="inline">servidor/lib/puntaje.ts</code>, pruebas de topes diarios</td><td><code class="inline">npm test</code> pasa: registrar −3 y luego −3 el mismo día es rechazado por el tope de −5</td></tr>
+<tr><td>C</td><td>Repositorio con ramas protegidas, <b>scaffolding de <code class="inline">servidor/</code> y <code class="inline">movil/</code></b>, CI que corre typecheck y pruebas, development build de Expo, RevenueCat en sandbox</td><td>La app abre en un teléfono real y <code class="inline">Purchases.configure()</code> no lanza error</td></tr>
+</table>
+
+<h2>3.3 Semana 2 — Flujo del docente (16 al 22 de agosto)</h2>
+<p><b>Objetivo:</b> un docente crea su curso y registra su primera acción.</p>
+<table>
+<tr><th>Rol</th><th>Tareas</th><th>Éxito de la fase</th></tr>
+<tr><td>A</td><td>D1–D4 (registro, crear curso, parciales), D6 panel, D10 invitación</td><td>Un docente nuevo llega desde cero hasta tener un código de invitación</td></tr>
+<tr><td>B</td><td>D11 asignar acción con buscador, validación de topes y período</td><td>Asignar −1 a un estudiante actualiza su puntaje de 60 a 59 en pantalla</td></tr>
+<tr><td>C</td><td>P1 registro del representante, P11 paywall, notificaciones push</td><td>Llega una notificación push a un teléfono real</td></tr>
+</table>
+
+<h2>3.4 Semana 3 — Flujo del representante (23 al 29 de agosto)</h2>
+<p><b>Objetivo:</b> el circuito completo funciona de punta a punta.</p>
+<table>
+<tr><th>Rol</th><th>Tareas</th><th>Éxito de la fase</th></tr>
+<tr><td>A</td><td>P2 canjear código, P3 registrar hijo con consentimiento, D7 lista, D8 aprobación</td><td>Un representante registra a su hijo y el docente lo aprueba</td></tr>
+<tr><td>B</td><td>D13 reporte general, P4 reporte diario del representante</td><td>El docente publica el reporte y el representante lo ve en su teléfono</td></tr>
+<tr><td>C</td><td>D19 paywall del docente, límites de plan verificados en servidor</td><td>Un docente con <code class="inline">DOC_FREE</code> recibe <code class="inline">402</code> al crear su segundo curso</td></tr>
+</table>
+<div class="callout"><b>Hito crítico del sábado 29 de agosto:</b> el circuito completo debe funcionar. Docente crea curso → invita → representante registra hijo → docente aprueba → docente asigna acción → docente publica reporte → representante lo ve. Si esto no está ese día, se activa el recorte de la semana 4.</div>
+
+<h2>3.5 Semana 4 — Punto de control (30 de agosto al 5 de septiembre)</h2>
+<p><b>Objetivo:</b> cerrar todo lo obligatorio y decidir el recorte.</p>
+<table>
+<tr><th>Rol</th><th>Tareas</th><th>Éxito de la fase</th></tr>
+<tr><td>A</td><td>Selector de hijos, importación CSV, pruebas S-1 a S-7</td><td>Las siete pruebas de seguridad pasan</td></tr>
+<tr><td>B</td><td>P5 reportes anteriores, P6 acumulado con gráfico</td><td>El gráfico de evolución se dibuja con datos reales</td></tr>
+<tr><td>C</td><td>D17 alertas con reautenticación, P10 confirmación</td><td>Una alerta llega a los representantes del curso</td></tr>
+</table>
+<div class="callout"><b>Decisión del miércoles 2 de septiembre.</b> Si el bloque obligatorio no está cerrado, se sacrifica <b>todo</b> lo opcional sin discusión y los tres pasan a pulir. Es preferible entregar cinco funciones sólidas que ocho a medias.</div>
+
+<h2>3.6 Semana 5 — Funciones de apoyo (6 al 12 de septiembre)</h2>
+<table>
+<tr><th>Rol</th><th>Tareas</th><th>Éxito de la fase</th></tr>
+<tr><td>A</td><td>Guías de uso, ajustes del flujo de vinculación</td><td>Alguien externo usa la app sin que le expliquen</td></tr>
+<tr><td>B</td><td>D12 asistencia, D14 comunicados y eventos</td><td>Un evento aparece y desaparece en las fechas correctas</td></tr>
+<tr><td>C</td><td>D15 inconformidades, D16 citas, P7, P8</td><td>Un representante reclama y el docente resuelve, devolviendo puntos</td></tr>
+</table>
+
+<h2>3.7 Semana 6 — Cierre (13 al 19 de septiembre)</h2>
+<p>Los tres trabajan en lo mismo:</p>
+<ul>
+<li>Datos de demostración creíbles: un curso con 25 estudiantes ficticios, dos semanas de historial, puntajes variados que muestren las franjas.</li>
+<li>Corrección conjunta de errores.</li>
+<li>Video de demostración: el circuito completo en <b>menos de 2 minutos</b> (regla de Next Gen), mostrando RevenueCat en funcionamiento, con descripción y subtítulos en inglés.</li>
+<li>README verificado en una máquina limpia por alguien que no lo escribió.</li>
+<li>Repositorio hecho público con <code class="inline">LICENSE</code> visible.</li>
+<li>Envío el <b>28 de septiembre</b>. No dejar el envío para el último día.</li>
+</ul>
+</div>
+
+<!-- PARTE 4 -->
+<div class="part">
+<h1>Parte 4 — Mapa de documentos</h1>
+
+<h2>4.1 Qué consultar según tu duda</h2>
+<table>
+<tr><th>Tu duda</th><th>Consulta</th></tr>
+<tr><td>¿Qué hace exactamente esta función?</td><td><code class="inline">docs/00-producto/</code></td></tr>
+<tr><td>¿Por qué elegimos esta tecnología?</td><td><code class="inline">docs/01-arquitectura/adr/</code></td></tr>
+<tr><td>¿Quién puede ver este dato?</td><td><code class="inline">docs/01-arquitectura/matriz-permisos.md</code></td></tr>
+<tr><td>¿Qué devuelve este endpoint?</td><td><code class="inline">api/openapi.yaml</code></td></tr>
+<tr><td>¿Cómo se llama este campo?</td><td><code class="inline">db/schema/</code></td></tr>
+<tr><td>¿Qué valores admite este estado?</td><td><code class="inline">db/schema/enums.ts</code></td></tr>
+<tr><td>¿Qué me toca esta semana?</td><td><code class="inline">docs/02-equipo/backlog-y-reparto.md</code> y tu manual de rol</td></tr>
+<tr><td>¿Cómo hago un PR?</td><td><code class="inline">docs/02-equipo/manual-equipo.md</code></td></tr>
+<tr><td>¿Qué decidimos sobre X regla?</td><td><code class="inline">Contexto/DECISIONS.md</code></td></tr>
+<tr><td>¿Qué está pendiente de definir?</td><td><code class="inline">Contexto/CONTEXT.md</code>, sección 7</td></tr>
+<tr><td>¿Qué corrigió este manual respecto a agosto?</td><td><code class="inline">docs/99-archivo/ERRATA-2026-08.md</code></td></tr>
+</table>
+
+<h2>4.2 Estructura del repositorio</h2>
+<pre class="code">cresco/
+├── Contexto/          &lt;- CLAUDE.md, CONTEXT.md, DECISIONS.md, NEXT_STEPS.md
+├── README.md · LICENSE
+├── .env.example
+├── package.json · package-lock.json
+├── api/openapi.yaml   &lt;- contrato de API
+├── db/
+│   ├── schema/        &lt;- esquema Drizzle (4 archivos: enums + 1 por persona)
+│   ├── migrations/    &lt;- generadas, NUNCA se editan a mano
+│   ├── seeds/         &lt;- datos de catálogo y ficticios
+│   └── acceso/        &lt;- capa de acceso (Persona A)
+├── servidor/          &lt;- Next.js. La scaffoldea C el día 1 (npx create-next-app)
+│   └── lib/puntaje.ts &lt;- de Persona B
+├── movil/             &lt;- Expo, UNA app con enrutado por rol. La scaffoldea C
+│   │                     el mismo día (npx create-expo-app)
+│   ├── theme/Theme.ts &lt;- de Persona A
+│   └── components/base/ &lt;- de Persona A
+└── docs/
+    ├── README.md      &lt;- índice; empieza aquí
+    ├── 00-producto/
+    ├── 01-arquitectura/
+    ├── 02-equipo/
+    ├── 03-piloto/
+    ├── 04-guias/
+    └── 05-validacion/</pre>
+<div class="callout"><b>Por qué no hay un envoltorio <code class="inline">apps/</code> ni un <code class="inline">packages/</code> compartido:</b> <code class="inline">servidor/</code> y <code class="inline">movil/</code> tienen cada uno su propio <code class="inline">package.json</code>, sin <code class="inline">npm workspaces</code>. Revisando el flujo real de datos, no hay código que de verdad se comparta entre las dos apps más allá de <code class="inline">db/schema/</code> (que ya está en la raíz y solo la importa <code class="inline">servidor/</code>): el servidor calcula todo y el móvil solo renderiza lo que la API devuelve. Esto no reabre ADR-002 ("sin monorepo completo") — sigue sin hacer falta ninguna herramienta de workspaces. <b>No crees <code class="inline">servidor/</code> ni <code class="inline">movil/</code> a mano ni por adelantado:</b> las herramientas de scaffolding (<code class="inline">create-next-app</code>, <code class="inline">create-expo-app</code>) suelen rechazar un directorio destino que ya tiene contenido.</div>
+</div>
+
+<!-- PARTE 5 -->
+<div class="part">
+<h1>Parte 5 — Riesgos</h1>
+<table>
+<tr><th>Riesgo</th><th>Impacto</th><th>Mitigación</th><th>Dueño</th></tr>
+<tr><td>RevenueCat no funciona en dispositivo real</td><td><b>Fatal:</b> incumple el Shipaton</td><td>Probarlo en semana 1, no al final</td><td>C</td></tr>
+<tr><td>A se atrasa y bloquea a B y C</td><td>Alto</td><td>Servidor simulado desde el día 1</td><td>Todos</td></tr>
+<tr><td>Alcance crece sin control</td><td>Alto</td><td>Punto de control del 2 de septiembre</td><td>Todos</td></tr>
+<tr><td>Alguien se cae por exámenes</td><td>Medio</td><td>Avisar temprano; reasignar en el punto de control</td><td>Todos</td></tr>
+<tr><td>Conflictos de fusión constantes</td><td>Medio</td><td>Regla de oro: nadie toca módulo ajeno</td><td>Todos</td></tr>
+<tr><td>Fuga de datos de un menor</td><td><b>Fatal</b> para el producto</td><td>Dos capas de permisos + pruebas S-1 a S-7</td><td>A</td></tr>
+<tr><td>Repositorio público sin <code class="inline">LICENSE</code> a tiempo</td><td>Alto — bloquea el envío</td><td>Elegir licencia esta semana; agregar <code class="inline">LICENSE</code> antes de semana 6</td><td>C</td></tr>
+</table>
+<p class="small">El trámite de Google Play Console <b>ya no es un riesgo del proyecto</b>: las reglas de Next Gen no lo exigen (verificado el 7-8 de agosto). Ver <code class="inline">Contexto/reglas-shipaton-next-gen.md</code>.</p>
+</div>
+
+<!-- PARTE 6 -->
+<div class="part">
+<h1>Parte 6 — Bloque de contexto para IA</h1>
+<div class="callout"><b>Cómo usarlo:</b> copien todo lo que sigue y péguenlo antes de su pregunta cuando le pregunten a una inteligencia artificial. Así la respuesta llega ajustada a este proyecto en vez de ser genérica.</div>
+
+<pre class="code">CONTEXTO DEL PROYECTO — CRESCO (equipo Neofix)
+
+Somos 3 estudiantes de ingeniería en computación construyendo una app
+Android para el hackathon RevenueCat Shipaton 2026 (categoría Next Gen).
+Semana 1 desde el 9 de agosto de 2026. Deadline interno 20 de septiembre;
+envío real 28 de septiembre; cierre oficial del Shipaton 30 de septiembre
+23:45 PDT. Dos de los tres nunca hemos construido una app antes.
+
+QUÉ ES: app de comunicación entre docentes y representantes legales de
+escuelas del Ecuador, para seguimiento de conducta y responsabilidad.
+El estudiante NUNCA es usuario. Dos interfaces: docente (herramienta de
+trabajo) y representante (informativa, simple, para personas con poca
+alfabetización estadística).
+
+NEXT GEN NO EXIGE cuenta de desarrollador de Google Play ni publicación
+en tienda: se evalúa por video de demostración (&lt;2 min) y repositorio
+público de código abierto con LICENSE en la raíz.
+
+STACK (decidido, no se rediscute):
+- PostgreSQL + Drizzle ORM
+- Next.js como SERVIDOR (no frontend web): BetterAuth, rutas API,
+  webhook de RevenueCat, tarea nocturna de reportes
+- Expo / React Native: UNA sola app, con enrutado por rol (docente/representante)
+- BetterAuth con plugin de organización (organization = institución)
+- RevenueCat SDK para suscripciones (REQUISITO OBLIGATORIO del hackathon)
+- NativeWind para estilos. shadcn/ui NO se usa en las apps: es solo web.
+
+REGLAS DE NEGOCIO CLAVE:
+- Puntaje: base 60 por parcial, piso 0, techo 100. Se reinicia cada
+  parcial. Es DERIVADO: se recalcula sumando acciones VIGENTES, nunca es
+  un contador que se incrementa.
+- Positivas: +1 por defecto, ajustable a +2.
+- Negativas de responsabilidad: fijo -1. De disciplina: -1 a -3.
+- Topes diarios: máximo +4 y máximo -5 por estudiante por día.
+- Acciones anuladas o modificadas valen 0 pero se muestran distinto.
+- Solo las acciones negativas se pueden anular y reclamar.
+- 5 tipos de acción: Positiva, Negativa, Nota (por estudiante) + Anuncio,
+  Evento (por curso, en tabla separada comunicado_curso).
+- Un solo representante legal por estudiante en la v1.
+- El representante registra los datos de su hijo; el docente los aprueba.
+- La invitación es al CURSO, no a un estudiante, y dura 30 días.
+- No hay administrador de institución en la v1; el docente escribe el
+  nombre de su escuela como texto libre.
+- No hay rol de docente colaborador en v1 (diferido a v2), aunque el
+  campo exista en el esquema.
+- Reportes: el docente llena campos etiquetados, ninguno obligatorio.
+  Solo el más reciente es visible en la pantalla principal del
+  representante. Plan gratuito: 2 reportes anteriores. Premium: 7.
+- Alerta de emergencia: exige que el docente reingrese su contraseña.
+- Citas en bloques de 15 minutos, requieren confirmación del docente.
+
+SEGURIDAD (crítico): un representante solo accede a estudiantes con
+vínculo ACTIVO. Se aplica en DOS capas: capa obligatoria de acceso a
+datos en el servidor y políticas RLS de PostgreSQL. Cada petición abre
+transacción con SET LOCAL app.user_id.
+
+ESTRUCTURA DEL EQUIPO (Neofix):
+- Persona A: identidad, estructura académica, vinculación, permisos
+- Persona B: acciones, puntaje, asistencia, reportes
+- Persona C: citas, alertas, RevenueCat, notificaciones, infraestructura
+
+CONVENCIONES: nombres de tablas y columnas en español, snake_case.
+Estados en MAYUSCULA_SNAKE definidos en db/schema/enums.ts. Timestamps
+timestamptz en UTC, zona America/Guayaquil — pero las columnas `date`
+(p. ej. fecha_ingreso) las calcula el servidor explícitamente, nunca
+`defaultNow()`, porque `now()::date` puede caer en el día equivocado
+según el timezone de la sesión de la base de datos. Nada se borra
+físicamente; se anula o se cambia de estado.
+
+ESTRUCTURA DE CÓDIGO: servidor/ (Next.js) y movil/ (Expo) son carpetas
+hermanas en la raíz del repo, cada una con su propio package.json, SIN npm
+workspaces — no es un monorepo. servidor/lib/puntaje.ts es de B; movil/theme/
+y movil/components/base/ son de A. Persona C las scaffoldea el día 1.
+
+RESTRICCIONES: 6 semanas, 3 personas, dos sin experiencia previa.
+Preferimos soluciones simples y probadas sobre soluciones elegantes.</pre>
+
+<p class="footer-note">Versión 1.2 · Última revisión: 8 de agosto de 2026 · Dueño: el equipo · Corrige la v1.0 del 3 de agosto — detalle en <code class="inline">docs/99-archivo/ERRATA-2026-08.md</code></p>
+</div>
+
+</body>
+</html>

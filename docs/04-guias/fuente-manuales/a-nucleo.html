@@ -1,0 +1,422 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Manual de rol — Persona A · Cresco</title>
+<style>
+:root{--teal:#106b58;--teal-dark:#0b4f41;--cream:#fdf1e0;--gray-bg:#f4f5f3;--border:#d8ddd9;--text:#1a1a1a;}
+*{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+@page{size:letter;margin:0.85in 0.9in;@bottom-center{content:counter(page);font-family:Arial,Helvetica,sans-serif;font-size:9pt;color:#666;}}
+body{font-family:Georgia,'Times New Roman',serif;color:var(--text);font-size:11pt;line-height:1.55;margin:0;}
+h1,h2,h3,h4{font-family:Arial,Helvetica,sans-serif;font-weight:700;color:var(--teal);margin-top:0;}
+h1{font-size:22pt;border-bottom:2px solid var(--teal);padding-bottom:8px;margin-bottom:14px;}
+h2{font-size:15pt;margin-top:26px;margin-bottom:10px;}
+h3{font-size:12.5pt;color:#333;margin-top:18px;margin-bottom:6px;}
+p{margin:0 0 10px 0;}
+ul,ol{margin:0 0 12px 0;padding-left:22px;}
+li{margin-bottom:4px;}
+hr{border:none;border-top:1.5px solid var(--teal);margin:16px 0;}
+.part{page-break-before:always;}
+.brand{font-family:Arial,Helvetica,sans-serif;font-weight:700;font-size:13pt;color:var(--teal);letter-spacing:1px;}
+table{border-collapse:collapse;width:100%;margin:12px 0 16px 0;font-family:Arial,Helvetica,sans-serif;font-size:9.5pt;}
+th{background:var(--teal);color:#fff;text-align:left;padding:6px 8px;font-weight:600;}
+td{padding:6px 8px;border-bottom:1px solid var(--border);vertical-align:top;}
+tr:nth-child(even) td{background:#f7f8f7;}
+code.inline{font-family:'Consolas','Courier New',monospace;background:var(--gray-bg);padding:1px 5px;border-radius:3px;color:#0b4f41;font-size:9.5pt;}
+pre.code{font-family:'Consolas','Courier New',monospace;font-size:9.5pt;background:var(--gray-bg);border-left:4px solid var(--teal);padding:10px 14px;margin:12px 0;white-space:pre-wrap;color:#1f4a3f;overflow-wrap:break-word;}
+.callout{background:var(--cream);border-left:4px solid var(--teal);padding:10px 14px;margin:14px 0;font-size:10pt;}
+.callout.warn{border-left-color:#a83c1e;background:#fdece4;}
+.callout b{color:var(--teal-dark);}
+.meta{font-family:Arial,Helvetica,sans-serif;font-size:9.5pt;color:#444;}
+.small{font-size:9pt;color:#555;}
+.footer-note{font-family:Arial,Helvetica,sans-serif;font-size:9pt;color:#666;margin-top:30px;border-top:1px solid var(--border);padding-top:8px;}
+</style>
+</head>
+<body>
+
+<div>
+<p class="brand">CRESCO</p>
+<hr>
+<h1 style="margin-top:60px;border:none;font-size:26pt;">Manual de rol — Persona A<br>Núcleo</h1>
+<p class="meta">Cresco · Versión 1.2 · 8 de agosto de 2026 · Envío del equipo: 28 de septiembre</p>
+<hr>
+<p class="small">Corrige la v1.0 del 3 de agosto de 2026. Ver <code class="inline">docs/99-archivo/ERRATA-2026-08.md</code> para el detalle de cada cambio. Esta versión 1.2 reinicia el calendario (tu semana 1 empieza el 9 de agosto, no el 4) y fija dónde vive tu <code class="inline">theme/Theme.ts</code>: dentro de <code class="inline">movil/</code>, que scaffoldea C el domingo.</p>
+<h2 style="margin-top:30px;">Tu rol en una frase</h2>
+<p><b>Tú decides quién es quién y a qué tiene derecho.</b></p>
+<p>Construyes la identidad, la estructura académica y —lo más importante— el sistema que garantiza que un representante solo vea a su propio hijo. Si eso falla, el producto muere. Ninguna otra parte del proyecto tiene ese peso.</p>
+<p>Eres además quien desbloquea a los otros dos en la semana 1. Ellos pueden avanzar con el servidor simulado, pero necesitan tu base de datos y tu autenticación para trabajar con datos reales. Por eso tu semana 1 es la más intensa de las tres.</p>
+</div>
+
+<div class="part">
+<h1>Parte 1 — Contexto del proyecto</h1>
+<h2>1.1 Qué construimos</h2>
+<p>App Android de comunicación entre docentes y representantes legales de escuelas del Ecuador, para seguimiento de conducta. El estudiante nunca usa la app.</p>
+<p>Dos interfaces: la del docente (herramienta de trabajo) y la del representante (informativa, simple).</p>
+<h2>1.2 El puntaje, en resumen</h2>
+<p>Cada estudiante parte de 60 puntos cada parcial. Piso 0, techo 100. Las acciones positivas suman (+1 o +2), las negativas restan (−1 a −3), con topes de +4 y −5 por día. Ese motor lo construye Persona B, pero tú necesitas conocerlo porque la matrícula que tú creas es la que lo sostiene.</p>
+<h2>1.3 Decisiones ya tomadas</h2>
+<table>
+<tr><th>#</th><th>Decisión</th></tr>
+<tr><td>ADR-001</td><td>PostgreSQL + Drizzle ORM</td></tr>
+<tr><td>ADR-002</td><td>Next.js como servidor, Expo para las apps</td></tr>
+<tr><td>ADR-003</td><td>BetterAuth con plugin de organización</td></tr>
+<tr><td>ADR-004</td><td>Permisos en dos capas: código + RLS</td></tr>
+<tr><td>ADR-005</td><td>El puntaje es derivado, nunca un contador</td></tr>
+<tr><td>ADR-006</td><td>RevenueCat es la fuente de verdad de pagos</td></tr>
+<tr><td>ADR-007</td><td>Entrega sin tienda, repositorio abierto bajo AGPL-3.0</td></tr>
+</table>
+</div>
+
+<div class="part">
+<h1>Parte 2 — Tu territorio</h1>
+<h2>2.1 Tus tablas</h2>
+<p>Archivo: <code class="inline">db/schema/nucleo.ts</code></p>
+<p><code class="inline">institucion</code> · <code class="inline">perfil_usuario</code> · <code class="inline">docente</code> · <code class="inline">representante</code> · <code class="inline">anio_lectivo</code> · <code class="inline">periodo_academico</code> · <code class="inline">dia_no_lectivo</code> · <code class="inline">curso</code> · <code class="inline">asignacion_docente</code> · <code class="inline">estudiante</code> · <code class="inline">matricula</code> · <code class="inline">invitacion_curso</code> · <code class="inline">vinculo_representacion</code> · <code class="inline">consentimiento</code></p>
+
+<h2>2.2 Tus pantallas</h2>
+<h3>App del docente</h3>
+<table>
+<tr><th>#</th><th>Pantalla</th><th>Semana</th></tr>
+<tr><td>D1</td><td>Bienvenida y registro</td><td>2</td></tr>
+<tr><td>D2</td><td>Inicio de sesión</td><td>2</td></tr>
+<tr><td>D3</td><td>Crear curso (escuela, año lectivo, nivel)</td><td>2</td></tr>
+<tr><td>D4</td><td>Definir parciales</td><td>2</td></tr>
+<tr><td>D6</td><td>Panel del curso</td><td>2</td></tr>
+<tr><td>D10</td><td>Invitar representantes</td><td>2</td></tr>
+<tr><td>D7</td><td>Lista de estudiantes</td><td>3</td></tr>
+<tr><td>D8</td><td>Aprobar estudiantes pendientes</td><td>3</td></tr>
+<tr><td>D9</td><td>Importar CSV</td><td>4 (opcional)</td></tr>
+</table>
+<h3>App del representante</h3>
+<table>
+<tr><th>#</th><th>Pantalla</th><th>Semana</th></tr>
+<tr><td>P2</td><td>Reclamar código del curso</td><td>3</td></tr>
+<tr><td>P3</td><td>Datos del hijo y consentimiento</td><td>3</td></tr>
+<tr><td>—</td><td>Selector de hijos (barra superior)</td><td>4</td></tr>
+</table>
+
+<h2>2.3 Tus endpoints</h2>
+<p>Todos están definidos en <code class="inline">api/openapi.yaml</code>. Si tu implementación difiere del contrato, el que está mal eres tú, no el contrato.</p>
+<pre class="code">GET  /docente/cursos            <- D5 selector, D6 panel
+POST /docente/cursos
+POST /docente/cursos/{id}/periodos
+POST /docente/cursos/{id}/invitacion
+GET  /docente/cursos/{id}/estudiantes
+POST /docente/estudiantes/{id}/aprobar
+POST /docente/cursos/{id}/estudiantes/importar
+POST /representante/invitaciones/reclamar
+GET  /representante/hijos</pre>
+
+<h2>2.4 Lo que NO tocas</h2>
+<ul>
+<li><code class="inline">db/schema/conducta.ts</code> — es de B</li>
+<li><code class="inline">db/schema/interaccion.ts</code> — es de C</li>
+<li>Cualquier pantalla de reportes, acciones, citas o pagos</li>
+</ul>
+<p>Si necesitas un campo en una tabla ajena, <b>lo pides en el grupo</b>. No lo agregas.</p>
+
+<h2>2.5 Superficie compartida</h2>
+<p><code class="inline">db/schema/enums.ts</code> y <code class="inline">api/openapi.yaml</code> los tocan los tres. Cambiarlos exige avisar al grupo antes, no después.</p>
+<p class="small">Nota: el 8 de agosto se difirió el rol <code class="inline">DOCENTE_COLABORADOR</code> a la v2 — el campo sigue en el esquema (<code class="inline">ROL_ASIGNACION</code>) pero ninguna pantalla ni política RLS de la v1 debe construirse asumiendo que está activo.</p>
+
+<h2>2.6 Dónde vive tu código de aplicación</h2>
+<p>Tus pantallas (D1–D8, P1–P3) y tu archivo de dirección visual viven dentro de <code class="inline">movil/</code> — la única app Expo del proyecto, con enrutado por rol. No es una carpeta que tú creas: la scaffoldea C el domingo 9 de agosto, día 1 de la semana 1, junto con <code class="inline">servidor/</code>. Tú trabajas <b>dentro</b> de ella desde el lunes.</p>
+<p>Eres además la dueña de <code class="inline">movil/theme/Theme.ts</code> y <code class="inline">movil/components/base/</code> — el resultado de la sesión de dirección visual (ver Parte 3bis). Cualquier pantalla, sea tuya, de B o de C, importa de ahí; nadie vuelve a escribir un <code class="inline">#hex</code> suelto.</p>
+<div class="callout"><b>Por qué no hay nada "compartido" entre <code class="inline">servidor/</code> y <code class="inline">movil/</code> más allá de <code class="inline">db/schema/</code>:</b> el servidor calcula todo (puntaje, límites de plan) y lo devuelve ya resuelto en la respuesta JSON; el móvil solo llama a la API y renderiza. No hace falta <code class="inline">npm workspaces</code> ni un paquete compartido — cada carpeta tiene su propio <code class="inline">package.json</code>. Esto no reabre ADR-002 ("sin monorepo completo"). Ver decisiones S1-S6 en <code class="inline">Contexto/DECISIONS.md</code>.</div>
+</div>
+
+<div class="part">
+<h1>Parte 3 — Preparación (semana 1, 4 de agosto en adelante)</h1>
+<div class="callout">Si nunca has usado estas herramientas, esta sección es la más importante del manual. Tómate el día completo. Llegar con todo instalado vale más que escribir código apurado el primer día.</div>
+
+<h2>3.1 Instalar</h2>
+<p><b>Node.js 20 o superior.</b> Descárgalo de nodejs.org. Verifica:</p>
+<pre class="code">node --version   # debe decir v20 o superior
+npm --version</pre>
+<p><b>Git.</b> Verifica con <code class="inline">git --version</code>. Configura tu identidad:</p>
+<pre class="code">git config --global user.name "Tu Nombre"
+git config --global user.email "tu@correo.com"</pre>
+<p><b>Un editor.</b> VS Code es lo más común. Instala las extensiones: ESLint, Prettier, y "PostgreSQL" para ver la base de datos.</p>
+<p><b>Base de datos PostgreSQL.</b> Tienes dos caminos:</p>
+<ul>
+<li><i>Recomendado para empezar:</i> una base gratuita en la nube (Neon o Supabase). Te dan una <code class="inline">DATABASE_URL</code> lista y no instalas nada.</li>
+<li><i>Local:</i> Docker con <code class="inline">docker run --name cresco-db -e POSTGRES_PASSWORD=clave -p 5432:5432 -d postgres:16</code></li>
+</ul>
+
+<h2>3.2 Conceptos que necesitas entender antes de escribir código</h2>
+<p><b>¿Qué es un ORM?</b> Una capa que te deja hablar con la base de datos usando TypeScript en vez de escribir SQL a mano. Drizzle es especial porque los tipos salen del esquema: si renombras una columna, el compilador te avisa en todos los lugares que la usaban.</p>
+<p><b>¿Qué es una migración?</b> Un archivo SQL que lleva la base de datos de un estado al siguiente. Nosotros no las escribimos: las genera <code class="inline">drizzle-kit</code> leyendo el esquema. Nunca las edites a mano.</p>
+<p><b>¿Qué es RLS?</b> <i>Row Level Security.</i> Reglas dentro de PostgreSQL que filtran qué filas puede ver cada usuario, aunque la aplicación se equivoque. Es nuestra segunda línea de defensa.</p>
+<p><b>¿Qué es BetterAuth?</b> Una librería que resuelve registro, inicio de sesión y sesiones. Crea sus propias tablas (<code class="inline">user</code>, <code class="inline">session</code>, <code class="inline">account</code>, <code class="inline">organization</code>, <code class="inline">member</code>). Nuestra tabla <code class="inline">perfil_usuario</code> las <b>extiende</b> con cédula y teléfono; nunca duplica lo que ya está en <code class="inline">user</code>.</p>
+
+<h2>3.3 Clonar y levantar</h2>
+<pre class="code">git clone &lt;url-del-repo&gt;
+cd cresco
+npm ci                       # versiones exactas del lockfile
+cp .env.example .env
+# Abre .env y pega tu DATABASE_URL
+npm run db:generate   # genera las migraciones desde el esquema
+npm run db:migrate    # las aplica</pre>
+
+<div class="callout warn">
+<b>Las correcciones E1 y E2 al esquema ya están aplicadas.</b> No tienes que hacerlas: tienes que <b>no deshacerlas</b>. Se aplicaron y verificaron el 8 de agosto, antes del primer commit, según la decisión E3 de <code class="inline">DECISIONS.md</code>. Están explicadas en §4.1 y §4.3 para que sepas por qué el esquema se ve así.
+<br><br>
+Todo lo de arriba está verificado con Node 24.19.0: <code class="inline">npm ci</code> instala 36 paquetes sin errores, <code class="inline">npm run typecheck</code> pasa limpio, y la migración <code class="inline">0000_cresco_inicial.sql</code> produce 41 tablas con 57 CHECK.
+</div>
+</div>
+
+<div class="part">
+<h1>Parte 4 — Semana a semana</h1>
+<h2>Semana 1 · 9 al 15 de agosto — Cimientos</h2>
+<div class="callout">Esta es tu semana más pesada. B y C dependen de que termines. Si algo se atrasa, avísalo el mismo día en que lo notas, no el sábado.</div>
+<p class="small">C scaffoldea <code class="inline">servidor/</code> y <code class="inline">movil/</code> el domingo 9, antes de que tú empieces. No lo hagas tú ni por adelantado — es su tarea del día 1 (decisión S6).</p>
+
+<h3>Domingo 9 — Base de datos viva</h3>
+<ol>
+<li>Confirma que <code class="inline">npm run db:migrate</code> corre sin errores. El esquema ya trae E1 y E2 aplicadas (§4.1 y §4.3): no las rehagas.</li>
+<li>Abre la base de datos con la extensión de VS Code y verifica que existen las 41 tablas.</li>
+<li>Instala Drizzle Studio para inspeccionar datos visualmente:
+<pre class="code">npx drizzle-kit studio</pre></li>
+</ol>
+<p><b>Éxito:</b> ves las tablas, puedes insertar una fila manualmente, y correr <code class="inline">npm run db:generate</code> responde <i>"No schema changes, nothing to migrate"</i>. Esa respuesta es tu comprobación permanente de que nadie desincronizó el esquema de la migración.</p>
+
+<div class="callout warn">
+<b>4.1 — Corrección: fechas que pueden capturar el día equivocado.</b><br>
+<code class="inline">matricula.fecha_ingreso</code> y <code class="inline">asignacion_docente.vigente_desde</code> son columnas <code class="inline">date</code> con <code class="inline">.defaultNow()</code>. En Postgres, <code class="inline">now()</code> convertido a <code class="inline">date</code> se resuelve según el timezone de la <i>sesión</i> de la base de datos — típicamente UTC en un proveedor cloud. Ecuador es UTC-5, así que una matrícula creada entre las 19:00 y las 23:59 hora de Guayaquil queda fechada al día siguiente, en silencio. La regla "todo en UTC, la conversión ocurre en la pantalla" (§5, más abajo) es correcta para <code class="inline">timestamptz</code>, pero no cubre este caso de columnas <code class="inline">date</code>.<br><br>
+<b>Ya está corregido</b> (decisión <b>E1</b>, aplicada el 8 de agosto). Las dos columnas quedaron <code class="inline">NOT NULL</code> <b>sin default, a propósito</b>: obligan a que el servidor pase la fecha calculada con <code class="inline">REGLAS.ZONA_HORARIA</code> (<code class="inline">America/Guayaquil</code>). En el SQL se ve así: <code class="inline">"fecha_ingreso" date NOT NULL</code>.<br><br>
+<b>Si te topas con un error</b> tipo <i>"null value in column fecha_ingreso violates not-null constraint"</i>, la respuesta correcta <b>no</b> es devolver el <code class="inline">.defaultNow()</code> — es pasar la fecha desde el servidor. Devolver el default reintroduce el bug en silencio.
+</div>
+
+<h3>Lunes 10 — Datos semilla</h3>
+<p>Crea <code class="inline">db/seeds/catalogo.ts</code> con:</p>
+<ul>
+<li>Las 6 categorías de acción (responsabilidad, disciplina, convivencia, puntualidad, desempeño, otro)</li>
+<li>Las 6 franjas de conducta con sus frases</li>
+<li>Los 5 planes</li>
+<li>Una plantilla de reporte con sus campos</li>
+</ul>
+<div class="callout"><b>Consejo:</b> coordina con B. Las categorías y franjas son datos que él usa, pero la carga inicial la haces tú porque es parte del arranque del sistema. Acuerden quién escribe qué antes de duplicar trabajo.</div>
+<p><b>Éxito:</b> <code class="inline">npm run db:seed</code> deja la base lista y repetible. Ejecutarlo dos veces no duplica filas.</p>
+
+<h3>Martes 11 — BetterAuth</h3>
+<ol>
+<li>Instala y configura BetterAuth <b>dentro de <code class="inline">servidor/</code></b>, el proyecto Next que C dejó armado el domingo.</li>
+<li>Activa el plugin de organización.</li>
+<li>Genera sus tablas con el CLI de BetterAuth.</li>
+<li>Prueba registro e inicio de sesión desde el navegador.</li>
+</ol>
+<div class="callout"><b>Trampa común:</b> BetterAuth genera una tabla <code class="inline">user</code>. No crees otra tabla de usuario. <code class="inline">perfil_usuario</code> apunta a <code class="inline">user.id</code> con una columna <code class="inline">user_id</code> de tipo texto. Si terminas con dos tablas de usuarios, tendrás que rehacerlo todo.</div>
+<p><b>Éxito:</b> te registras con correo y contraseña, y la fila aparece en la tabla <code class="inline">user</code>.</p>
+
+<h3>Miércoles 12 — La capa de acceso</h3>
+<p>Esta es la parte más importante de tu trabajo en todo el proyecto.</p>
+<p>Crea la carpeta <code class="inline">db/acceso/</code> con funciones que <b>siempre</b> filtran por vínculo:</p>
+<pre class="code">// db/acceso/estudiantes.ts
+export async function estudiantesDelRepresentante(userId: string) {
+  return db
+    .select()
+    .from(estudiante)
+    .innerJoin(vinculoRepresentacion, eq(vinculoRepresentacion.estudianteId, estudiante.id))
+    .innerJoin(representante, eq(representante.id, vinculoRepresentacion.representanteId))
+    .where(and(
+      eq(representante.userId, userId),
+      eq(vinculoRepresentacion.estado, "ACTIVO"),
+    ));
+}</pre>
+<p><b>Regla que anuncias al equipo:</b> está prohibido usar <code class="inline">db.select()</code> suelto sobre <code class="inline">estudiante</code>, <code class="inline">matricula</code>, <code class="inline">accion_registrada</code> o <code class="inline">reporte_estudiante</code> fuera de <code class="inline">db/acceso/</code>. Tú rechazas cualquier PR que lo haga.</p>
+<p><b>Éxito:</b> existe al menos una función de acceso por cada tabla sensible.</p>
+
+<h3>Jueves 13 y viernes 14 — RLS</h3>
+<p>Escribe las políticas para las cinco tablas críticas. Patrón:</p>
+<pre class="code">ALTER TABLE estudiante ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY p_representante_lee_estudiante ON estudiante
+FOR SELECT USING (
+  EXISTS (
+    SELECT 1 FROM vinculo_representacion v
+    JOIN representante r ON r.id = v.representante_id
+    WHERE v.estudiante_id = estudiante.id
+      AND v.estado = 'ACTIVO'
+      AND r.user_id = current_setting('app.user_id', true)
+  )
+);</pre>
+<p>Cada petición debe abrir su transacción con:</p>
+<pre class="code">SET LOCAL app.user_id = '&lt;id del usuario&gt;';</pre>
+<div class="callout"><b>Consejo:</b> si olvidas fijar la variable, la consulta devuelve <b>cero filas</b> en vez de todas. Eso es intencional: falla de forma visible y segura.</div>
+<p><b>Éxito de la semana 1:</b> un usuario se registra, inicia sesión, y una consulta directa sin <code class="inline">app.user_id</code> devuelve cero filas.</p>
+
+<h2>Semana 2 · 16 al 22 de agosto — El docente crea su curso</h2>
+<h3>Pantallas D1, D2 (registro e inicio de sesión)</h3>
+<p>Usa los componentes de BetterAuth para Expo. No inventes tu propio manejo de sesión.</p>
+<h3>Pantallas D3, D4 (crear curso y parciales)</h3>
+<p>El flujo es un asistente de tres pasos:</p>
+<ol>
+<li>Nombre de la escuela (texto libre) → crea <code class="inline">institucion</code> con <code class="inline">verificada = false</code></li>
+<li>Año lectivo: fecha de inicio y fin</li>
+<li>Curso: nivel, paralelo, jornada</li>
+</ol>
+<p>Luego, los parciales: entre 2 y 3, con fechas que no se solapan.</p>
+<div class="callout"><b>Trampa:</b> si el docente ya alcanzó su límite de cursos (<code class="inline">DOC_FREE</code> permite 1), el endpoint debe devolver <code class="inline">402</code> con código <code class="inline">LIMITE_PLAN</code>. Coordina con C: él construye el paywall que se muestra al recibir ese código.</div>
+<h3>Pantalla D10 (invitación)</h3>
+<p>Genera un código corto legible (por ejemplo <code class="inline">5A-K7QM</code>) y un enlace. Vence a los 30 días. Admite varios usos porque invita al curso, no a un estudiante.</p>
+<p><b>Éxito de la semana 2:</b> un docente nuevo llega desde cero hasta tener un código de invitación en pantalla.</p>
+
+<h2>Semana 3 · 23 al 29 de agosto — Vinculación</h2>
+<div class="callout">Esta es la semana del hito crítico del proyecto.</div>
+<h3>Pantallas P2, P3 (canjear código y registrar al hijo)</h3>
+<p>El flujo del representante:</p>
+<ol>
+<li>Ingresa el código corto</li>
+<li>Registra los datos de su hijo: cédula, nombres, apellidos, fecha de nacimiento</li>
+<li>Declara el parentesco</li>
+<li><b>Acepta el consentimiento de tratamiento de datos</b>, y se guarda la versión del documento aceptado</li>
+</ol>
+<p>El estudiante queda con <code class="inline">estadoVerificacion = 'PENDIENTE'</code>.</p>
+<div class="callout"><b>Trampa 1 — segundo representante:</b> si el estudiante ya tiene un representante activo, devuelve <code class="inline">409</code>. En la v1 hay un solo representante legal por estudiante. El índice único parcial ya lo impide; tu endpoint debe dar un mensaje claro en vez de dejar que explote un error de base de datos.</div>
+
+<div class="callout warn">
+<b>4.3 — Corrección: estudiantes sin documento pueden chocar entre sí.</b><br>
+<code class="inline">estudiante.numero_documento</code> es <code class="inline">NOT NULL</code>, y <code class="inline">TIPO_DOCUMENTO</code> admite <code class="inline">SIN_DOCUMENTO</code> — un caso real y esperado en niños pequeños. El índice único <code class="inline">ux_estudiante_documento</code> es sobre <code class="inline">(institucion, tipo_documento, numero_documento)</code>. Si dos estudiantes distintos del mismo colegio no tienen cédula, el valor que la app ponga en <code class="inline">numero_documento</code> para ambos puede colisionar — el segundo estudiante sin cédula recibiría un <code class="inline">409</code> como si fuera un duplicado, cuando es un niño distinto.<br><br>
+<b>Ya está corregido</b> (decisión <b>E2</b>, aplicada el 8 de agosto). <code class="inline">ux_estudiante_documento</code> es ahora un índice único <b>parcial</b>, el mismo patrón que ya usaban <code class="inline">ux_matricula_cursando</code> y <code class="inline">ux_curso_titular_vigente</code>. En el SQL se ve así:
+<pre class="code">CREATE UNIQUE INDEX "ux_estudiante_documento" ON "estudiante"
+  USING btree ("institucion_id","tipo_documento","numero_documento")
+  WHERE tipo_documento &lt;&gt; 'SIN_DOCUMENTO';</pre>
+La unicidad sigue garantizada para quienes tienen cédula o pasaporte; los <code class="inline">SIN_DOCUMENTO</code> quedan fuera del índice y ya no colisionan entre sí. <b>Tu endpoint sigue debiendo dar un mensaje claro</b> en el caso legítimo de duplicado (mismo documento real ya registrado) en vez de dejar escapar el error de base de datos.
+</div>
+
+<h3>Pantallas D7, D8 (lista y aprobación)</h3>
+<p>El docente ve los estudiantes pendientes, puede corregir nombres y aprobar o rechazar. Al aprobar se crea la matrícula y el registro de puntaje inicial en 60.</p>
+<div class="callout"><b>Consejo:</b> el docente va a aprobar 25 estudiantes de golpe. Haz que la pantalla permita aprobar varios a la vez, no uno por uno con tres toques cada uno.</div>
+<p><b>Éxito de la semana 3:</b> un representante registra a su hijo desde su teléfono y el docente lo aprueba desde el suyo.</p>
+
+<h2>Semana 4 · 30 de agosto al 5 de septiembre — Seguridad y multi-hijo</h2>
+<h3>Selector de hijos</h3>
+<p>Barra superior con el nombre del estudiante actual y una flecha para cambiar. Funciona incluso con hijos en colegios distintos.</p>
+<h3>Las siete pruebas de seguridad</h3>
+<p>Son obligatorias. Están en <code class="inline">docs/01-arquitectura/matriz-permisos.md</code>:</p>
+<table>
+<tr><th>#</th><th>Caso</th><th>Esperado</th></tr>
+<tr><td>S-1</td><td>Representante A pide el reporte del hijo de B</td><td>403</td></tr>
+<tr><td>S-2</td><td>Vínculo revocado</td><td>403</td></tr>
+<tr><td>S-3</td><td>Docente registra acción en curso ajeno</td><td>403</td></tr>
+<tr><td>S-4</td><td>Matrícula finalizada</td><td>403</td></tr>
+<tr><td>S-5</td><td>Consulta sin app.user_id</td><td>0 filas</td></tr>
+<tr><td>S-6</td><td>Segundo representante para el mismo estudiante</td><td>409</td></tr>
+<tr><td>S-7</td><td>Alerta sin reautenticación</td><td>401</td></tr>
+</table>
+<h3>Importación CSV (opcional)</h3>
+<p>Si hay tiempo. Se parsea el archivo y <b>se descarta</b>: nunca se almacena.</p>
+<p><b>Éxito de la semana 4:</b> las siete pruebas pasan en el CI.</p>
+
+<h2>Semanas 5 y 6 · 6 al 19 de septiembre</h2>
+<ul>
+<li>Guías de uso para docente y representante (dos páginas con capturas)</li>
+<li>Ajustes del flujo de vinculación según lo que hayan visto probando</li>
+<li>Semana 6: trabajo conjunto en datos de demostración, video y cierre</li>
+</ul>
+</div>
+
+<div class="part">
+<h1>Parte 5 — Trampas y consejos</h1>
+<p><b>No dupliques la identidad.</b> BetterAuth ya tiene <code class="inline">user</code>. Tu <code class="inline">perfil_usuario</code> la extiende. Es el error más caro de deshacer.</p>
+<p><b>La invitación de BetterAuth no es tu invitación.</b> BetterAuth tiene una invitación para sumar adultos a una organización. La tuya (<code class="inline">invitacion_curso</code>) es del dominio y desemboca en registrar un menor con consentimiento. No las mezcles.</p>
+<p><b>Nada se borra.</b> Revocar un vínculo corta el acceso hacia adelante; no borra el histórico. Al finalizar una matrícula, el representante pierde acceso pero la institución conserva los datos.</p>
+<p><b>Todo en UTC — con un matiz.</b> Los <code class="inline">timestamptz</code> se guardan en UTC; la conversión a <code class="inline">America/Guayaquil</code> ocurre en la pantalla, nunca en la base de datos. Pero las columnas <code class="inline">date</code> que representan "qué día ocurrió esto" (como <code class="inline">fecha_ingreso</code>) las calcula el servidor explícitamente con la zona horaria correcta — nunca con <code class="inline">defaultNow()</code>. Ver §4.1.</p>
+<p><b>Prueba con dos cuentas desde el primer día.</b> Crea dos representantes y dos estudiantes en tus datos de prueba — uno de ellos sin documento. Es la única forma de notar una fuga de permisos o una colisión de constraint antes de que sea tarde.</p>
+<p><b>La cédula ecuatoriana se valida localmente.</b> El algoritmo del dígito verificador (módulo 10) son unas veinte líneas. No busques una API del Registro Civil: no está abierta al público y consultar identidades reales complica el cumplimiento de protección de datos.</p>
+<p><b>No construyas nada para <code class="inline">DOCENTE_COLABORADOR</code>.</b> Está diferido a v2 desde el 8 de agosto.</p>
+</div>
+
+<div class="part">
+<h1>Parte 6 — Cuando te bloquees</h1>
+<ol>
+<li><b>Relee el contrato.</b> ¿<code class="inline">openapi.yaml</code> ya define el comportamiento?</li>
+<li><b>Revisa el ADR.</b> ¿La decisión ya está tomada?</li>
+<li><b>Medio día máximo.</b> Si llevas más, avisa al grupo ese mismo día.</li>
+<li><b>Pregunta a una IA</b> pegando el bloque de contexto de la última sección.</li>
+</ol>
+</div>
+
+<div class="part">
+<h1>Parte 7 — Bloque de contexto para IA</h1>
+<div class="callout">Copia todo esto y pégalo antes de tu pregunta.</div>
+<pre class="code">CONTEXTO — PROYECTO CRESCO, ROL: PERSONA A (NÚCLEO)
+
+Soy uno de 3 estudiantes (equipo Neofix) construyendo una app Android
+para el hackathon RevenueCat Shipaton 2026, categoría Next Gen. Semana 1
+desde el 9 de agosto de 2026; deadline interno 20 de septiembre; envío
+real 28 de septiembre. Es mi primera app. Mi rol es el módulo de
+identidad, estructura académica, vinculación y permisos.
+
+MI CÓDIGO VIVE EN movil/theme/Theme.ts, movil/components/base/ y dentro
+de movil/ (pantallas D1-D8, P1-P3) y servidor/ (BetterAuth). Esas dos
+carpetas las scaffoldea C el día 1 con create-next-app / create-expo-app;
+yo trabajo dentro, no las creo.
+
+EL PRODUCTO: app de comunicación entre docentes y representantes legales
+de escuelas del Ecuador, para seguimiento de conducta. El estudiante
+NUNCA es usuario. Dos interfaces: docente y representante.
+
+STACK: PostgreSQL + Drizzle ORM. Next.js como servidor (BetterAuth,
+rutas API). Expo/React Native para las apps. BetterAuth con plugin de
+organización. NativeWind para estilos (shadcn NO funciona en React
+Native).
+
+MIS TABLAS: institucion, perfil_usuario, docente, representante,
+anio_lectivo, periodo_academico, dia_no_lectivo, curso,
+asignacion_docente, estudiante, matricula, invitacion_curso,
+vinculo_representacion, consentimiento.
+
+REGLAS QUE ME TOCAN:
+- No hay administrador de institución en v1. El docente escribe el
+  nombre de su escuela como texto libre; la institución queda con
+  verificada=false.
+- No hay rol DOCENTE_COLABORADOR activo en v1 (diferido a v2); el campo
+  existe en el esquema pero ninguna pantalla ni política lo usa.
+- La organization de BetterAuth ES la institución. perfil_usuario
+  EXTIENDE el user de BetterAuth (cédula, teléfono); no lo duplica.
+- Una persona puede ser docente y representante a la vez: son dos
+  tablas de perfil separadas, no un campo "rol".
+- La invitación es al CURSO (no a un estudiante), dura 30 días, admite
+  varios usos.
+- El REPRESENTANTE registra los datos de su hijo al canjear el código;
+  queda en estado PENDIENTE hasta que el docente lo apruebe. Al aprobar
+  nace la matrícula con puntaje base 60.
+- UN SOLO representante legal por estudiante en la v1 (índice único
+  parcial). Intentar un segundo devuelve 409.
+- El consentimiento de tratamiento de datos del menor se guarda con la
+  versión del documento aceptado, no como booleano.
+- Un estudiante tiene una sola matrícula CURSANDO. Estados: CURSANDO,
+  RETIRADA, TRASLADADA, FINALIZADA.
+- El histórico de conducta cuelga de la matrícula, no del estudiante.
+- Nada se borra físicamente: se anula o se cambia de estado.
+- Timestamps timestamptz en UTC; zona America/Guayaquil. Las columnas
+  `date` que representan un día calendario (fecha_ingreso,
+  vigente_desde) las calcula el servidor explícitamente con esa zona
+  horaria — nunca defaultNow(), porque now()::date puede resolver al
+  día siguiente según el timezone de la sesión de la base de datos.
+- estudiante.numero_documento es NOT NULL, pero el índice único
+  ux_estudiante_documento debe ser PARCIAL (excluir
+  tipo_documento = 'SIN_DOCUMENTO'), para que dos estudiantes sin
+  cédula del mismo colegio no colisionen entre sí.
+
+SEGURIDAD (lo más crítico de mi rol): un representante solo accede a
+estudiantes con vínculo ACTIVO. DOS capas:
+1. Capa obligatoria db/acceso/ en el servidor: prohibido usar
+   db.select() suelto sobre estudiante, matricula, accion_registrada,
+   reporte_estudiante.
+2. Políticas RLS de PostgreSQL sobre esas mismas tablas. Cada petición
+   abre transacción con SET LOCAL app.user_id = '&lt;id&gt;'. Si se olvida,
+   devuelve 0 filas.
+
+CONVENCIONES: tablas y columnas en español snake_case. Estados en
+MAYUSCULA_SNAKE definidos en db/schema/enums.ts. Claves primarias uuid.
+Migraciones generadas por drizzle-kit, nunca escritas a mano.
+
+MI RESTRICCIÓN: 6 semanas, primera app, prefiero soluciones simples y
+probadas sobre elegantes. Explícame los conceptos, no solo el código.</pre>
+<p class="footer-note">Versión 1.2 · Última revisión: 8 de agosto de 2026 · Dueño: Persona A · Corrige la v1.0 del 3 de agosto — detalle en <code class="inline">docs/99-archivo/ERRATA-2026-08.md</code></p>
+</div>
+
+</body>
+</html>
