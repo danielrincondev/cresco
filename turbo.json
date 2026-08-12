@@ -1,0 +1,43 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "globalEnv": [
+    "DATABASE_URL",
+    "DATABASE_MIGRATION_URL",
+    "BETTER_AUTH_SECRET",
+    "BETTER_AUTH_URL",
+    "GOOGLE_CLIENT_ID",
+    "GOOGLE_CLIENT_SECRET",
+    "REVENUECAT_API_KEY",
+    "REVENUECAT_WEBHOOK_SECRET",
+    "EXPO_PUBLIC_API_URL",
+    "PORT",
+    "MOBILE_PORT",
+    "NODE_ENV",
+    "CI"
+  ],
+  "tasks": {
+    "dev": {
+      "cache": false,
+      "persistent": true
+    },
+    "build": {
+      "dependsOn": ["^build"],
+      "outputs": [".next/**", "!.next/cache/**", "!.next/dev/**", "dist/**"]
+    },
+    "typecheck": {
+      "dependsOn": ["^typecheck"],
+      "outputs": []
+    },
+    "db:generate": {
+      "cache": true,
+      "outputs": ["migrations/**"]
+    },
+    "db:migrate": {
+      "cache": false
+    },
+    "test": {
+      "dependsOn": ["^build"],
+      "outputs": []
+    }
+  }
+}

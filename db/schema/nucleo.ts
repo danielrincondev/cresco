@@ -19,6 +19,7 @@ import {
   ESTADO_MATRICULA, ESTADO_INVITACION, ESTADO_VINCULO, PARENTESCO,
   TIPO_CONSENTIMIENTO, REGLAS,
 } from "./enums";
+import { organization, user } from "./auth";
 
 /** Helper: CHECK de pertenencia a una lista de constantes */
 const enTuple = (col: string, valores: readonly string[]) =>
@@ -37,7 +38,7 @@ const auditoriaCols = {
 // ---------------------------------------------------------------------------
 export const institucion = pgTable("institucion", {
   id: uuid("id").primaryKey().defaultRandom(),
-  organizationId: text("organization_id").notNull().unique(), // BetterAuth organization.id
+  organizationId: text("organization_id").notNull().unique().references(() => organization.id, { onDelete: "cascade" }), // BetterAuth organization.id
   nombreDeclarado: text("nombre_declarado").notNull(),
   verificada: boolean("verificada").notNull().default(false),
   codigoAmie: text("codigo_amie"),
@@ -64,7 +65,7 @@ export const institucion = pgTable("institucion", {
 // ---------------------------------------------------------------------------
 export const perfilUsuario = pgTable("perfil_usuario", {
   id: uuid("id").primaryKey().defaultRandom(),
-  userId: text("user_id").notNull().unique(), // BetterAuth user.id
+  userId: text("user_id").notNull().unique().references(() => user.id, { onDelete: "cascade" }), // BetterAuth user.id
   tipoDocumento: text("tipo_documento").notNull().default("CEDULA"),
   numeroDocumento: text("numero_documento").notNull(),
   telefono: text("telefono"),
@@ -80,7 +81,7 @@ export const perfilUsuario = pgTable("perfil_usuario", {
  */
 export const docente = pgTable("docente", {
   id: uuid("id").primaryKey().defaultRandom(),
-  userId: text("user_id").notNull().unique(),
+  userId: text("user_id").notNull().unique().references(() => user.id, { onDelete: "cascade" }),
   tituloProfesional: text("titulo_profesional"),
   correoContacto: text("correo_contacto"),
   telefonoContacto: text("telefono_contacto"),
@@ -90,7 +91,7 @@ export const docente = pgTable("docente", {
 
 export const representante = pgTable("representante", {
   id: uuid("id").primaryKey().defaultRandom(),
-  userId: text("user_id").notNull().unique(),
+  userId: text("user_id").notNull().unique().references(() => user.id, { onDelete: "cascade" }),
   ocupacion: text("ocupacion"),
   direccion: text("direccion"),
   telefonoAlterno: text("telefono_alterno"),

@@ -1,0 +1,12 @@
+{
+  "expo": {
+    "name": "Cresco",
+    "slug": "cresco",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "platforms": ["android"],
+    "android": {
+      "package": "app.cresco.mobile"
+    }
+  }
+}

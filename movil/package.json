@@ -1,0 +1,23 @@
+{
+  "name": "@cresco/movil",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "main": "index.ts",
+  "scripts": {
+    "dev": "varlock run -- expo start",
+    "build": "tsc --noEmit",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "expo": "57.0.12",
+    "react": "19.2.3",
+    "react-native": "0.86.2"
+  },
+  "devDependencies": {
+    "@types/react": "~19.2.0",
+    "typescript": "^5.9.0",
+    "vitest": "^4.0.0"
+  }
+}

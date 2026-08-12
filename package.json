@@ -4,26 +4,40 @@
   "private": true,
   "description": "Cresco — comunicacion entre docentes y representantes legales de escuelas del Ecuador",
   "type": "module",
+  "packageManager": "npm@11.6.2",
   "engines": {
-    "node": ">=20"
+    "node": ">=24 <25"
   },
+  "workspaces": [
+    "db",
+    "servidor",
+    "movil"
+  ],
   "scripts": {
-    "typecheck": "tsc --noEmit",
-    "db:generate": "drizzle-kit generate",
-    "db:migrate": "drizzle-kit migrate",
-    "db:check": "drizzle-kit check",
-    "test": "echo \"Sin pruebas todavia: el runner se conecta al montar CI. Ver NEXT_STEPS.md, martes 4.\""
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "typecheck": "turbo run typecheck",
+    "db:generate": "turbo run db:generate --filter=@cresco/db",
+    "db:migrate": "turbo run db:migrate --filter=@cresco/db",
+    "db:check": "varlock run -- drizzle-kit check --config drizzle.config.ts",
+    "test": "turbo run test",
+    "env:check": "varlock load"
   },
-  "dependencies": {
-    "dotenv": "^17.0.0",
-    "drizzle-orm": "^0.44.0",
-    "pg": "^8.16.0"
+  "overrides": {
+    "next": {
+      "@next/env": "npm:@varlock/nextjs-integration@1.2.0"
+    }
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
     "@types/pg": "^8.15.0",
     "drizzle-kit": "^0.31.0",
+    "drizzle-orm": "^0.45.2",
+    "pg": "^8.16.0",
     "tsx": "^4.20.0",
-    "typescript": "^5.9.0"
+    "turbo": "^2.10.9",
+    "typescript": "~6.0.3",
+    "varlock": "^1.16.1",
+    "vitest": "^4.0.0"
   }
 }

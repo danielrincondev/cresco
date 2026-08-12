@@ -1,0 +1,10 @@
+{
+  "name": "Cresco",
+  "dockerComposeFile": "docker-compose.yml",
+  "service": "app",
+  "workspaceFolder": "/workspace/cresco",
+  "shutdownAction": "stopCompose",
+  "forwardPorts": [3000, 5432, 8081],
+  "postCreateCommand": "npm ci",
+  "remoteUser": "node"
+}

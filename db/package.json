@@ -1,0 +1,29 @@
+{
+  "name": "@cresco/db",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./schema": "./schema/index.ts",
+    "./acceso": "./acceso/index.ts"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json --noEmit",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "db:generate": "varlock run -- drizzle-kit generate --config ../drizzle.config.ts",
+    "db:migrate": "varlock run -- drizzle-kit migrate --config ../drizzle.config.ts",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "drizzle-orm": "^0.45.2",
+    "pg": "^8.16.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "@types/pg": "^8.15.0",
+    "drizzle-kit": "^0.31.0",
+    "typescript": "^5.9.0",
+    "varlock": "^1.16.1",
+    "vitest": "^4.0.0"
+  }
+}

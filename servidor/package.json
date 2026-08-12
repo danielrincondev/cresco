@@ -1,0 +1,34 @@
+{
+  "name": "@cresco/servidor",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "varlock run -- next dev",
+    "build": "varlock run -- next build",
+    "start": "varlock run -- next start",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@better-auth/drizzle-adapter": "1.6.27",
+    "@cresco/db": "*",
+    "@varlock/nextjs-integration": "1.2.0",
+    "better-auth": "1.6.27",
+    "drizzle-orm": "^0.45.2",
+    "next": "16.3.0",
+    "pg": "^8.16.0",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "varlock": "^1.16.1",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "@types/pg": "^8.15.0",
+    "@types/react": "~19.2.0",
+    "@types/react-dom": "~19.2.0",
+    "typescript": "^5.9.0",
+    "vitest": "^4.0.0"
+  }
+}
