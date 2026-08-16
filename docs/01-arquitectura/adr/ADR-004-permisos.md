@@ -1,6 +1,10 @@
 # ADR-004 — Aplicación de permisos por rol
 
-**Fecha:** 2026-08-02 · **Estado:** Aceptado
+**Fecha:** 2026-08-02 · **Estado:** Reemplazado el 2026-08-16
+
+> Decisión vigente: cada función pública de Convex obtiene la identidad mediante
+> `ctx.auth.getUserIdentity()` y aplica la autorización antes de leer o modificar
+> documentos. Ya no existe RLS de PostgreSQL.
 
 ## Contexto
 La regla más crítica del producto es que un representante solo acceda a los

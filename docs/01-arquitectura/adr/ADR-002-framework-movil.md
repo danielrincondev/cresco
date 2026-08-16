@@ -1,6 +1,9 @@
 # ADR-002 — Framework móvil y servidor
 
-**Fecha:** 2026-08-02 · **Estado:** Aceptado
+**Fecha:** 2026-08-02 · **Estado:** Reemplazado el 2026-08-16
+
+> Decisión vigente: una aplicación Expo consume directamente el backend Convex.
+> No existe un servidor Next.js separado.
 
 ## Contexto
 El producto es una app Android usada por un docente de pie en un aula y por un

@@ -9,35 +9,15 @@
     "node": ">=24 <25"
   },
   "workspaces": [
-    "db",
-    "servidor",
     "movil"
   ],
   "scripts": {
-    "dev": "turbo run dev",
-    "build": "turbo run build",
-    "typecheck": "turbo run typecheck",
-    "db:generate": "turbo run db:generate --filter=@cresco/db",
-    "db:migrate": "turbo run db:migrate --filter=@cresco/db",
-    "db:check": "varlock run -- drizzle-kit check --config drizzle.config.ts",
-    "test": "turbo run test",
-    "env:check": "varlock load"
-  },
-  "overrides": {
-    "next": {
-      "@next/env": "npm:@varlock/nextjs-integration@1.2.0"
-    }
-  },
-  "devDependencies": {
-    "@types/node": "^24.0.0",
-    "@types/pg": "^8.15.0",
-    "drizzle-kit": "^0.31.0",
-    "drizzle-orm": "^0.45.2",
-    "pg": "^8.16.0",
-    "tsx": "^4.20.0",
-    "turbo": "^2.10.9",
-    "typescript": "~6.0.3",
-    "varlock": "^1.16.1",
-    "vitest": "^4.0.0"
+    "dev": "npm run dev --workspace @cresco/movil",
+    "build": "npm run build --workspace @cresco/movil",
+    "typecheck": "npm run typecheck --workspace @cresco/movil",
+    "test": "npm test --workspace @cresco/movil",
+    "env:check": "npm run env:check --workspace @cresco/movil",
+    "convex:dev": "npm run convex:dev --workspace @cresco/movil",
+    "convex:sync-auth-env": "npm run convex:sync-auth-env --workspace @cresco/movil"
   }
 }

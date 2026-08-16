@@ -6,15 +6,15 @@ escribe uno nuevo que reemplaza al anterior y el viejo pasa a estado `Reemplazad
 
 | # | Decisión | Estado |
 |---|---|---|
-| 001 | Motor de base de datos y ORM | Aceptado |
-| 002 | Framework móvil y servidor | Aceptado |
-| 003 | Autenticación e identidad | Aceptado |
-| 004 | Aplicación de permisos por rol | Aceptado |
+| 001 | Motor de base de datos y ORM | Reemplazado el 2026-08-16 |
+| 002 | Framework móvil y servidor | Reemplazado el 2026-08-16 |
+| 003 | Autenticación e identidad | Reemplazado el 2026-08-16 |
+| 004 | Aplicación de permisos por rol | Reemplazado el 2026-08-16 |
 | 005 | Puntaje como valor derivado | Aceptado |
 | 006 | Integración de RevenueCat | Aceptado |
 | 007 | Entrega sin publicación en tienda, con repositorio abierto | Aceptado |
 
-> **ADR-007 reemplaza una consecuencia de ADR-002** (la que anticipaba tramitar
-> Google Play Console e iniciarlo en la semana 2). La decisión de fondo de
-> ADR-002 — Next.js como servidor + Expo para las apps — sigue vigente sin
-> cambios. Al leer ADR-002, esa viñeta sobre Play Console ya no aplica.
+La arquitectura vigente desde el 16 de agosto de 2026 es Expo + Clerk + Convex,
+sin servidor Next.js, Better Auth, PostgreSQL ni Drizzle. Los ADR-001 a ADR-004
+se conservan como registro histórico; el `README.md` de la raíz y el código son
+la fuente de verdad para el runtime vigente.

@@ -9,78 +9,82 @@ categoría Next Gen.
 
 ## Estado del proyecto
 
-**Todavía no hay código de aplicación.** Lo que existe y está verificado es la
-base sobre la que se construye:
+La implementación activa es una sola aplicación Expo con autenticación de Clerk
+y backend de Convex:
 
 | Pieza | Estado |
 |---|---|
-| Esquema de datos (`db/schema/`) | ✅ 41 tablas, 57 CHECK, migración inicial generada |
-| Contrato de API (`api/openapi.yaml`) | ✅ 32 rutas, OpenAPI 3.1 |
-| Documentación y ADR (`docs/`) | ✅ |
-| Servidor Next.js | ⬜ semana 1 |
-| Apps Expo (docente y representante) | ⬜ semana 2 |
-| Datos semilla (`db/seeds/`) | ⬜ bloquea a todo el equipo |
-| Capa de acceso y RLS (`db/acceso/`) | ⬜ Persona A, semana 1 |
+| Aplicación Expo (`movil/`) | Implementado: arranque, sesión y cierre de sesión |
+| Clerk para Expo | Implementado: proveedor, caché segura de token y flujo alojado |
+| Convex (`movil/convex/`) | Implementado: configuración de Clerk y consulta autenticada |
+| Bitwarden Secrets Manager | Implementado: resolución por token de máquina y UUID |
 
-## Documentación
+No existe un servidor HTTP ni una base de datos SQL separados. `servidor/`,
+`db/`, Better Auth, Next.js, PostgreSQL y Drizzle fueron retirados al adoptar
+Clerk + Convex.
 
-Índice completo en **[`docs/README.md`](docs/README.md)**.
+## Arquitectura activa
 
-| Carpeta | Responde a |
-|---|---|
-| `Contexto/` | Estado, decisiones cerradas y próximos pasos |
-| `docs/00-producto/` | ¿Qué construimos y por qué? |
-| `docs/01-arquitectura/` | ¿Cómo está construido? (ADR, permisos) |
-| `docs/02-equipo/` | ¿Cómo trabajamos? (backlog, manual) |
-| `docs/03-piloto/` | ¿Qué firmamos y aceptamos? |
-| `docs/04-guias/` | ¿Cómo se usa y se opera? |
-| `docs/05-validacion/` | ¿Qué nos dijeron los usuarios? |
-| `api/openapi.yaml` | Contrato de API (junto al código, no en docs) |
-| `db/schema/` | Esquema de datos en Drizzle |
+- `movil/src/App.tsx`: interfaz Expo y estado de autenticación.
+- `movil/convex/auth.config.ts`: valida en Convex los JWT emitidos por Clerk.
+- `movil/convex/viewer.ts`: ejemplo de función Convex autenticada.
+- `movil/.env.schema`: contrato de configuración de Clerk y Convex.
+- `.devcontainer/devcontainer.json`: entorno Node 24 con estado persistente de
+  Varlock y Convex.
+
+Los documentos de producto siguen en `docs/`. Las decisiones de arquitectura
+anteriores a este cambio se conservan como contexto histórico, pero el código y
+este README describen el runtime vigente.
 
 ## Arranque en una máquina limpia
 
-Requiere Node.js 20 o superior (verificado con **24.19.0 LTS**) y una base
-PostgreSQL accesible.
+Requiere Node.js 24, una aplicación de Clerk, un despliegue de Convex y una
+cuenta de Bitwarden Secrets Manager.
 
 ```bash
 git clone <repo> && cd cresco
-npm ci                        # instala las versiones exactas del lockfile
-cp .env.example .env          # completar DATABASE_URL y claves
-npm run db:migrate            # aplica la migración inicial
+npm ci
+npm run convex:dev
 ```
 
-Comandos disponibles hoy:
+El primer `convex:dev` autentica la CLI y crea `movil/.env.local`. Guarda en
+Bitwarden el URL generado y los valores de Clerk; después entrega al proceso las
+cuatro variables bootstrap documentadas en `.env.example`.
+
+En Clerk activa la Native API y la integración de Convex. La integración debe
+añadir `aud: "convex"` a los claims de sesión. Mientras la app no implemente un
+selector de organizaciones, `Force organization selection` debe permanecer
+desactivado; si se activa, Clerk deja la sesión en la tarea
+`choose-organization` y Convex no puede autenticarla.
+
+```bash
+npm run env:check
+npm run convex:sync-auth-env
+npm run convex:dev
+npm run dev
+```
+
+`convex:sync-auth-env` copia el Frontend API URL de Clerk al despliegue Convex.
+No se usa un archivo `.env` local para secretos.
+
+## Comandos
 
 | Comando | Qué hace |
 |---|---|
-| `npm run typecheck` | Compila el esquema con TypeScript sin emitir |
-| `npm run db:generate` | Regenera migraciones desde `db/schema/` |
-| `npm run db:migrate` | Aplica las migraciones pendientes |
-| `npm run db:check` | Detecta colisiones entre migraciones |
-| `npm test` | Aún sin pruebas; el runner se conecta al montar CI |
-
-`npm ci` y `npm run typecheck` se ejecutaron el 8 de agosto de 2026 y pasan en
-limpio. `npm run db:generate` sobre el esquema actual responde *"No schema
-changes"*: el esquema y `db/migrations/0000_cresco_inicial.sql` están
-sincronizados, y esa es la comprobación de que nadie los desincronizó.
-
-`npm run dev` (servidor Next) y `npx expo start` (apps) aparecerán cuando esos
-proyectos existan. Ver [`Contexto/NEXT_STEPS.md`](Contexto/NEXT_STEPS.md).
-
-## Servidor simulado
-
-Para trabajar la app contra el contrato sin esperar al backend:
-
-```bash
-npx @stoplight/prism-cli mock api/openapi.yaml
-```
+| `npm run dev` | Inicia Expo mediante Varlock |
+| `npm run convex:dev` | Configura o sincroniza el backend Convex |
+| `npm run convex:sync-auth-env` | Configura el emisor JWT de Clerk en Convex |
+| `npm run env:check` | Valida y resuelve la configuración |
+| `npm run typecheck` | Comprueba TypeScript |
+| `npm test` | Ejecuta las pruebas de funciones Convex |
+| `npm run build` | Ejecuta la comprobación de compilación de la app |
 
 ## Comprobaciones antes de un PR
 
 ```bash
+npm run env:check
 npm run typecheck
-npm test          # incluirá las pruebas S-1 a S-7 de la matriz de permisos
+npm test
 ```
 
 ## Licencia

@@ -2,11 +2,19 @@
   "expo": {
     "name": "Cresco",
     "slug": "cresco",
+    "scheme": "cresco",
     "version": "1.0.0",
     "orientation": "portrait",
-    "platforms": ["android"],
+    "platforms": [
+      "android"
+    ],
     "android": {
       "package": "app.cresco.mobile"
-    }
+    },
+    "plugins": [
+      "@clerk/expo",
+      "expo-secure-store",
+      "expo-web-browser"
+    ]
   }
 }
