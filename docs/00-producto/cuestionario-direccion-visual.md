@@ -40,6 +40,8 @@ incumpla se descarta sin discutir:
     (p. ej. la del docente más densa, la del representante más aireada)
  c) Dos temas independientes
 
+ Respouesta: Si iremos con la opcion B
+
 > *Recomendación:* **b**. Un solo color de marca hace que se vean del mismo
 > producto, pero el docente necesita densidad (40 nombres en pantalla) y el
 > representante necesita respiro. La diferencia se resuelve con escala de
@@ -48,6 +50,8 @@ incumpla se descarta sin discutir:
 **A2** 🔴 ¿**Modo oscuro en la v1?**
  a) No. Solo claro. Se difiere a v2
  b) Sí, desde el inicio
+
+ Respouesta: Iremos por la opcion a
 
 > *Recomendación:* **a**. Duplica el trabajo de definición y de prueba de
 > contraste, y multiplica los estados a revisar en cada componente. Con 31
@@ -60,7 +64,7 @@ Afecta radios, tipografía y saturación. Tengan presente que el producto da
 malas noticias sobre un hijo: demasiado alegre resta credibilidad, demasiado
 severo asusta al padre.
 
----
+---Como la app sera usada por padres y profesores queremos se vea seria y algo institucional, sin ir al extremo de la rigidez de una institucion pero manteniendo la seriedad de que la informacion de la app es importante.
 
 ## Bloque B — Color de marca y semántico
 
@@ -72,9 +76,13 @@ explícitamente; si no, cámbienlo y regenero los manuales.
 Definan:
 - Primario, y al menos 3 variantes (claro / base / oscuro) para estados
 - Un color de acento, si hacen falta dos
+FAltan hacer pruebas, se llenara posteriormente
 
+Sera azul, y sus variantes para los estados 
+Para el el color acento sera el gris
 **B2** 🔴 **Colores semánticos.** Éxito, advertencia, error, informativo.
 
+Rojo claro para las acciones negativas, rojo oscuro para emergencias y rojo normal para errores de app
 > *Trampa concreta de este producto:* el rojo de "error de formulario" **no puede
 > ser el mismo** que el de "acción negativa de tu hijo" ni que el de "alerta de
 > emergencia". Son tres cosas distintas y el padre las va a ver en la misma
@@ -86,7 +94,7 @@ separador; texto primario, secundario, deshabilitado, y texto sobre color.
 **B4** 🟡 ¿La **publicidad** del plan gratuito tiene un contenedor visual propio
 que la separe del contenido? Un anuncio que se confunde con un reporte escolar
 es un problema de confianza, no de estética.
-
+Si siempre es aparte para que no se confunda
 ---
 
 ## Bloque C — Las seis franjas de conducta 🔴
@@ -105,21 +113,28 @@ con valores reales.
 | 81 – 100 | Excelente | ? |
 
 **C1** 🔴 ¿Qué color lleva cada franja?
-
+franjas: {
+    CRITICA: "#B3453A", MUY_BAJO: "#D0714F", BAJO: "#E0A44A",
+    BASE: "#A8AFA4", BUENO: "#6FAE95", EXCELENTE: "#2E8B72",
+  }
 **C2** 🔴 ¿**Rojo→verde clásico, o una escala menos punitiva?**
 El rojo sobre el nombre de un niño de 8 años tiene una carga que conviene medir.
 Una alternativa es que el extremo bajo sea ámbar/naranja en vez de rojo, y
 reservar el rojo para la alerta de emergencia.
+
+De Rojo a verde
 
 **C3** 🔴 ¿Cómo se distingue una franja **sin depender del color**?
 Obligatorio: entre el 5 y el 8 % de los hombres tiene daltonismo, y el padre
 puede estar mirando la pantalla bajo el sol. Opciones: icono distinto, posición
 en una barra, la frase orientadora en negrita, un patrón.
 
+Estara acompañado del puntaje siempre asi que si no se entiende por los colores o la barra. El puntaje referencia ayudara con esto
+
 **C4** 🟡 ¿La franja "En el punto de partida" (51-60) se ve **neutra**?
 Es donde arranca todo estudiante cada parcial. Si se ve amarilla o de
 advertencia, cada padre empieza el parcial creyendo que su hijo va mal.
-
+Sera de un color gris neutro
 ---
 
 ## Bloque D — Acciones y sus estados 🟡
@@ -162,7 +177,7 @@ Ya está decidido que sea visible, no escondida en términos. Falta el tratamien
 **F1** 🔴 ¿**Fuente del sistema o fuente cargada?**
  a) La del sistema (Roboto en Android). Cero peso, cero riesgo, arranque instantáneo
  b) Una fuente cargada con `expo-font` (Inter, Manrope, etc.)
-
+Cargaremos una fuente, la fuente sera Inter.
 > *Recomendación:* **a** para la v1. Cargar fuentes en Expo añade peso al bundle
 > y un estado de "fuente no lista" que hay que manejar en cada pantalla. Si
 > quieren personalidad tipográfica, úsenla solo en el número del puntaje y en los
