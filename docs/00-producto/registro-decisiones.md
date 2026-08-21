@@ -414,15 +414,16 @@ Ordenados por urgencia, con lo que hace falta para cerrar cada uno.
 
 | # | Riesgo | Qué falta |
 |---|---|---|
-| 1 🔴 | **Repositorio sin decidir.** No se puede empezar a migrar el código sin saber dónde | Reunión con A y B |
+| 1 ✅ | ~~Repositorio sin decidir~~ | **Resuelto el 21 de agosto.** Se sigue en `danielrincondev/cresco`: la rama `feat/dev-daniel` se fusionó a `main` y sobre ella se restauró el modelo de dominio |
 | 2 🔴 | **Carga acumulada.** 31 pantallas completas + migración a Convex + Clerk nuevo + diferenciador de IA, todo en el calendario ya recortado por la semana perdida. Aceptado conscientemente (+30–40% diario), pero es el riesgo de mayor probabilidad de todo este documento | Vigilar el punto de control del 2 de septiembre con disciplina real, no solo de nombre |
-| 3 🔴 | **Spike de autenticación con Clerk sin confirmación de haberse ejecutado.** Es lo único que puede invalidar la elección de Clerk, y bloquea a Persona A | Confirmar que corrió, con login funcionando en un teléfono real |
+| 3 ✅ | ~~Spike de autenticación con Clerk sin confirmar~~ | **Resuelto por Daniel** en el commit `2067a3e`: `convex/auth.config.ts` conecta Clerk con Convex y `convex/viewer.ts` demuestra que la identidad llega hasta una función del backend, con su prueba |
 | 4 🔴 | **Validación con un profesor real.** Sigue sin ocurrir; es el único riesgo que ningún stack los protege de él | Ejecutar el domingo 16 como está planeado |
 | 5 ✅ | ~~Contraste del texto secundario por debajo del mínimo legible en exteriores~~ | **Resuelto** — `#4A5568` (~6.8:1 sobre `#EBF4FA`, ~7.5:1 sobre blanco). Ver §5.2 |
 | 6 ✅ | ~~Los tres rojos sin hex, riesgo de confundirse con las franjas~~ | **Resuelto** — `#E53E3E` / `#C53030` / `#9B2C2C`. `#E53E3E` queda por debajo de AA como texto directo (3.7–4.1:1) — usar solo como fondo de chip. Ver §5.2 |
-| 7 🟡 | **El verde propuesto para acciones positivas comparte matiz con las franjas `BUENO`/`EXCELENTE`** (~160° vs. ~156–164°) — la diferencia es solo de saturación, no alcanza a separarlos como sí pasó con los rojos | Confirmar `#16A34A` (matiz ~142°) en vez de `#10B981`/`#059669`. Ver §5.2 |
+| 7 ✅ | ~~El verde de acciones positivas comparte matiz con las franjas~~ | **Resuelto:** confirmado `#16A34A` (matiz ~142°) el 21 de agosto. Está en `movil/src/theme/Theme.ts` |
 | 8 ✅ | ~~Material Symbols puede no venir en `@expo/vector-icons`~~ | **Resuelto** — cargar la fuente variable directo con `expo-font` + `fontVariationSettings`. Probar en Android real antes de construir toda la navegación. Ver §5.6 |
 | 9 ✅ | ~~Webhook escrito para el stack anterior~~ | **Resuelto en diseño**, con 3 correcciones sobre la primera plantilla (cuerpo crudo antes de parsear, nombre de cabecera + runtime, código de respuesta en fallos de proceso). Código completo en §2.4. Falta archivar `fusion-semana-1.md` cuando exista `convex/` |
 | 10 🟡 | **Auditoría (qué eventos se registran en v1) sin confirmación explícita** — la propuesta quedó condicional en el documento de decisiones | Aprobar la lista concreta del bloque 4.5 |
 | 11 🟢 | **Retención de datos sin pactar con ninguna escuela real.** La política interna ya está definida, pero es una promesa sin contraparte todavía | Se negocia en la carta de acuerdo del piloto |
-| 12 🟢 | **Segundo entitlement `docente_pro` aprobado en concepto, sin fecha de implementación asignada** | Asignar semana en el calendario de Persona C |
+| 12 ✅ | ~~Segundo entitlement `docente_pro` sin implementar~~ | **Resuelto:** está en `convex/lib/enums.ts` (`ENTITLEMENTS`) y sembrado en el plan `DOC_PRO`. Falta crearlo en el panel de RevenueCat |
+| 13 🔴 | **NUEVO (21 ago).** La migración dejó el proyecto sin modelo de dominio: `convex/schema.ts` estaba vacío y `enums.ts`, `openapi.yaml` y `db/acceso/` se borraron sin portarse | **Resuelto ese mismo día** — las 41 tablas, las constantes y las guardas están restauradas; `openapi.yaml` archivado en `docs/99-archivo/`. La lógica de `db/acceso/` sigue solo en el historial (`git show cf65f89:db/acceso/…`) y hay que reescribirla como funciones de Convex |
