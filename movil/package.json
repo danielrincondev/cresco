@@ -7,7 +7,8 @@
   "scripts": {
     "dev": "varlock run -- expo start",
     "build": "tsc --noEmit",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && npm run typecheck:convex",
+    "typecheck:convex": "tsc --noEmit -p convex/tsconfig.json",
     "test": "vitest run --passWithNoTests",
     "env:check": "varlock load",
     "convex:dev": "convex dev",
@@ -27,8 +28,9 @@
   },
   "devDependencies": {
     "@edge-runtime/vm": "^5.0.0",
-    "@varlock/bitwarden-plugin": "^2.0.0",
+    "@types/node": "^24.13.3",
     "@types/react": "~19.2.0",
+    "@varlock/bitwarden-plugin": "^2.0.0",
     "convex-test": "^0.0.55",
     "typescript": "~6.0.3",
     "varlock": "^1.16.1",

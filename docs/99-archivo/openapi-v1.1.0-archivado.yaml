@@ -1,0 +1,1184 @@
+openapi: 3.1.0
+info:
+  title: API Cresco
+  version: 1.1.0
+  description: |
+    Contrato entre las apps Expo y el servidor Next.js.
+    Acordado por los tres el día 1. Cambiar un endpoint exige acuerdo y subir la versión.
+
+    Autenticación: BetterAuth por cookie de sesión. Los endpoints bajo /docente
+    exigen perfil de docente; los de /representante, perfil de representante.
+
+    Regla transversal: ningún endpoint devuelve datos de un estudiante sin
+    verificar el vínculo activo del solicitante. Si no lo hay, 403.
+
+    v1.1.0 — se añaden los endpoints del lado del docente del módulo de Persona C
+    (bandeja de inconformidades D15, horario y confirmación de citas D16), las
+    alertas recibidas del representante (P10) y el registro de dispositivo para
+    notificaciones push. Estaban en el backlog pero faltaban en el contrato.
+
+servers:
+  - url: https://api.cresco.app/v1
+    description: Producción
+  - url: http://localhost:3000/api/v1
+    description: Local
+
+security:
+  - sesionBetterAuth: []
+
+tags:
+  - name: Curso
+  - name: Estudiantes
+  - name: Acciones
+  - name: Comunicados
+  - name: Asistencia
+  - name: Reportes
+  - name: Citas
+  - name: Inconformidades
+  - name: Alertas
+  - name: Suscripcion
+  - name: Dispositivos
+
+paths:
+  # =========================================================================
+  # DOCENTE — CURSO Y CALENDARIO
+  # =========================================================================
+  /docente/cursos:
+    get:
+      tags: [Curso]
+      summary: Cursos del docente autenticado
+      responses:
+        "200":
+          description: Lista de cursos
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  cursos: { type: array, items: { $ref: "#/components/schemas/Curso" } }
+                  limite_plan: { type: integer, description: "H1: cursos activos permitidos" }
+    post:
+      tags: [Curso]
+      summary: Crear curso, institución declarada y año lectivo
+      description: |
+        A1/A2 — Primer uso del docente. El nombre de la escuela es texto libre y
+        la institución queda sin verificar hasta la v2.
+        H1 — Si el docente ya alcanzó su límite de cursos, devuelve 402.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [nombre_institucion, nombre_curso, nivel, paralelo, anio_inicio, anio_fin]
+              properties:
+                nombre_institucion: { type: string, maxLength: 160 }
+                nombre_curso: { type: string }
+                nivel: { type: string, example: "5to de básica" }
+                paralelo: { type: string, example: "A" }
+                jornada: { type: string, enum: [MATUTINA, VESPERTINA, NOCTURNA] }
+                anio_inicio: { type: string, format: date }
+                anio_fin: { type: string, format: date }
+      responses:
+        "201":
+          description: Curso creado
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Curso" }
+        "402": { $ref: "#/components/responses/LimitePlan" }
+
+  /docente/cursos/{cursoId}/periodos:
+    parameters: [{ $ref: "#/components/parameters/CursoId" }]
+    post:
+      tags: [Curso]
+      summary: Definir los parciales del año lectivo
+      description: "B1/B2 — De 2 a 3 parciales, con fechas que no se solapan."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [periodos]
+              properties:
+                periodos:
+                  type: array
+                  minItems: 2
+                  maxItems: 3
+                  items:
+                    type: object
+                    required: [nombre, orden, fecha_inicio, fecha_fin]
+                    properties:
+                      nombre: { type: string }
+                      orden: { type: integer }
+                      fecha_inicio: { type: string, format: date }
+                      fecha_fin: { type: string, format: date }
+      responses:
+        "201": { description: Períodos creados }
+        "409": { description: "Las fechas se solapan con otro período" }
+
+  /docente/cursos/{cursoId}/invitacion:
+    parameters: [{ $ref: "#/components/parameters/CursoId" }]
+    post:
+      tags: [Estudiantes]
+      summary: Generar el código de invitación al curso
+      description: "A1/D4 — Código de un curso, válido 30 días, reutilizable por varios representantes."
+      responses:
+        "201":
+          description: Invitación generada
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  codigo_corto: { type: string, example: "5A-K7QM" }
+                  enlace: { type: string, format: uri }
+                  expira_en: { type: string, format: date-time }
+
+  # =========================================================================
+  # DOCENTE — ESTUDIANTES
+  # =========================================================================
+  /docente/cursos/{cursoId}/estudiantes:
+    parameters: [{ $ref: "#/components/parameters/CursoId" }]
+    get:
+      tags: [Estudiantes]
+      summary: Lista del curso
+      parameters:
+        - name: estado_verificacion
+          in: query
+          schema: { type: string, enum: [PENDIENTE, APROBADO, RECHAZADO] }
+      responses:
+        "200":
+          description: Estudiantes del curso
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  estudiantes: { type: array, items: { $ref: "#/components/schemas/Estudiante" } }
+                  pendientes_aprobacion: { type: integer }
+
+  /docente/estudiantes/{estudianteId}/aprobar:
+    parameters: [{ $ref: "#/components/parameters/EstudianteId" }]
+    post:
+      tags: [Estudiantes]
+      summary: Aprobar o rechazar un estudiante registrado por su representante
+      description: "A1 — El docente puede completar datos faltantes antes de aprobar."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [decision]
+              properties:
+                decision: { type: string, enum: [APROBAR, RECHAZAR] }
+                nombres: { type: string, description: "Corrección opcional" }
+                apellidos: { type: string }
+                numero_lista: { type: integer }
+                motivo_rechazo: { type: string }
+      responses:
+        "200": { description: Decisión aplicada }
+
+  /docente/cursos/{cursoId}/estudiantes/importar:
+    parameters: [{ $ref: "#/components/parameters/CursoId" }]
+    post:
+      tags: [Estudiantes]
+      summary: Importar lista desde CSV
+      description: "D1/I3 — Se parsea el archivo y se descarta; nunca se almacena."
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                archivo: { type: string, format: binary }
+      responses:
+        "200":
+          description: Resultado del procesamiento
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  creados: { type: integer }
+                  duplicados: { type: integer }
+                  errores:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        fila: { type: integer }
+                        mensaje: { type: string }
+
+  # =========================================================================
+  # DOCENTE — ACCIONES
+  # =========================================================================
+  /docente/catalogo-acciones:
+    get:
+      tags: [Acciones]
+      summary: Catálogo de tipos de acción con sus rangos de puntos
+      responses:
+        "200":
+          description: Catálogo vigente
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  tipos: { type: array, items: { $ref: "#/components/schemas/TipoAccion" } }
+
+  /docente/acciones:
+    post:
+      tags: [Acciones]
+      summary: Asignar una acción a un estudiante
+      description: |
+        C2 — Los puntos deben caer dentro del rango del tipo.
+        C4 — Topes diarios: +4 y −5 por estudiante. Si se excede, 422.
+        B3 — Solo en días de clase y con el período abierto.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [matricula_id, tipo_accion_id, puntos]
+              properties:
+                matricula_id: { type: string, format: uuid }
+                tipo_accion_id: { type: string, format: uuid }
+                puntos: { type: integer, example: -1 }
+                descripcion: { type: string }
+                fecha_ocurrencia: { type: string, format: date }
+      responses:
+        "201":
+          description: Acción registrada
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  accion: { $ref: "#/components/schemas/Accion" }
+                  puntaje_actual: { type: integer }
+                  franja: { $ref: "#/components/schemas/Franja" }
+        "422":
+          description: Tope diario alcanzado o puntos fuera de rango
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+              examples:
+                topeDiario:
+                  value:
+                    codigo: TOPE_DIARIO_ALCANZADO
+                    mensaje: "Este estudiante ya perdió 5 puntos hoy."
+        "409": { description: "El período está cerrado o no es día de clase" }
+
+  /docente/acciones/{accionId}/resolver:
+    parameters:
+      - name: accionId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      tags: [Acciones]
+      summary: Anular o modificar una acción
+      description: |
+        C8 — Solo las negativas.
+        F4 — Ambas llevan la acción a 0 puntos y recalculan; se distinguen al mostrarla.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [estado, motivo]
+              properties:
+                estado: { type: string, enum: [ANULADA, MODIFICADA] }
+                motivo: { type: string }
+      responses:
+        "200":
+          description: Acción resuelta y puntaje recalculado
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  puntaje_actual: { type: integer }
+
+  # =========================================================================
+  # DOCENTE — COMUNICADOS, ASISTENCIA, REPORTE
+  # =========================================================================
+  /docente/cursos/{cursoId}/comunicados:
+    parameters: [{ $ref: "#/components/parameters/CursoId" }]
+    post:
+      tags: [Comunicados]
+      summary: Publicar un anuncio o un evento para todo el curso
+      description: |
+        C2 — El EVENTO se muestra en el reporte hasta 7 días antes de su fecha
+        y desaparece el día siguiente. El ANUNCIO puede publicarse en días sin clase.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [tipo, titulo, contenido]
+              properties:
+                tipo: { type: string, enum: [ANUNCIO, EVENTO] }
+                titulo: { type: string, maxLength: 120 }
+                contenido: { type: string }
+                fecha_evento: { type: string, format: date }
+                hora_evento: { type: string }
+      responses:
+        "201": { description: Comunicado publicado }
+
+  /docente/cursos/{cursoId}/asistencia:
+    parameters: [{ $ref: "#/components/parameters/CursoId" }]
+    put:
+      tags: [Asistencia]
+      summary: Registrar la asistencia del día (lote)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [fecha, registros]
+              properties:
+                fecha: { type: string, format: date }
+                registros:
+                  type: array
+                  items:
+                    type: object
+                    required: [matricula_id, estado]
+                    properties:
+                      matricula_id: { type: string, format: uuid }
+                      estado: { type: string, enum: [PRESENTE, AUSENTE, ATRASO, JUSTIFICADA, PERMISO] }
+                      observacion: { type: string }
+      responses:
+        "200": { description: Asistencia guardada }
+
+  /docente/cursos/{cursoId}/reporte-general:
+    parameters: [{ $ref: "#/components/parameters/CursoId" }]
+    get:
+      tags: [Reportes]
+      summary: Plantilla y borrador del reporte del día
+      parameters:
+        - name: fecha
+          in: query
+          schema: { type: string, format: date }
+      responses:
+        "200":
+          description: Campos de la plantilla con lo ya escrito
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  campos: { type: array, items: { $ref: "#/components/schemas/CampoPlantilla" } }
+                  estado: { type: string, enum: [BORRADOR, PUBLICADO, ANULADO] }
+    post:
+      tags: [Reportes]
+      summary: Guardar o publicar el reporte general
+      description: |
+        E1/E2 — Ningún campo es obligatorio y el reporte completo es opcional.
+        Al publicar se generan los reportes por estudiante y se notifica.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [fecha, valores, publicar]
+              properties:
+                fecha: { type: string, format: date }
+                publicar: { type: boolean }
+                valores:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      campo_codigo: { type: string }
+                      valor: { type: string }
+      responses:
+        "200": { description: Guardado }
+        "201": { description: Publicado y notificado }
+
+  # =========================================================================
+  # REPRESENTANTE
+  # =========================================================================
+  /representante/invitaciones/reclamar:
+    post:
+      tags: [Estudiantes]
+      summary: Reclamar el código del curso y registrar al estudiante
+      description: |
+        A1 — El representante aporta los datos del menor.
+        I4 — Exige el consentimiento de tratamiento de datos, con versión.
+        El estudiante queda PENDIENTE hasta que el docente lo apruebe.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [codigo_corto, estudiante, parentesco, consentimiento]
+              properties:
+                codigo_corto: { type: string }
+                parentesco: { type: string, enum: [MADRE, PADRE, ABUELO_A, TIO_A, HERMANO_A, TUTOR_LEGAL, OTRO] }
+                estudiante:
+                  type: object
+                  required: [numero_documento, nombres, apellidos]
+                  properties:
+                    tipo_documento: { type: string, enum: [CEDULA, PASAPORTE, SIN_DOCUMENTO] }
+                    numero_documento: { type: string }
+                    nombres: { type: string }
+                    apellidos: { type: string }
+                    fecha_nacimiento: { type: string, format: date }
+                consentimiento:
+                  type: object
+                  required: [version_documento, otorgado]
+                  properties:
+                    version_documento: { type: string, example: "2026-08-01" }
+                    otorgado: { type: boolean }
+      responses:
+        "201":
+          description: Estudiante registrado, pendiente de aprobación
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  estudiante_id: { type: string, format: uuid }
+                  estado_verificacion: { type: string, example: PENDIENTE }
+        "409":
+          description: "D2 — Ese estudiante ya tiene un representante activo"
+        "410": { description: "La invitación expiró o fue revocada" }
+
+  /representante/hijos:
+    get:
+      tags: [Estudiantes]
+      summary: Estudiantes que representa
+      description: "D6 — Alimenta la barra superior para cambiar entre hijos, aun de distintos colegios."
+      responses:
+        "200":
+          description: Lista de representados
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  hijos:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        estudiante_id: { type: string, format: uuid }
+                        matricula_id: { type: string, format: uuid }
+                        nombres: { type: string }
+                        curso: { type: string }
+                        institucion: { type: string }
+                        estado_verificacion: { type: string }
+
+  /representante/reporte-diario:
+    get:
+      tags: [Reportes]
+      summary: Reporte del día del hijo seleccionado
+      description: |
+        E4 — Solo el más reciente es visible en la pantalla principal.
+        Si aún no se ha generado, 204 y la app muestra
+        "Aún no tienes reporte nuevo, pero puedes ver el anterior".
+      parameters:
+        - name: matricula_id
+          in: query
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Reporte disponible
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ReporteDiario" }
+        "204": { description: "Aún no hay reporte para hoy" }
+        "403": { $ref: "#/components/responses/SinVinculo" }
+
+  /representante/reportes-anteriores:
+    get:
+      tags: [Reportes]
+      summary: Historial de reportes diarios
+      description: "E4 — Plan gratuito: 2 reportes. Premium: los 7 de la semana."
+      parameters:
+        - name: matricula_id
+          in: query
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Historial según el plan
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  reportes: { type: array, items: { $ref: "#/components/schemas/ReporteDiario" } }
+                  limite_plan: { type: integer, example: 2 }
+                  hay_mas_con_premium: { type: boolean }
+
+  /representante/reporte-acumulado:
+    get:
+      tags: [Reportes]
+      summary: Bitácora y evolución del parcial
+      description: "C2 — Las NOTA no entran en la bitácora. C6 — Los puntos de cada acción sí son visibles."
+      parameters:
+        - name: matricula_id
+          in: query
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Reporte acumulado
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ReporteAcumulado" }
+        "403": { $ref: "#/components/responses/SinVinculo" }
+
+  /representante/reporte-acumulado/exportar:
+    post:
+      tags: [Reportes]
+      summary: Exportar el acumulado a PDF
+      description: |
+        E6/I2 — Premium libre; plan gratuito, tras ver un anuncio recompensado.
+
+        I3 — El PDF se genera en memoria y se devuelve en esta misma respuesta.
+        **No se guarda en ningún almacenamiento ni se expone por URL**, porque la
+        regla del proyecto es que no se guardan archivos en ninguna parte. La app
+        recibe el binario y lo escribe en el teléfono (`expo-sharing`) si el
+        representante decide guardarlo o compartirlo.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [matricula_id]
+              properties:
+                matricula_id: { type: string, format: uuid }
+                token_recompensa: { type: string, description: "Del anuncio visto; solo en plan gratuito" }
+      responses:
+        "200":
+          description: PDF del acumulado
+          content:
+            application/pdf:
+              schema: { type: string, format: binary }
+        "402": { $ref: "#/components/responses/LimitePlan" }
+        "403": { $ref: "#/components/responses/SinVinculo" }
+
+  /representante/inconformidades:
+    post:
+      tags: [Inconformidades]
+      summary: Abrir inconformidad sobre una acción negativa
+      description: "C8 — Solo acciones negativas. F3 — El docente tiene 30 días."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [accion_id, motivo, mensaje]
+              properties:
+                accion_id: { type: string, format: uuid }
+                motivo: { type: string, enum: [NO_OCURRIO, CONTEXTO_INCOMPLETO, SANCION_DESPROPORCIONADA, SOLICITA_REUNION, OTRO] }
+                mensaje: { type: string }
+      responses:
+        "201":
+          description: Inconformidad abierta
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id: { type: string, format: uuid }
+                  vence_en: { type: string, format: date-time }
+        "409": { description: "Ya existe una inconformidad para esa acción" }
+
+  /representante/citas/disponibilidad:
+    get:
+      tags: [Citas]
+      summary: Bloques libres del docente
+      description: "F1 — Bloques de 15 minutos derivados del horario publicado."
+      parameters:
+        - name: docente_id
+          in: query
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Bloques disponibles
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  bloques:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: string, format: uuid }
+                        fecha_hora_inicio: { type: string, format: date-time }
+                        modalidad: { type: string }
+
+  /representante/citas:
+    post:
+      tags: [Citas]
+      summary: Reservar un bloque
+      description: "F2 — Nace SOLICITADA; requiere confirmación del docente."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [disponibilidad_id, estudiante_id]
+              properties:
+                disponibilidad_id: { type: string, format: uuid }
+                estudiante_id: { type: string, format: uuid }
+                motivo: { type: string }
+      responses:
+        "201": { description: "Cita solicitada" }
+        "403": { $ref: "#/components/responses/SinVinculo" }
+        "409": { description: "El bloque ya fue tomado" }
+
+  # =========================================================================
+  # DOCENTE — INCONFORMIDADES Y CITAS (D15, D16)
+  # =========================================================================
+  /docente/inconformidades:
+    get:
+      tags: [Inconformidades]
+      summary: Bandeja de inconformidades del docente
+      description: |
+        D15 — F3: las que están por vencer suben de prioridad. Vencido el plazo
+        de 30 días la tarea programada las pasa a VENCIDA.
+      parameters:
+        - name: estado
+          in: query
+          schema:
+            type: string
+            enum: [ABIERTA, EN_REVISION, RESUELTA_MANTENIDA, RESUELTA_MODIFICADA, RESUELTA_ANULADA, VENCIDA]
+      responses:
+        "200":
+          description: Inconformidades de los cursos del docente
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  inconformidades: { type: array, items: { $ref: "#/components/schemas/Inconformidad" } }
+                  abiertas: { type: integer }
+                  por_vencer: { type: integer, description: "Vencen en 7 días o menos" }
+
+  /docente/inconformidades/{inconformidadId}/resolver:
+    parameters:
+      - name: inconformidadId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      tags: [Inconformidades]
+      summary: Resolver una inconformidad
+      description: |
+        F4 — `RESUELTA_MODIFICADA` lleva la acción a `MODIFICADA` (0 puntos) y
+        `RESUELTA_ANULADA` la lleva a `ANULADA` (0 puntos). Ambas recalculan el
+        puntaje llamando a la función de Persona B; ninguna lo incrementa a mano.
+        `RESUELTA_MANTENIDA` no altera el puntaje.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [estado, respuesta_docente]
+              properties:
+                estado:
+                  type: string
+                  enum: [RESUELTA_MANTENIDA, RESUELTA_MODIFICADA, RESUELTA_ANULADA]
+                respuesta_docente: { type: string }
+      responses:
+        "200":
+          description: Inconformidad resuelta y puntaje recalculado
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  estado: { type: string }
+                  puntaje_actual: { type: integer }
+        "409": { description: "Ya estaba resuelta o está VENCIDA" }
+
+  /docente/disponibilidad:
+    get:
+      tags: [Citas]
+      summary: Horario publicado por el docente
+      responses:
+        "200":
+          description: Bloques publicados con su estado
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  bloques: { type: array, items: { $ref: "#/components/schemas/BloqueDisponibilidad" } }
+    post:
+      tags: [Citas]
+      summary: Publicar horario de atención
+      description: |
+        F1 — El docente publica una franja y el servidor la parte en bloques de
+        15 minutos. Publicar sobre una franja ya existente devuelve 409.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [fecha, hora_inicio, hora_fin]
+              properties:
+                curso_id: { type: string, format: uuid }
+                fecha: { type: string, format: date }
+                hora_inicio: { type: string, example: "10:00" }
+                hora_fin: { type: string, example: "11:00" }
+                modalidad: { type: string, enum: [PRESENCIAL, VIRTUAL, TELEFONICA] }
+                lugar_o_enlace: { type: string }
+      responses:
+        "201":
+          description: Bloques creados
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  bloques_creados: { type: integer, example: 4 }
+        "409": { description: "Ya hay un bloque publicado en ese horario" }
+
+  /docente/citas:
+    get:
+      tags: [Citas]
+      summary: Citas del docente
+      parameters:
+        - name: estado
+          in: query
+          schema:
+            type: string
+            enum: [SOLICITADA, CONFIRMADA, RECHAZADA, REPROGRAMADA, CANCELADA, ATENDIDA, NO_ASISTIO]
+      responses:
+        "200":
+          description: Citas del docente autenticado
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  citas: { type: array, items: { $ref: "#/components/schemas/Cita" } }
+                  por_confirmar: { type: integer }
+
+  /docente/citas/{citaId}/responder:
+    parameters:
+      - name: citaId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      tags: [Citas]
+      summary: Confirmar, rechazar o cerrar una cita
+      description: "F2 — La cita nace SOLICITADA y no vale hasta que el docente la confirme."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [estado]
+              properties:
+                estado:
+                  type: string
+                  enum: [CONFIRMADA, RECHAZADA, CANCELADA, ATENDIDA, NO_ASISTIO]
+                notas_docente: { type: string }
+      responses:
+        "200": { description: Estado de la cita actualizado }
+        "409": { description: "Transición de estado no permitida" }
+
+  # =========================================================================
+  # ALERTAS
+  # =========================================================================
+  /docente/alertas:
+    post:
+      tags: [Alertas]
+      summary: Activar una alerta de emergencia
+      description: |
+        G1 — Exige reautenticación: el docente reingresa su contraseña y el
+        cliente envía el token resultante.
+        G2 — Alcance CURSO o ESTUDIANTE.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [curso_id, alcance, tipo, titulo, mensaje, token_reautenticacion]
+              properties:
+                curso_id: { type: string, format: uuid }
+                alcance: { type: string, enum: [CURSO, ESTUDIANTE] }
+                estudiante_id: { type: string, format: uuid }
+                tipo: { type: string, enum: [EVACUACION, SUSPENSION_CLASES, ACCIDENTE, RETIRO_ANTICIPADO, SALUD, SIMULACRO, OTRO] }
+                titulo: { type: string }
+                mensaje: { type: string }
+                es_simulacro: { type: boolean }
+                token_reautenticacion: { type: string }
+      responses:
+        "201":
+          description: Alerta enviada
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  destinatarios: { type: integer }
+        "401": { description: "Reautenticación inválida o vencida" }
+
+  /representante/alertas:
+    get:
+      tags: [Alertas]
+      summary: Alertas dirigidas al representante
+      description: "P10 — Alcance CURSO o ESTUDIANTE, según a quién iba dirigida."
+      responses:
+        "200":
+          description: Alertas recibidas, más recientes primero
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  alertas: { type: array, items: { $ref: "#/components/schemas/AlertaRecibida" } }
+                  sin_confirmar: { type: integer }
+
+  /representante/alertas/{alertaId}/confirmar:
+    parameters:
+      - name: alertaId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      tags: [Alertas]
+      summary: Confirmar lectura de la alerta
+      description: "G3"
+      responses:
+        "200": { description: Confirmada }
+
+  # =========================================================================
+  # SUSCRIPCIÓN
+  # =========================================================================
+  /suscripcion/estado:
+    get:
+      tags: [Suscripcion]
+      summary: Plan y límites vigentes del usuario
+      responses:
+        "200":
+          description: Estado de la suscripción
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  plan_codigo: { type: string }
+                  sin_publicidad: { type: boolean }
+                  expira_en: { type: string, format: date-time }
+                  limites: { type: object, additionalProperties: true }
+
+  /webhooks/revenuecat:
+    post:
+      tags: [Suscripcion]
+      summary: Webhook de RevenueCat
+      description: |
+        Idempotente por el identificador del evento. Un reenvío no duplica nada.
+        Autenticado por cabecera compartida, no por sesión de usuario.
+      security: []
+      responses:
+        "200": { description: Procesado }
+        "401": { description: Firma inválida }
+
+  # =========================================================================
+  # DISPOSITIVOS — notificaciones push
+  # =========================================================================
+  /dispositivos:
+    post:
+      tags: [Dispositivos]
+      summary: Registrar el token push del dispositivo
+      description: |
+        Lo llaman las dos apps al iniciar sesión. El token es único: si ya existe
+        se reasigna al usuario actual en vez de duplicarse (un teléfono prestado
+        no debe seguir recibiendo las alertas del dueño anterior).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token_push]
+              properties:
+                token_push: { type: string }
+                plataforma: { type: string, enum: [ANDROID], default: ANDROID }
+                version_app: { type: string }
+      responses:
+        "200": { description: Dispositivo registrado o reasignado }
+
+    delete:
+      tags: [Dispositivos]
+      summary: Dar de baja el token al cerrar sesión
+      parameters:
+        - name: token_push
+          in: query
+          required: true
+          schema: { type: string }
+      responses:
+        "204": { description: Dispositivo desactivado }
+
+# ===========================================================================
+components:
+  securitySchemes:
+    sesionBetterAuth:
+      type: apiKey
+      in: cookie
+      name: better-auth.session_token
+      description: |
+        Cookie de sesión emitida por BetterAuth. El servidor la resuelve a un
+        `user.id` y abre la transacción con `SET LOCAL app.user_id` (ADR-004).
+
+  parameters:
+    CursoId:
+      name: cursoId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    EstudianteId:
+      name: estudianteId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+
+  responses:
+    SinVinculo:
+      description: El usuario no representa a este estudiante
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+          example:
+            codigo: SIN_VINCULO
+            mensaje: "No tiene acceso a este estudiante."
+    LimitePlan:
+      description: Requiere plan superior
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+          example:
+            codigo: LIMITE_PLAN
+            mensaje: "Su plan permite 1 curso activo."
+
+  schemas:
+    Error:
+      type: object
+      required: [codigo, mensaje]
+      properties:
+        codigo: { type: string }
+        mensaje: { type: string }
+        detalles: { type: object, additionalProperties: true }
+
+    Curso:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        nombre: { type: string }
+        nivel: { type: string }
+        paralelo: { type: string }
+        jornada: { type: string }
+        institucion: { type: string }
+        total_estudiantes: { type: integer }
+        periodo_vigente: { $ref: "#/components/schemas/Periodo" }
+
+    Periodo:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        nombre: { type: string }
+        orden: { type: integer }
+        fecha_inicio: { type: string, format: date }
+        fecha_fin: { type: string, format: date }
+        estado: { type: string, enum: [PLANIFICADO, EN_CURSO, CERRADO] }
+
+    Estudiante:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        matricula_id: { type: string, format: uuid }
+        nombres: { type: string }
+        apellidos: { type: string }
+        numero_lista: { type: integer }
+        estado_verificacion: { type: string, enum: [PENDIENTE, APROBADO, RECHAZADO] }
+        puntaje_actual: { type: integer }
+        franja: { $ref: "#/components/schemas/Franja" }
+
+    Franja:
+      type: object
+      properties:
+        codigo: { type: string, example: BUENO }
+        nombre: { type: string, example: "Buen desempeño" }
+        frase_representante: { type: string }
+        color_hex: { type: string }
+
+    TipoAccion:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        codigo: { type: string }
+        nombre: { type: string }
+        signo: { type: string, enum: [POSITIVA, NEGATIVA, NOTA] }
+        categoria: { type: string }
+        puntos_defecto: { type: integer }
+        puntos_min: { type: integer }
+        puntos_max: { type: integer }
+        admite_inconformidad: { type: boolean }
+
+    Accion:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        tipo_nombre: { type: string }
+        categoria: { type: string }
+        signo: { type: string, enum: [POSITIVA, NEGATIVA, NOTA] }
+        puntos_aplicados: { type: integer }
+        descripcion: { type: string }
+        fecha_ocurrencia: { type: string, format: date }
+        estado: { type: string, enum: [VIGENTE, ANULADA, MODIFICADA] }
+        puede_reclamar: { type: boolean, description: "C8 — solo negativas vigentes" }
+
+    Comunicado:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        tipo: { type: string, enum: [ANUNCIO, EVENTO] }
+        titulo: { type: string }
+        contenido: { type: string }
+        fecha_evento: { type: string, format: date }
+        hora_evento: { type: string }
+
+    CampoPlantilla:
+      type: object
+      properties:
+        codigo: { type: string, example: ANUNCIOS }
+        etiqueta: { type: string, example: Anuncios }
+        tipo_dato: { type: string, enum: [TEXTO_CORTO, TEXTO_LARGO, LISTA] }
+        texto_ayuda: { type: string }
+        valor: { type: string }
+        orden: { type: integer }
+
+    ReporteDiario:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        fecha: { type: string, format: date }
+        tiene_novedades: { type: boolean }
+        puntaje_al_cierre: { type: integer }
+        franja: { $ref: "#/components/schemas/Franja" }
+        estado_asistencia: { type: string }
+        reporte_general:
+          type: array
+          items: { $ref: "#/components/schemas/CampoPlantilla" }
+        acciones:
+          type: array
+          items: { $ref: "#/components/schemas/Accion" }
+        comunicados:
+          type: array
+          items: { $ref: "#/components/schemas/Comunicado" }
+        citacion_pendiente: { type: boolean }
+
+    Inconformidad:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        estudiante_nombre: { type: string }
+        curso: { type: string }
+        motivo: { type: string, enum: [NO_OCURRIO, CONTEXTO_INCOMPLETO, SANCION_DESPROPORCIONADA, SOLICITA_REUNION, OTRO] }
+        mensaje: { type: string }
+        estado:
+          type: string
+          enum: [ABIERTA, EN_REVISION, RESUELTA_MANTENIDA, RESUELTA_MODIFICADA, RESUELTA_ANULADA, VENCIDA]
+        accion: { $ref: "#/components/schemas/Accion" }
+        respuesta_docente: { type: string }
+        vence_en: { type: string, format: date-time }
+        resuelta_en: { type: string, format: date-time }
+
+    BloqueDisponibilidad:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        fecha: { type: string, format: date }
+        hora_inicio: { type: string, example: "10:00" }
+        hora_fin: { type: string, example: "10:15" }
+        modalidad: { type: string, enum: [PRESENCIAL, VIRTUAL, TELEFONICA] }
+        lugar_o_enlace: { type: string }
+        estado: { type: string, enum: [DISPONIBLE, RESERVADO, BLOQUEADO, CANCELADO] }
+
+    Cita:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        estudiante_nombre: { type: string }
+        representante_nombre: { type: string }
+        origen: { type: string, enum: [SOLICITADA_POR_REPRESENTANTE, CITACION_DOCENTE] }
+        motivo: { type: string }
+        fecha_hora_inicio: { type: string, format: date-time }
+        fecha_hora_fin: { type: string, format: date-time }
+        modalidad: { type: string, enum: [PRESENCIAL, VIRTUAL, TELEFONICA] }
+        estado:
+          type: string
+          enum: [SOLICITADA, CONFIRMADA, RECHAZADA, REPROGRAMADA, CANCELADA, ATENDIDA, NO_ASISTIO]
+        notas_docente: { type: string }
+
+    AlertaRecibida:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        tipo: { type: string, enum: [EVACUACION, SUSPENSION_CLASES, ACCIDENTE, RETIRO_ANTICIPADO, SALUD, SIMULACRO, OTRO] }
+        alcance: { type: string, enum: [CURSO, ESTUDIANTE] }
+        titulo: { type: string }
+        mensaje: { type: string }
+        es_simulacro: { type: boolean }
+        curso: { type: string }
+        estudiante_nombre: { type: string, description: "Solo si el alcance es ESTUDIANTE" }
+        activada_en: { type: string, format: date-time }
+        confirmado_en: { type: string, format: date-time }
+
+    ReporteAcumulado:
+      type: object
+      properties:
+        periodo: { $ref: "#/components/schemas/Periodo" }
+        puntaje_base: { type: integer }
+        puntaje_actual: { type: integer }
+        franja: { $ref: "#/components/schemas/Franja" }
+        serie_evolucion:
+          type: array
+          description: Puntos para el gráfico simple
+          items:
+            type: object
+            properties:
+              fecha: { type: string, format: date }
+              puntaje: { type: integer }
+        bitacora:
+          type: array
+          items: { $ref: "#/components/schemas/Accion" }
+        resumen_categorias:
+          type: array
+          items:
+            type: object
+            properties:
+              categoria: { type: string }
+              cantidad: { type: integer }
+              puntos: { type: integer }
+        inasistencias: { type: integer }
+        atrasos: { type: integer }

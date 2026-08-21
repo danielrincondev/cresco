@@ -8,6 +8,8 @@
  * @module
  */
 
+import type * as semillas from "../semillas.js";
+import type * as suscripciones from "../suscripciones.js";
 import type * as viewer from "../viewer.js";
 
 import type {
@@ -17,6 +19,8 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  semillas: typeof semillas;
+  suscripciones: typeof suscripciones;
   viewer: typeof viewer;
 }>;
 

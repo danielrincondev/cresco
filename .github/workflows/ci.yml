@@ -1,0 +1,48 @@
+# CI de Cresco — dueño: Persona C (infraestructura).
+#
+# Comprueba tipos y pruebas en cada PR. Un solo job porque ahora hay un solo
+# proyecto: Expo en la raíz con `convex/` dentro, un `package.json` por
+# workspace y nada más que orquestar.
+#
+# ⚠️ Este archivo es solo la mitad del trabajo. Para que un PR en rojo **no se
+# pueda fusionar** hay que marcar el check como obligatorio en GitHub:
+#   Settings → Branches → regla sobre `main` → Require status checks.
+# Sin ese paso el CI se pone rojo y el botón de fusionar sigue verde.
+
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+# Un push nuevo sobre la misma rama cancela la corrida anterior: en un
+# hackathon la cola de Actions es un recurso escaso.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verificar:
+    name: Tipos y pruebas
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      # `npm ci` y no `npm install`: instala exactamente el package-lock.json
+      # versionado, que es lo que hace reproducible la máquina limpia.
+      - run: npm ci
+
+      # Comprueba las dos superficies: la app de Expo y las funciones de
+      # Convex, que tienen tsconfig separados.
+      - name: Tipos
+        run: npm run typecheck
+
+      - name: Pruebas
+        run: npm test
