@@ -1,0 +1,24 @@
+{
+  "name": "Cresco",
+  "image": "mcr.microsoft.com/devcontainers/javascript-node:24-bookworm",
+  "forwardPorts": [8081],
+  "portsAttributes": {
+    "8081": {
+      "label": "Expo Metro",
+      "onAutoForward": "notify"
+    }
+  },
+  "remoteEnv": {
+    "BITWARDEN_ACCESS_TOKEN": "${localEnv:BITWARDEN_ACCESS_TOKEN}",
+    "CLERK_JWT_ISSUER_DOMAIN": "${localEnv:CLERK_JWT_ISSUER_DOMAIN}",
+    "CONVEX_DEPLOYMENT": "${localEnv:CONVEX_DEPLOYMENT}",
+    "EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY": "${localEnv:EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY}",
+    "EXPO_PUBLIC_CONVEX_URL": "${localEnv:EXPO_PUBLIC_CONVEX_URL}"
+  },
+  "mounts": [
+    "source=cresco-varlock,target=/home/node/.config/varlock,type=volume",
+    "source=cresco-convex,target=/home/node/.convex,type=volume"
+  ],
+  "postCreateCommand": "sudo chown -R node:node /home/node/.config/varlock /home/node/.convex && npm ci",
+  "remoteUser": "node"
+}

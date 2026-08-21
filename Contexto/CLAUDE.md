@@ -1,5 +1,10 @@
 # CLAUDE.md — Instrucciones permanentes para Claude Code
 
+> **Instrucción vigente desde el 16 de agosto de 2026:** el runtime es una sola
+> aplicación Expo con Clerk y Convex. No se debe reintroducir `servidor/`, `db/`,
+> Next.js, Better Auth, PostgreSQL ni Drizzle. Las secciones posteriores que
+> describen ese stack se conservan únicamente como contexto histórico.
+
 ## Qué es este proyecto
 
 **Cresco** es una aplicación Android de comunicación entre **docentes** y

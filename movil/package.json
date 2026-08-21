@@ -1,0 +1,38 @@
+{
+  "name": "@cresco/movil",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "main": "index.ts",
+  "scripts": {
+    "dev": "varlock run -- expo start",
+    "build": "tsc --noEmit",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests",
+    "env:check": "varlock load",
+    "convex:dev": "convex dev",
+    "convex:sync-auth-env": "varlock printenv CLERK_JWT_ISSUER_DOMAIN | convex env set CLERK_JWT_ISSUER_DOMAIN"
+  },
+  "dependencies": {
+    "@clerk/expo": "^4.3.0",
+    "convex": "^1.44.0",
+    "expo": "~57.0.13",
+    "expo-auth-session": "~57.0.7",
+    "expo-crypto": "~57.0.1",
+    "expo-secure-store": "~57.0.1",
+    "expo-web-browser": "~57.0.2",
+    "react": "19.2.3",
+    "react-native": "0.86.2",
+    "react-native-safe-area-context": "~5.7.0"
+  },
+  "devDependencies": {
+    "@edge-runtime/vm": "^5.0.0",
+    "@varlock/bitwarden-plugin": "^2.0.0",
+    "@types/react": "~19.2.0",
+    "convex-test": "^0.0.55",
+    "typescript": "~6.0.3",
+    "varlock": "^1.16.1",
+    "vite": "^8.2.1",
+    "vitest": "^4.0.0"
+  }
+}

@@ -1,6 +1,9 @@
 # ADR-003 — Autenticación e identidad
 
-**Fecha:** 2026-08-02 · **Estado:** Aceptado
+**Fecha:** 2026-08-02 · **Estado:** Reemplazado el 2026-08-16
+
+> Decisión vigente: Clerk autentica la aplicación Expo y Convex valida sus JWT
+> mediante `movil/convex/auth.config.ts`. Better Auth fue retirado.
 
 ## Contexto
 Hay dos perfiles (docente y representante) y una misma persona puede ser ambos.

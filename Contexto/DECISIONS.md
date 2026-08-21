@@ -5,6 +5,11 @@ concreta. Si Claude Code propone algo que contradice una fila de estas tablas,
 debe señalar explícitamente que contradice una decisión previa y esperar
 confirmación del usuario.
 
+> **Reemplazo confirmado por el usuario el 16 de agosto de 2026:** Expo + Clerk +
+> Convex es la arquitectura vigente. Las decisiones anteriores sobre Next.js,
+> Better Auth, PostgreSQL, Drizzle, RLS y el contrato OpenAPI quedan históricas y
+> no deben guiar nuevas implementaciones.
+
 Formato de fecha: aproximada, dentro de la sesión de diseño del 3 de agosto de
 2026 salvo indicación distinta.
 

@@ -1,31 +1,6 @@
 node_modules/
-.env
-.env.*
-!.env.example
-*.keystore
-*.jks
-google-services.json
-service-account*.json
-/build/
-/dist/
-.expo/
-.expo-shared/
-
-# servidor/ (Next.js) y movil/ (Expo) no existen todavía — nacen el día 1 de
-# la semana 1 (decision S3, DECISIONS.md). Estos patrones sin "/" inicial
-# cubren sus carpetas de build en cualquier profundidad, no solo en la raíz.
-.next/
-next-env.d.ts
-*.tsbuildinfo
-web-build/
-*.pem
-
-# PDF: siempre es una salida generada, nunca una fuente
-*.pdf
-# Excepcion: los manuales de 04-guias solo existen como PDF y son material
-# de trabajo del equipo. Mientras no se reescriban en Markdown, se versionan.
-!/docs/04-guias/*.pdf
-
-# Acuerdos firmados: contienen nombres, firmas y cedulas. Nunca al repositorio.
+/movil/.expo/
+/.env
+/movil/.env.local
 /docs/03-piloto/firmados/*
 !/docs/03-piloto/firmados/.gitkeep

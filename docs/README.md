@@ -4,6 +4,11 @@
 que se agrega un documento.** Un documento que no está en esta tabla, no existe
 para el equipo.
 
+> **Arquitectura vigente desde el 16 de agosto de 2026:** Expo + Clerk + Convex.
+> Los manuales y documentos de planificación anteriores se conservan como
+> contexto histórico cuando describen Next.js, Better Auth, PostgreSQL o Drizzle.
+> Para el runtime actual mandan el `README.md` de la raíz y `movil/`.
+
 Estado: `✅ listo` · `🚧 en progreso` · `⬜ pendiente` · `📦 archivado`
 
 ---
@@ -14,10 +19,10 @@ Vive fuera de `docs/` porque Claude Code lo carga en cada sesión.
 
 | Documento | Estado | Dueño |
 |---|---|---|
-| `../Contexto/CLAUDE.md` | ✅ instrucciones permanentes | Todos |
-| `../Contexto/CONTEXT.md` | ✅ estado completo del proyecto | Todos |
-| `../Contexto/DECISIONS.md` | ✅ decisiones cerradas | Todos |
-| `../Contexto/NEXT_STEPS.md` | ✅ por dónde continuar | Todos |
+| `../Contexto/CLAUDE.md` | histórico; reemplazado en arquitectura | Todos |
+| `../Contexto/CONTEXT.md` | histórico; reemplazado en arquitectura | Todos |
+| `../Contexto/DECISIONS.md` | histórico; consultar ADR actualizados | Todos |
+| `../Contexto/NEXT_STEPS.md` | histórico; no usar como backlog activo | Todos |
 | `../Contexto/reglas-shipaton-next-gen.md` | ✅ reglas oficiales verificadas | Persona C |
 
 ## 00-producto — ¿Qué construimos y por qué?
@@ -32,13 +37,12 @@ Vive fuera de `docs/` porque Claude Code lo carga en cada sesión.
 
 | Documento | Estado | Dueño |
 |---|---|---|
-| `adr/` (7 decisiones, indexadas en `adr/README.md`) | ✅ | Quien propuso cada una |
+| `adr/` (7 decisiones; ADR-001 a ADR-004 reemplazados) | actualizado | Todos |
 | `matriz-permisos.md` | ✅ | Persona A |
 | `modelo-datos.md` | ⬜ | Persona A |
 
-> El esquema ejecutable vive en `db/schema/` y el contrato de API en
-> `api/openapi.yaml`. No son documentos de lectura: son archivos que las
-> herramientas consumen, por eso están junto al código.
+> El esquema y las funciones ejecutables viven en `movil/convex/`. No existe un
+> contrato OpenAPI ni una base PostgreSQL separados en la arquitectura vigente.
 
 ## 02-equipo — ¿Cómo trabajamos?
 

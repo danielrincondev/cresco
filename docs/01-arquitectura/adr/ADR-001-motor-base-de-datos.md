@@ -1,6 +1,9 @@
 # ADR-001 — Motor de base de datos y ORM
 
-**Fecha:** 2026-08-02 · **Estado:** Aceptado
+**Fecha:** 2026-08-02 · **Estado:** Reemplazado el 2026-08-16
+
+> Decisión vigente: Convex proporciona la base de datos, las funciones de
+> backend y los tipos generados. Ya no existe PostgreSQL ni Drizzle.
 
 ## Contexto
 El modelo de datos es relacional y normalizado: 41 tablas con integridad

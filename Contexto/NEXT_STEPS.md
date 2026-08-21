@@ -1,5 +1,9 @@
 # NEXT_STEPS.md — Por dónde continuar
 
+> **Archivado el 16 de agosto de 2026.** Este plan corresponde al stack retirado
+> de Next.js, Better Auth, PostgreSQL y Drizzle. No debe usarse como backlog
+> activo; el runtime vigente es Expo + Clerk + Convex.
+
 Estado al 8 de agosto de 2026. Proyecto **Cresco**, equipo **Neofix**. El usuario
 es **Persona C** (citas, inconformidades, alertas, RevenueCat, notificaciones,
 CI, despliegue).

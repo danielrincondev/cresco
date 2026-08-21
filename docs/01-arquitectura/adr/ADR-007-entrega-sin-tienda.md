@@ -4,7 +4,7 @@
 
 > Reemplaza la consecuencia de **ADR-002** que anticipaba subir un build a un
 > canal de pruebas internas de Play Console e iniciar el trámite en la semana 2.
-> La decisión de fondo de ADR-002 (Next.js + Expo) **no cambia**.
+> La decisión original de ADR-002 sobre Next.js fue reemplazada el 2026-08-16.
 
 ## Contexto
 

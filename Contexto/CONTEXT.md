@@ -1,10 +1,11 @@
 # CONTEXT.md — Estado del proyecto Cresco
 
-Última actualización: 8 de agosto de 2026. Equipo **Neofix**.
+Última actualización de arquitectura: 16 de agosto de 2026.
 
-Este documento resume todo lo decidido hasta hoy y, al final, **lo que
-explícitamente NO se ha decidido**. Si algo aparece en la sección "Pendiente de
-definir", no lo asumas ni lo inventes: pregúntale al usuario.
+> El usuario reemplazó explícitamente el backend anterior por Expo + Clerk +
+> Convex. Las secciones que describen Next.js, Better Auth, PostgreSQL o Drizzle
+> son históricas y no definen el runtime vigente. Consultar el `README.md` de la
+> raíz y `movil/`.
 
 ---
 

@@ -1,10 +1,12 @@
 # Matriz de permisos — Cresco v1.0
 
-> **Estado:** Vigente · **Dueño:** Persona A · **Última revisión:** 2026-08-07
+> **Estado:** Reglas de producto vigentes; mecanismo técnico reemplazado el
+> 2026-08-16 · **Dueño:** Persona A
 
-Este documento es la fuente de la que se derivan las políticas RLS y las pruebas
-de seguridad. Cualquier endpoint nuevo debe poder ubicarse en esta tabla antes de
-escribirse.
+Esta matriz sigue definiendo quién puede acceder a cada dato. Las referencias a
+endpoints HTTP, `db/acceso/` y RLS son históricas: cada función pública de Convex
+debe validar la identidad de Clerk y aplicar aquí la relación autorizada antes
+de leer o modificar documentos.
 
 **Roles activos en la v1:** `DOCENTE_TITULAR`, `REPRESENTANTE`, `ANONIMO`.
 
