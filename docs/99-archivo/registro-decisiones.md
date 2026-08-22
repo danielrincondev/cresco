@@ -1,6 +1,19 @@
 # Registro de decisiones — sesión del 14 de agosto de 2026
 
-> **Estado:** Vigente · **Dueño:** Persona C (Product Manager) · **Última revisión:** 2026-08-14
+> **Estado:** Reemplazado el 2026-08-22 · **Dueño:** Persona C (Product Manager) · **Última revisión:** 2026-08-14
+
+**Este documento pasa a archivo.** Las decisiones de producto que seguían
+vigentes viven ahora una por archivo en `docs/00-producto/decisiones/`
+(DP-001 a DP-008), con la misma disciplina de los ADR: nunca se editan, se
+reemplazan. El resumen del pivote de stack (§2) vive en los ADR de
+`docs/01-arquitectura/adr/`. La dirección visual (§5) está implementada en
+`movil/src/theme/Theme.ts`; el cuestionario que la originó también se archivó
+(`docs/99-archivo/cuestionario-direccion-visual.md`).
+
+Se conserva aquí completo, sin editar, como registro histórico de la sesión
+del 14 y 21 de agosto.
+
+---
 
 Consolida en un solo documento todo lo decidido hasta hoy: el proyecto, el
 pivote de stack, las decisiones de producto de esta semana y la dirección

@@ -1,6 +1,14 @@
 # Decisiones pendientes — sesión de Product Manager
 
-> **Estado:** Borrador · **Dueño:** Persona C (Product Manager) · **Fecha:** 2026-08-14
+> **Estado:** Reemplazado el 2026-08-22 · **Dueño:** Persona C (Product Manager) · **Fecha:** 2026-08-14
+
+**Este documento pasa a archivo.** Todos sus bloques quedaron resueltos. Las
+decisiones que siguen siendo relevantes viven, una por archivo, en
+`docs/00-producto/decisiones/` (DP-001 a DP-008). Se conserva completo, sin
+editar, porque las respuestas escritas a mano en este archivo (bloques 1, 3,
+4 y 5) son el registro original de esas decisiones.
+
+---
 
 Todas las decisiones abiertas del proyecto, en un solo sitio, ordenadas por qué
 bloquean. Las toma Persona C con potestad delegada por A y B.

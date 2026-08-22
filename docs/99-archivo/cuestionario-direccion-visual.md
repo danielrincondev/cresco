@@ -1,6 +1,12 @@
 # Cuestionario de dirección visual — Cresco v1.0
 
-> **Estado:** Borrador · **Dueño:** Persona A (dueña del archivo `Theme.ts`) · **Última revisión:** 2026-08-08
+> **Estado:** Reemplazado el 2026-08-22 · **Dueño:** Persona A (dueña del archivo `Theme.ts`) · **Última revisión:** 2026-08-08
+
+**El tema ya está escrito** en `movil/src/theme/Theme.ts`, con todos los
+valores decididos aquí (colores, tipografía, espaciado, radios, franjas,
+iconografía). Este documento pasa a archivo tal como su propia introducción
+lo anunciaba ("una vez escrito el tema, este documento pasa a Reemplazado").
+Se conserva completo como el porqué detrás de cada valor de `Theme.ts`.
 
 Preguntas cuya respuesta hace falta para poder escribir `Theme.ts` y los seis
 componentes base. Mismo formato que `cuestionario-definiciones.md`: respondan con

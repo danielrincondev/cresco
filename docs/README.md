@@ -29,9 +29,14 @@ Vive fuera de `docs/` porque Claude Code lo carga en cada sesión.
 
 | Documento | Estado | Dueño |
 |---|---|---|
+| `decisiones/` (8 decisiones de producto, DP-001 a DP-008) | ✅ vigente — una decisión por archivo, misma disciplina que los ADR | Persona C |
 | `cuestionario-definiciones.md` | 📦 reemplazado por `DECISIONS.md` | Todos |
-| `cuestionario-direccion-visual.md` | 🚧 guion de la sesión de dirección visual | Persona A |
 | `glosario.md` | ⬜ | Todos |
+
+> `registro-decisiones.md`, `decisiones-pendientes.md` y
+> `cuestionario-direccion-visual.md` se archivaron el 22 de agosto: sus
+> decisiones vigentes viven en `decisiones/`, y la dirección visual está
+> implementada en `movil/src/theme/Theme.ts`. Ver `99-archivo` más abajo.
 
 ## 01-arquitectura — ¿Cómo está construido?
 
@@ -49,6 +54,7 @@ Vive fuera de `docs/` porque Claude Code lo carga en cada sesión.
 | Documento | Estado | Dueño |
 |---|---|---|
 | `manual-equipo.md` | ✅ | Todos |
+| `flujo-de-trabajo.md` | ✅ ramas, PR, CODEOWNERS, banderas — qué hace cada uno paso a paso | Todos |
 | `backlog-y-reparto.md` | ✅ se actualiza cada lunes | Todos |
 | `registro-riesgos.md` | ⬜ | Persona C |
 
@@ -94,6 +100,9 @@ Vive fuera de `docs/` porque Claude Code lo carga en cada sesión.
 | Documento | Estado | Dueño |
 |---|---|---|
 | `ERRATA-2026-08.md` | 📦 reemplazado — su contenido ya está en los manuales v1.1 de `04-guias/`; se conserva como historial | Persona C |
+| `registro-decisiones.md` | 📦 reemplazado — sus decisiones vigentes están en `00-producto/decisiones/` | Persona C |
+| `decisiones-pendientes.md` | 📦 reemplazado — todos sus bloques quedaron resueltos, ver `00-producto/decisiones/` | Persona C |
+| `cuestionario-direccion-visual.md` | 📦 reemplazado — el tema ya está escrito en `movil/src/theme/Theme.ts` | Persona A |
 
 ---
 

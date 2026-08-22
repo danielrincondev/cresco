@@ -5,10 +5,14 @@
 Media página que evita la mayor causa de fracaso de un equipo de tres, que no es técnica.
 
 ## Propiedad
-Cada persona es dueña de su módulo (ver `backlog-y-reparto.md`). **Nadie edita el
-módulo de otro.** Si necesitas un campo ajeno, lo pides en el grupo y su dueño lo
-agrega. Excepción: `db/schema/enums.ts` y `api/openapi.yaml` son compartidos y
-cambian solo con acuerdo de los tres.
+Cada persona es dueña de su módulo (ver `backlog-y-reparto.md`):
+`convex/nucleo.ts` (A) · `convex/conducta.ts` (B) · `convex/interaccion.ts` (C).
+**Nadie edita el módulo de otro.** Si necesitas un campo ajeno, lo pides en el
+grupo y su dueño lo agrega. Excepción: `convex/schema.ts`, `convex/lib/enums.ts`,
+`convex/lib/guardas.ts` y `convex/lib/permisos.ts` son compartidos y cambian solo
+con acuerdo de los tres. Esto ya no depende de que todos se acuerden de leer
+esta regla: `.github/CODEOWNERS` hace que GitHub pida automáticamente la
+aprobación correcta según qué archivo toque el PR.
 
 ## Ramas y commits
 - Ramas desde `develop`: `feat/`, `fix/`, `chore/` + descripción corta.
