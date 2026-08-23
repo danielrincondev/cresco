@@ -23,6 +23,9 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 jobs:
   verificar:
     name: Tipos y pruebas
