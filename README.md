@@ -22,9 +22,12 @@ y backend de Convex:
 | Datos semilla (`convex/semillas.ts`) | Implementado y cargado en al menos un despliegue de desarrollo |
 | Webhook de RevenueCat (`convex/http.ts`) | Implementado, con pruebas (`npm test`) |
 | Sistema de diseño (`movil/src/theme/Theme.ts`) | Implementado: color, tipografía, espaciado, iconografía |
-| Integración continua (`.github/workflows/ci.yml`) | Implementado: tipos y pruebas en cada PR |
+| Integración continua (`.github/workflows/ci.yml`) | Implementado: tipos y 19 pruebas en cada PR |
+| Propiedad por módulo (`.github/CODEOWNERS`) | Implementado — falta activar branch protection en GitHub |
+| Banderas de activación (`convex/lib/flags.ts`) | Implementado |
 | Bitwarden Secrets Manager | Estructura lista en `.env.schema`, **sin vault compartido configurado todavía** — ver más abajo |
 | **Las 31 pantallas del producto** | **Sin construir — es el trabajo que queda** |
+| `convex/{nucleo,conducta,interaccion}.ts` | Sin construir — un módulo por persona |
 
 No existe un servidor HTTP ni una base de datos SQL separados. `servidor/`,
 `db/`, Better Auth, Next.js, PostgreSQL y Drizzle fueron retirados al adoptar
@@ -39,9 +42,26 @@ Clerk + Convex.
 - `.devcontainer/devcontainer.json`: entorno Node 24 con estado persistente de
   Varlock y Convex.
 
+## Cómo trabaja el equipo
+
+Ramas cortas desde `main` → PR → revisión automática por `CODEOWNERS` → CI en
+verde → fusión. El ciclo completo, paso a paso, está en
+[`docs/02-equipo/flujo-de-trabajo.md`](docs/02-equipo/flujo-de-trabajo.md).
+
+Las decisiones se registran **una por archivo y nunca se editan**: arquitectura
+en [`docs/01-arquitectura/adr/`](docs/01-arquitectura/adr/), producto en
+[`docs/00-producto/decisiones/`](docs/00-producto/decisiones/). Si una decisión
+cambia, se escribe otra que la reemplaza y la anterior queda marcada
+`Reemplazada`, no borrada.
+
+Las reglas de negocio con valor concreto (puntajes, topes, plazos, colores) no
+viven en ningún documento: viven en `movil/convex/lib/enums.ts`,
+`movil/convex/schema.ts` y `movil/src/theme/Theme.ts`, donde no pueden
+desincronizarse de lo que la aplicación realmente hace.
+
 Los documentos de producto siguen en `docs/`. Las decisiones de arquitectura
-anteriores a este cambio se conservan como contexto histórico, pero el código y
-este README describen el runtime vigente.
+anteriores a este cambio se conservan como contexto histórico en
+`docs/99-archivo/`, pero el código y este README describen el runtime vigente.
 
 ## Arranque en una máquina limpia
 

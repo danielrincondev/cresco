@@ -27,17 +27,19 @@ migración acordada.
 | | **Persona A — Núcleo** | **Persona B — Conducta** | **Persona C — Interacción e infra** |
 |---|---|---|---|
 | **Tablas** | `institucion`, `perfil_usuario`, `docente`, `representante`, `anio_lectivo`, `periodo_academico`, `dia_no_lectivo`, `curso`, `asignacion_docente`, `estudiante`, `matricula`, `invitacion_curso`, `vinculo_representacion`, `consentimiento` | `categoria_accion`, `tipo_accion`, `accion_registrada`, `comunicado_curso`, `franja_conducta`, `puntaje_periodo`, `registro_asistencia`, `plantilla_*`, `reporte_*`, `entrega_reporte` | `disponibilidad_docente`, `cita`, `inconformidad`, `alerta_emergencia`, `entrega_alerta`, `plan`, `suscripcion`, `evento_revenuecat`, `desbloqueo_recompensado`, `dispositivo`, `notificacion`, `auditoria` |
-| **Responsable de** | BetterAuth, RLS y capa de acceso, importación CSV, flujo de vinculación | Motor de puntaje, generación nocturna de reportes, gráfico de evolución | RevenueCat, notificaciones push, PDF, CI, despliegue |
+| **Responsable de** | Clerk, capa de permisos, importación CSV, flujo de vinculación, tema y componentes base | Motor de puntaje, generación nocturna de reportes, gráfico de evolución | RevenueCat, notificaciones push, PDF, CI, despliegue |
+| **Su archivo de funciones** | `convex/nucleo.ts` | `convex/conducta.ts` | `convex/interaccion.ts` |
 | **Pantallas** | D1–D8, P1–P3 | D9–D13, P4–P6 | D14–D19, P7–P12 |
 
-**Superficie compartida:** `db/schema/enums.ts` y `api/openapi.yaml`. Cambiar
-cualquiera de los dos exige acuerdo de los tres en el grupo, no un PR silencioso.
+> Los nombres de tabla de la fila anterior están en `snake_case` porque vienen
+> del modelo relacional original. En Convex son **`camelCase`**
+> (`perfilUsuario`, `accionRegistrada`, `franjaConducta`…) — ver
+> `movil/convex/schema.ts`, que manda.
 
-> **Pendiente de ratificar:** el 7 de agosto se subió el contrato a **v1.1.0**
-> añadiendo los endpoints del lado del docente del módulo C (D15, D16), las
-> alertas recibidas del representante (P10) y el registro de dispositivo push.
-> Estaban en este backlog pero faltaban en `openapi.yaml`. Cambio de superficie
-> compartida: **confírmenlo los tres en la reunión del lunes.**
+**Superficie compartida:** `convex/schema.ts`, `convex/lib/enums.ts`,
+`convex/lib/guardas.ts`, `convex/lib/permisos.ts` y `convex/lib/flags.ts`.
+Cambiar cualquiera exige acuerdo de los tres — y desde el 22 de agosto lo pide
+GitHub automáticamente vía `.github/CODEOWNERS`, no depende de recordarlo.
 
 ---
 
@@ -47,8 +49,8 @@ cualquiera de los dos exige acuerdo de los tres en el grupo, no un PR silencioso
 
 | # | Pantalla | Endpoint principal | Prioridad |
 |---|---|---|---|
-| D1 | Bienvenida y registro | BetterAuth | Must |
-| D2 | Inicio de sesión | BetterAuth | Must |
+| D1 | Bienvenida y registro | Clerk | Must |
+| D2 | Inicio de sesión | Clerk | Must |
 | D3 | Crear curso (escuela, año lectivo, nivel) | `POST /docente/cursos` | Must |
 | D4 | Definir parciales | `POST /docente/cursos/{id}/periodos` | Must |
 | D5 | Selector de curso | `GET /docente/cursos` | Should |
@@ -71,7 +73,7 @@ cualquiera de los dos exige acuerdo de los tres en el grupo, no un PR silencioso
 
 | # | Pantalla | Endpoint principal | Prioridad |
 |---|---|---|---|
-| P1 | Registro e inicio de sesión | BetterAuth | Must |
+| P1 | Registro e inicio de sesión | Clerk | Must |
 | P2 | Reclamar código del curso | `POST /representante/invitaciones/reclamar` | Must |
 | P3 | Datos del hijo y consentimiento | mismo endpoint | Must |
 | P4 | **Inicio: reporte del día** (con selector de hijo) | `GET /representante/reporte-diario` | Must |
@@ -179,9 +181,14 @@ Las referencias `RN-xx` y las letras del cuestionario apuntan a la especificaci�
 
 ## 5. Plan de seis semanas
 
+> ⚠️ **Este calendario de seis semanas es el de agosto y quedó atrás.** El estado
+> real y el orden de trabajo vigente están en `Contexto/NEXT_STEPS.md` (y, en
+> cuanto existan, en los Issues del milestone). Se conserva porque el reparto de
+> pantallas por persona sigue siendo el acordado.
+
 | Semana | A — Núcleo | B — Conducta | C — Interacción e infra |
 |---|---|---|---|
-| **1** | BetterAuth, migraciones, capa de acceso, RLS | Catálogo semilla, motor de puntaje con pruebas | Repositorio, CI, dev build de Expo, RevenueCat en sandbox |
+| **1** | ✅ Clerk + Convex, capa de permisos | ✅ Catálogo semilla · ⬜ motor de puntaje con pruebas | ✅ Repositorio, CI · ⬜ dev build de Expo, RevenueCat |
 | **2** | D1–D4, D6, D10 | D11 (asignar acción), tope diario | P1, P11 (paywall), notificaciones push |
 | **3** | P2, P3, D7, D8 (aprobación) | D13 y P4 (reporte diario extremo a extremo) | D19, límites de plan en servidor |
 | **4** | Selector de hijos, CSV, pruebas S-1 a S-7 | P5, P6, gráfico de evolución | D17 alertas, P10 |
@@ -195,11 +202,20 @@ se corta el *Should* completo y las tres personas pasan a pulir.
 
 ## 6. Definición de "terminado"
 
-Una historia está terminada cuando cumple las cinco:
+Una historia está terminada cuando cumple las seis:
 
-1. El endpoint responde según `openapi.yaml`, incluidos sus códigos de error.
+1. La función de Convex valida sus argumentos y aplica las guardas
+   (`convex/lib/guardas.ts`) y permisos (`convex/lib/permisos.ts`) que le tocan.
 2. La pantalla maneja los tres estados: cargando, vacío y error.
 3. Si toca datos de estudiantes, tiene una prueba de que un usuario sin vínculo
-   recibe `403`.
-4. Fue revisada y aprobada por otra persona del equipo.
-5. Funciona en un dispositivo Android real, no solo en el emulador.
+   recibe `ErrorPermiso`.
+4. `npm run typecheck` y `npm test` pasan.
+5. Fue revisada y aprobada por otra persona del equipo (nadie fusiona su propio
+   PR).
+6. Funciona en un dispositivo Android real, no solo en el emulador.
+
+> La columna "Endpoint principal" del inventario de pantallas describe el
+> contrato HTTP original, archivado en
+> `docs/99-archivo/openapi-v1.1.0-archivado.yaml`. Ya no es ejecutable, pero
+> sigue siendo la descripción más completa de qué debe hacer cada función de
+> Convex: léelo como especificación, no como ruta.

@@ -19,10 +19,10 @@ Vive fuera de `docs/` porque Claude Code lo carga en cada sesión.
 
 | Documento | Estado | Dueño |
 |---|---|---|
-| `../Contexto/CLAUDE.md` | histórico; reemplazado en arquitectura | Todos |
-| `../Contexto/CONTEXT.md` | histórico; reemplazado en arquitectura | Todos |
-| `../Contexto/DECISIONS.md` | histórico; consultar ADR actualizados | Todos |
-| `../Contexto/NEXT_STEPS.md` | histórico; no usar como backlog activo | Todos |
+| `../Contexto/CLAUDE.md` | ✅ reescrito el 22-ago para el stack vigente | Todos |
+| `../Contexto/CONTEXT.md` | ✅ reescrito el 22-ago: estado real y pendientes | Todos |
+| `../Contexto/DECISIONS.md` | 📦 registro histórico; sus IDs (C2, D2, F3…) los cita el código | Todos |
+| `../Contexto/NEXT_STEPS.md` | 🚧 plan de retoma; se sustituye por Issues | Persona C |
 | `../Contexto/reglas-shipaton-next-gen.md` | ✅ reglas oficiales verificadas | Persona C |
 
 ## 00-producto — ¿Qué construimos y por qué?
@@ -30,21 +30,21 @@ Vive fuera de `docs/` porque Claude Code lo carga en cada sesión.
 | Documento | Estado | Dueño |
 |---|---|---|
 | `decisiones/` (8 decisiones de producto, DP-001 a DP-008) | ✅ vigente — una decisión por archivo, misma disciplina que los ADR | Persona C |
-| `cuestionario-definiciones.md` | 📦 reemplazado por `DECISIONS.md` | Todos |
 | `glosario.md` | ⬜ | Todos |
 
-> `registro-decisiones.md`, `decisiones-pendientes.md` y
-> `cuestionario-direccion-visual.md` se archivaron el 22 de agosto: sus
-> decisiones vigentes viven en `decisiones/`, y la dirección visual está
-> implementada en `movil/src/theme/Theme.ts`. Ver `99-archivo` más abajo.
+> Cuatro documentos de esta carpeta se archivaron el 22 de agosto:
+> `registro-decisiones.md` y `decisiones-pendientes.md` (sus decisiones vigentes
+> están en `decisiones/`), `cuestionario-direccion-visual.md` (el tema ya está
+> escrito en `movil/src/theme/Theme.ts`) y `cuestionario-definiciones.md` (ya
+> estaba marcado `Reemplazado`, pero seguía fuera del archivo).
 
 ## 01-arquitectura — ¿Cómo está construido?
 
 | Documento | Estado | Dueño |
 |---|---|---|
-| `adr/` (7 decisiones; ADR-001 a ADR-004 reemplazados) | actualizado | Todos |
-| `matriz-permisos.md` | ✅ | Persona A |
-| `modelo-datos.md` | ⬜ | Persona A |
+| `adr/` (8 decisiones; ADR-001 a ADR-004 reemplazados) | ✅ actualizado | Todos |
+| `matriz-permisos.md` | ✅ actualizado el 22-ago: `permisos.ts` en vez de RLS | Persona A |
+| `modelo-datos.md` | ⬜ — lo cubre `movil/convex/schema.ts`, que está comentado tabla por tabla | Persona A |
 
 > El esquema y las funciones ejecutables viven en `movil/convex/`. No existe un
 > contrato OpenAPI ni una base PostgreSQL separados en la arquitectura vigente.
@@ -62,30 +62,25 @@ Vive fuera de `docs/` porque Claude Code lo carga en cada sesión.
 
 | Documento | Estado | Dueño |
 |---|---|---|
-| `aviso-privacidad.md` | ⬜ **necesario antes de P3** | Persona A |
-| `texto-consentimiento.md` | ⬜ **necesario antes de P3** | Persona A |
-| `carta-acuerdo-piloto.md` | ⬜ antes del piloto | Todos |
+| `aviso-privacidad.md` | ⬜ **necesario antes de P3**; declara la política de DP-007 | Persona C |
+| `texto-consentimiento.md` | ⬜ **necesario antes de P3**; se guarda su versión, no un booleano | Persona C |
+| `carta-acuerdo-piloto.md` | ⬜ antes del piloto; ahí se negocia la retención (DP-007) | Persona C |
 | `firmados/` | 🚫 ignorada por Git | — |
 
 ## 04-guias — ¿Cómo se usa y se opera?
 
 | Documento | Estado | Dueño |
 |---|---|---|
-| `00-Manual-Principal-Cresco.pdf` | ✅ v1.1, 8 de agosto | Todos |
-| `A-Nucleo.pdf` | ✅ v1.1, 8 de agosto | Persona A |
-| `B-Conducta-y-Reportes.pdf` | ✅ v1.1, 8 de agosto | Persona B |
-| `C-Interaccion-Monetizacion-Infra.pdf` | ✅ v1.1, 8 de agosto | Persona C |
-| `fuente-manuales/*.html` | ✅ fuente de los 4 PDF de arriba — editar aquí, no el PDF | Persona C |
 | `guia-docente.md` | ⬜ semana 5 | Persona B |
 | `guia-representante.md` | ⬜ semana 5 | Persona B |
 | `integracion-revenuecat.md` | ⬜ semana 2 | Persona C |
 
-> **Excepción a la regla del PDF.** Estos cuatro manuales se distribuyen como PDF
-> porque es lo que el equipo lee día a día, pero desde el 8 de agosto **sí tienen
-> fuente**: `fuente-manuales/*.html`. Para corregirlos, editen el `.html` y
-> regeneren el PDF (comando en `docs/99-archivo/ERRATA-2026-08.md`, sección 7).
-> Los `.pdf` siguen exceptuados en `.gitignore` para que no desaparezcan del
-> repositorio.
+> **Los cuatro manuales de rol (v1.1, 8 de agosto) se archivaron el 22 de agosto**
+> en `99-archivo/manuales-v1.1-stack-retirado/`. Instruían instalar Better Auth,
+> correr `drizzle-kit` y construir `db/acceso/` — seguirlos hoy reintroduce el
+> stack abandonado. Lo que los reemplaza está en el `README.md` de esa carpeta.
+> Esta sección queda para las guías de **uso del producto**, que son otra cosa:
+> se escriben en Markdown y el PDF es una salida, nunca una fuente.
 
 ## 05-validacion — ¿Qué nos dijeron los usuarios?
 
@@ -99,10 +94,13 @@ Vive fuera de `docs/` porque Claude Code lo carga en cada sesión.
 
 | Documento | Estado | Dueño |
 |---|---|---|
-| `ERRATA-2026-08.md` | 📦 reemplazado — su contenido ya está en los manuales v1.1 de `04-guias/`; se conserva como historial | Persona C |
+| `ERRATA-2026-08.md` | 📦 reemplazado — su contenido ya está en los manuales v1.1, hoy archivados | Persona C |
+| `manuales-v1.1-stack-retirado/` | 📦 los 4 manuales de rol y sus fuentes HTML: describen el stack retirado | Persona C |
+| `openapi-v1.1.0-archivado.yaml` | 📦 contrato de 32 rutas; ya no es ejecutable, pero sigue siendo la mejor especificación de qué hace cada función | Persona C |
 | `registro-decisiones.md` | 📦 reemplazado — sus decisiones vigentes están en `00-producto/decisiones/` | Persona C |
 | `decisiones-pendientes.md` | 📦 reemplazado — todos sus bloques quedaron resueltos, ver `00-producto/decisiones/` | Persona C |
 | `cuestionario-direccion-visual.md` | 📦 reemplazado — el tema ya está escrito en `movil/src/theme/Theme.ts` | Persona A |
+| `cuestionario-definiciones.md` | 📦 reemplazado — registro de qué se preguntó; las respuestas vigentes están en los DP | Todos |
 
 ---
 

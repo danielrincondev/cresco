@@ -1,13 +1,15 @@
 # NEXT_STEPS.md — Por dónde continuar
 
-Estado al **viernes 21 de agosto de 2026**. Proyecto **Cresco**, equipo
+Estado al **sábado 22 de agosto de 2026**. Proyecto **Cresco**, equipo
 **Neofix**. El usuario es **Persona C** (interacción, RevenueCat,
 notificaciones, infraestructura, y Product Manager con potestad delegada por A
 y B).
 
-> **Reemplaza al plan anterior**, que Daniel archivó el 16 de agosto porque
-> describía el stack retirado (Next.js + PostgreSQL + Drizzle + Better Auth).
-> La versión archivada sigue en el historial de git si hace falta consultarla.
+> **Este archivo es temporal.** El "qué falta" se está migrando a GitHub Issues
+> con un Project board (ver `docs/02-equipo/flujo-de-trabajo.md`). Cuando esos
+> Issues existan, este documento se reduce a un puntero y deja de reescribirse
+> — que es justamente el problema que el equipo decidió resolver el 22 de
+> agosto.
 
 ---
 
@@ -15,7 +17,7 @@ y B).
 
 | Hito | Fecha | Faltan |
 |---|---|---|
-| Hoy | viernes 21 de agosto | — |
+| Hoy | sábado 22 de agosto | — |
 | Punto de control | miércoles 2 de septiembre | 12 días |
 | Deadline interno | domingo 20 de septiembre | 4 semanas y 2 días |
 | **Envío del equipo** | **lunes 28 de septiembre** | **5 semanas y 1 día** |
@@ -40,11 +42,13 @@ desde la raíz.
 | Constantes de dominio y reglas | ✅ `convex/lib/enums.ts` |
 | Guardas de integridad | ✅ `convex/lib/guardas.ts` |
 | Capa de permisos | ✅ `convex/lib/permisos.ts` |
-| Datos semilla | ✅ `convex/semillas.ts` — falta **ejecutarlas** |
-| Webhook de RevenueCat | ✅ `convex/http.ts` + `convex/suscripciones.ts`, 18 pruebas |
+| Datos semilla | ✅ `convex/semillas.ts`, **ya cargadas** y verificadas |
+| Webhook de RevenueCat | ✅ `convex/http.ts` + `convex/suscripciones.ts` |
 | Tokens visuales | ✅ `movil/src/theme/Theme.ts` |
-| Integración continua | ✅ `.github/workflows/ci.yml` |
-| **Las 31 pantallas** | ⬜ **es todo lo que falta** |
+| Integración continua | ✅ `.github/workflows/ci.yml` — 19 pruebas en verde |
+| Propiedad por módulo | ✅ `.github/CODEOWNERS` + plantilla de PR |
+| Banderas de activación | ✅ `convex/lib/flags.ts` |
+| **Las 31 pantallas** | ⬜ **es el grueso de lo que falta** |
 
 ---
 
@@ -59,14 +63,16 @@ cd movil
 npx convex dev          # crea el proyecto y regenera _generated/
 ```
 
-Ese comando también arregla el único parche pendiente: `_generated/api.d.ts`
-está editado a mano para que el repo compile sin cuenta de Convex, y `convex
-dev` lo regenera correctamente.
+Ya ejecutado por Persona C: `_generated/` está regenerado correctamente y las
+semillas están cargadas. **A y B tienen que correrlo en su propia máquina**,
+porque hoy cada quien tiene su propio despliegue de desarrollo (si eso debe
+seguir así o pasar a un despliegue compartido es una decisión abierta, ver
+`CONTEXT.md` §7).
 
 Después, en el panel de Convex, definir las variables de entorno:
 `CLERK_JWT_ISSUER_DOMAIN` y `REVENUECAT_WEBHOOK_SECRET`.
 
-### 2. Cargar las semillas 🔴 — llevan bloqueando desde el 8 de agosto
+### 2. Cargar las semillas — ✅ hecho, repetir en cada despliegue nuevo
 
 ```bash
 npx convex run semillas:cargar
@@ -74,7 +80,8 @@ npx convex run semillas:cargar
 
 Es idempotente: se puede correr las veces que haga falta. Deja las 6 franjas
 con su color y su frase, las 6 categorías, los 7 tipos de acción, los 5 planes
-con sus límites y la plantilla del reporte con sus 4 campos.
+con sus límites y la plantilla del reporte con sus 4 campos. Verificado en el
+despliegue de C; A y B deben correrlo en el suyo.
 
 ### 3. Los seis componentes base 🔴 — Persona A
 

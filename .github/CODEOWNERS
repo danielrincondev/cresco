@@ -29,3 +29,8 @@
 /movil/convex/lib/enums.ts      @danielrincondev @JerePoveda @Kenny28-176
 /movil/convex/lib/guardas.ts    @danielrincondev @JerePoveda @Kenny28-176
 /movil/convex/lib/permisos.ts   @danielrincondev @JerePoveda @Kenny28-176
+/movil/convex/lib/flags.ts      @danielrincondev @JerePoveda @Kenny28-176
+
+# Proceso del equipo: cambiar como trabajamos requiere que los tres lo vean.
+/.github/CODEOWNERS             @danielrincondev @JerePoveda @Kenny28-176
+/docs/02-equipo/                @danielrincondev @JerePoveda @Kenny28-176

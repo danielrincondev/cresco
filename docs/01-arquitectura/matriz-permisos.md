@@ -92,37 +92,44 @@ la condición indicada).
 
 ---
 
-## Tablas con RLS obligatoria
+## Tablas de acceso restringido — la defensa es una sola capa
 
-Estas cinco llevan políticas en Postgres además del filtro de aplicación
-(ADR-004), porque un fallo en ellas expone datos de un menor:
+Estas cinco son las que exponen datos de un menor si fallan:
 
-`estudiante` · `matricula` · `accion_registrada` · `reporte_estudiante` · `puntaje_periodo`
+`estudiante` · `matricula` · `accionRegistrada` · `reporteEstudiante` · `puntajePeriodo`
 
-Patrón de la política para el representante:
+> ⚠️ **Cambio de fondo respecto al diseño original.** Con PostgreSQL había dos
+> capas (la capa obligatoria `db/acceso/` **y** políticas RLS del motor), de modo
+> que un bug en la aplicación no bastaba para filtrar datos. **Convex no tiene
+> RLS.** Queda una sola capa: `movil/convex/lib/permisos.ts`. No hay red debajo,
+> y por eso la bitácora de `auditoria` pasa de complemento a control
+> compensatorio (DP-006).
 
-```sql
-CREATE POLICY p_representante_lee_estudiante ON estudiante
-FOR SELECT USING (
-  EXISTS (
-    SELECT 1
-      FROM vinculo_representacion v
-      JOIN representante r ON r.id = v.representante_id
-     WHERE v.estudiante_id = estudiante.id
-       AND v.estado = 'ACTIVO'
-       AND r.user_id = current_setting('app.user_id', true)
-  )
-);
+Ninguna función toca `ctx.db` sobre esas cinco tablas sin pasar antes por una
+función de `permisos.ts`:
+
+```ts
+// Patrón para el representante — equivale a la antigua política RLS.
+import { exigirRepresentante, exigirVinculo } from "./lib/permisos";
+
+export const reporteDeMiHijo = query({
+  args: { estudianteId: v.id("estudiante") },
+  handler: async (ctx, args) => {
+    const representante = await exigirRepresentante(ctx);
+    // Lanza ErrorPermiso si no hay vínculo ACTIVO (regla D2).
+    await exigirVinculo(ctx, representante._id, args.estudianteId);
+    // Recién aquí se puede leer.
+  },
+});
 ```
 
-Cada petición debe abrir su transacción con:
+Para el docente, el equivalente es `exigirTitularDelCurso` /
+`exigirAccesoDocenteAEstudiante`.
 
-```sql
-SET LOCAL app.user_id = '<user id de BetterAuth>';
-```
-
-Si se olvida, la consulta devuelve cero filas. Eso es intencional: falla de forma
-visible en vez de silenciosa.
+**Si olvidas la comprobación, Convex no falla:** devuelve los datos. Es
+exactamente lo contrario del comportamiento de RLS (que devolvía cero filas al
+olvidar `SET LOCAL`). Por eso la revisión de PR de abajo dejó de ser una
+formalidad.
 
 ---
 
@@ -133,22 +140,28 @@ despliega.
 
 | # | Caso | Resultado esperado |
 |---|---|---|
-| S-1 | Representante A pide el reporte de un hijo de B | `403 SIN_VINCULO` |
-| S-2 | Representante consulta un estudiante con vínculo `REVOCADO` | `403` |
-| S-3 | Docente registra una acción en un curso ajeno | `403` |
-| S-4 | Representante consulta un reporte de una matrícula `FINALIZADA` | `403` |
-| S-5 | Consulta directa sin `app.user_id` fijado | 0 filas |
-| S-6 | Segundo representante intenta vincularse al mismo estudiante (D2) | `409` |
-| S-7 | Alerta de emergencia sin token de reautenticación (G1) | `401` |
+| S-1 | Representante A pide el reporte de un hijo de B | `ErrorPermiso` (`SIN_VINCULO`) |
+| S-2 | Representante consulta un estudiante con vínculo `REVOCADO` | `ErrorPermiso` |
+| S-3 | Docente registra una acción en un curso ajeno | `ErrorPermiso` |
+| S-4 | Representante consulta un reporte de una matrícula `FINALIZADA` | `ErrorPermiso` |
+| S-5 | Función llamada sin sesión de Clerk | `ErrorPermiso` (`exigirPerfil` lanza) |
+| S-6 | Segundo representante intenta vincularse al mismo estudiante (D2) | `ErrorDominio` (conflicto) |
+| S-7 | Alerta de emergencia sin reautenticación reciente (G1) | `ErrorPermiso` |
+
+> S-5 cambió de significado con Convex. Antes comprobaba que una consulta sin
+> `app.user_id` devolvía cero filas (el motor protegía). Ahora comprueba que
+> `exigirPerfil` lanza: **la protección es la función, no el motor.**
 
 ---
 
 ## Cómo se revisa
 
-En cada pull request que toque datos de estudiantes, el revisor verifica tres cosas:
+En cada pull request que toque datos de estudiantes, el revisor verifica tres cosas
+(están también en `.github/pull_request_template.md`):
 
-1. ¿La consulta pasa por `db/acceso/`?
-2. ¿Está cubierta por una política RLS o se justifica por qué no?
-3. ¿Existe una prueba que confirme que un usuario sin vínculo recibe `403`?
+1. ¿La consulta pasa por `convex/lib/permisos.ts`, sin `ctx.db` suelto?
+2. ¿Los eventos que corresponden quedan auditados con `auditar()` (DP-006)?
+3. ¿Existe una prueba que confirme que un usuario sin vínculo recibe
+   `ErrorPermiso`?
 
 Si alguna respuesta es no, el PR no se aprueba.
