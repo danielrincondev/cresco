@@ -1,11 +1,10 @@
 # CONTEXT.md — Estado del proyecto Cresco
 
-Última actualización de arquitectura: 16 de agosto de 2026.
-
-> El usuario reemplazó explícitamente el backend anterior por Expo + Clerk +
-> Convex. Las secciones que describen Next.js, Better Auth, PostgreSQL o Drizzle
-> son históricas y no definen el runtime vigente. Consultar el `README.md` de la
-> raíz y `movil/`.
+> **Reescrito el 22 de agosto de 2026.** La versión anterior describía el stack
+> retirado en su sección de arquitectura, y su "Estado del repositorio" y su
+> lista de "Pendiente de definir" habían quedado obsoletos (afirmaban que no
+> había commits, ni proyecto Expo, ni CI, ni pruebas — todo eso ya existe).
+> Se conserva en el historial: `git show ba3b4b8:Contexto/CONTEXT.md`.
 
 ---
 
@@ -23,110 +22,92 @@ conocimientos estadísticos.
 
 ## 2. Plazos
 
-> **Calendario reiniciado el 8 de agosto de 2026.** El plan original (semana 1
-> desde el 4 de agosto) había quedado atrás: no se habían ejecutado sus tareas.
-> Ver la decisión en `DECISIONS.md`, sección "Estructura de código y
-> calendario".
-
 | Hito | Fecha |
 |---|---|
-| Día 0 (instalar herramientas, leer manuales) | hoy, sábado 8 de agosto de 2026 |
-| Semana 1 — Cimientos | 9 – 15 de agosto |
-| Semana 2 — Flujo del docente | 16 – 22 de agosto |
-| Semana 3 — Flujo del representante (hito crítico el 29) | 23 – 29 de agosto |
-| Semana 4 — Punto de control (decisión el miércoles 2) | 30 de agosto – 5 de septiembre |
-| Semana 5 — Funciones de apoyo | 6 – 12 de septiembre |
-| Semana 6 — Cierre | 13 – 19 de septiembre |
-| **Deadline interno** | 20 de septiembre |
-| **Fecha de envío del equipo** | **28 de septiembre** (sin cambio — fecha externa) |
-| Cierre oficial del Shipaton | 30 de septiembre, 23:45 PDT (1 de octubre, 01:45 en Ecuador) — sin cambio |
+| Punto de control | miércoles 2 de septiembre |
+| **Deadline interno** | domingo 20 de septiembre |
+| **Envío del equipo** | **lunes 28 de septiembre** |
+| Cierre oficial del Shipaton | 30 de septiembre, 23:45 PDT |
 
-⚠️ **El colchón entre el deadline interno y el envío real se comprimió**: era
-13 días (15→28 sep.), ahora son **8 días** (20→28 sep.). El envío y el cierre
-oficial no se movieron porque los fija el patrocinador, no nosotros.
+**El equipo está de vacaciones académicas hasta el 10 de octubre**, así que hay
+disponibilidad completa durante todo el tramo que queda — a diferencia del plan
+de agosto, que asumía trabajar alrededor de clases.
 
-Lo que se reserva para diferenciador, pulido y prueba con usuarios reales sigue
-siendo el tramo entre el deadline interno y el envío. **No se usa para ampliar
-alcance**, y ahora hay menos margen de error en esos días que antes.
+Los 8 días entre el deadline interno y el envío se reservan para el
+diferenciador, pulido y prueba con usuarios reales. **No se usan para ampliar
+alcance.**
 
 ## 3. Alcance de la v1
 
 **Incluye:** autenticación y dos perfiles; creación de curso, año lectivo y
 parciales; invitación al curso; registro de estudiantes por el representante con
-aprobación del docente; acciones positivas, negativas y notas; anuncios y
-eventos; asistencia; reporte general diario y reporte por estudiante; reporte
-acumulado del parcial; inconformidades; citas; alerta de emergencia;
+aprobación del docente; acciones positivas y negativas; anuncios (notas del
+profesor y eventos); asistencia; reporte general diario y reporte por estudiante;
+reporte acumulado del parcial; inconformidades; citas; alerta de emergencia;
 suscripciones vía RevenueCat.
 
 **Excluido de la v1 (diferido a v2):** administrador de institución / rectoría;
 preguntas del representante al docente sobre un reporte; licencia institucional;
 segundo representante por estudiante; panel web; iOS; mensajería libre;
-calificaciones académicas.
+calificaciones académicas; rol `DOCENTE_COLABORADOR`.
 
-## 4. Decisiones de arquitectura y su porqué
+## 4. Arquitectura vigente
 
-### ADR-001 — PostgreSQL + Drizzle ORM
-El modelo es relacional y normalizado (41 tablas, integridad referencial, índices
-únicos parciales, CHECKs que codifican reglas de negocio). Firestore exigiría
-desnormalizar y mover toda la integridad a la aplicación. Drizzle da tipos de
-TypeScript derivados del esquema, así que el contrato de datos no puede
-desincronizarse del código.
+Ver los ADR en `docs/01-arquitectura/adr/`. Resumen:
 
-### ADR-002 — Next.js (servidor) + Expo (apps)
-**Tauri fue evaluado y descartado**: soporte móvil inmaduro y sin SDK de
-RevenueCat, lo que incumpliría el requisito del hackathon. Next.js **no es un
-frontend web**: es el servidor donde viven BetterAuth, las rutas de API, el
-webhook de RevenueCat y la tarea nocturna. `shadcn/ui` no funciona en React
-Native; para las apps se usa NativeWind con componentes propios.
-
-### ADR-003 — BetterAuth con plugin de organización
-La `organization` de BetterAuth representa la institución declarada por el
-docente. `perfil_usuario` **extiende** el `user` de BetterAuth con cédula y
-teléfono; no lo duplica. La invitación de organización de BetterAuth **no** se usa
-para vincular representantes: `invitacion_curso` es del dominio y desemboca en el
-registro de un menor con consentimiento.
-
-### ADR-004 — Permisos en dos capas
-Al elegir BetterAuth + Drizzle, la autenticación vive en el servidor y no en
-Postgres, así que la garantía de aislamiento no viene gratis. Se aplican dos
-capas: (1) capa obligatoria `db/acceso/` en el servidor, (2) políticas RLS de
-PostgreSQL sobre `estudiante`, `matricula`, `accion_registrada`,
-`reporte_estudiante` y `puntaje_periodo`. Cada petición abre transacción con
-`SET LOCAL app.user_id`. Si se olvida, devuelve 0 filas (falla visible y segura).
-
-### ADR-005 — El puntaje es derivado, nunca un contador
-`puntaje = clamp(60 + Σ puntos de acciones VIGENTES del período, 0, 100)`.
-`puntaje_periodo` es una caché reconstruible. Si fuera un contador, cualquier
-fallo lo desincronizaría de la bitácora de forma permanente y sin detectarlo.
-
-### ADR-006 — RevenueCat es la fuente de verdad de pagos
-Requisito obligatorio del Shipaton. La tabla `suscripcion` es una proyección
-local. El webhook es idempotente por `evento_revenuecat.evento_id_externo`
-(índice único). Los límites viven en `plan.limites` como JSON y se verifican en
-el servidor, nunca solo en la app.
+- **Convex** es la base de datos y el servidor a la vez: `query`, `mutation`,
+  `action`, `httpAction` y cron. Reemplazó a PostgreSQL + Drizzle + Next.js
+  (ADR-001 y ADR-002, ambos `Reemplazados`).
+- **Clerk** autentica (ADR-003, `Reemplazado`). El identificador canónico del
+  sistema es `perfilUsuario._id`, **no** el id de Clerk, que vive aparte en
+  `authSubject` con su propio índice. Orden obligatorio al arrancar: Clerk
+  autentica → se busca o crea el `perfilUsuario` → recién entonces
+  `Purchases.logIn(perfilId)`.
+- **`convex/lib/permisos.ts` es la única capa de autorización** (ADR-004,
+  `Reemplazado`). Con Convex se perdió la RLS de PostgreSQL: ya no hay una
+  segunda capa de defensa, y la bitácora de `auditoria` pasa a ser el control
+  compensatorio (DP-006).
+- **ADR-005 — el puntaje es derivado, nunca un contador:**
+  `puntaje = clamp(60 + Σ puntos de acciones VIGENTES del período, 0, 100)`.
+  `puntajePeriodo` es una caché reconstruible.
+- **ADR-006 — RevenueCat es la fuente de verdad de pagos.** `suscripcion` es una
+  proyección local. El webhook es idempotente por `eventoIdExterno`, comprobado
+  con una lectura indexada dentro de la mutation. `CANCELLATION` **no** significa
+  vencido: el acceso sigue hasta `expiraEn`.
+- **ADR-007 / ADR-008 — entrega sin tienda**, con Test Store de RevenueCat para
+  probar compras sin Google Play Console.
 
 ## 5. Reglas de negocio confirmadas
+
+> Los valores exactos viven en `movil/convex/lib/enums.ts` (`REGLAS`). Esta
+> sección explica el porqué; si un número difiere, **manda el código**.
 
 ### Puntaje
 - Base **60** por parcial, piso **0**, techo **100**. Se reinicia cada parcial.
 - Positivas: **+1** por defecto, el docente puede subirlas a **+2**.
-- Negativas de responsabilidad: **siempre −1**, fijo.
-- Negativas de disciplina: **−1** por defecto, hasta **−3**.
-- Topes diarios: máximo **+4** y máximo **−5** por estudiante por día. Se validan
-  en el servidor, no en la base de datos. Al exceder: `422 TOPE_DIARIO_ALCANZADO`.
+- Irresponsabilidad: **siempre −1**, fijo, no ajustable.
+- Indisciplina y deshonestidad: **−1 a −3**, a criterio del docente.
+- Topes diarios: máximo **+4** y máximo **−5** por estudiante por día
+  (`exigirTopeDiario`).
 - Al cerrar el parcial el puntaje se **congela**.
 - El puntaje **nunca** modifica calificaciones académicas.
 
 ### Franjas de conducta
 0–15 crítica · 16–30 muy por debajo · 31–50 por debajo · 51–60 punto de partida ·
-61–80 buen desempeño · 81–100 excelente.
+61–80 buen desempeño · 81–100 excelente. Cada una con su color y su frase
+orientadora, sembradas en `convex/semillas.ts`. Siempre acompañadas del puntaje
+numérico, para no depender solo del color.
 
-### Cinco tipos de acción
-- Por estudiante (tabla `accion_registrada`): **Positiva**, **Negativa**, **Nota**
-- Por curso (tabla `comunicado_curso`): **Anuncio**, **Evento**
-- Las **Notas** no entran en la bitácora del acumulado.
-- Los **Eventos** aparecen en el reporte diario desde hasta 7 días antes de su
-  fecha y hasta el día siguiente, como bloque expandible.
+### Acciones y anuncios (DP-002 y DP-003)
+- **Por estudiante** (`accionRegistrada`): **Positiva** o **Negativa**. No hay
+  catálogo de nombres — el docente elige una categoría y escribe el mensaje
+  libre. Categorías negativas: `INDISCIPLINA`, `IRRESPONSABILIDAD`,
+  `DESHONESTIDAD`.
+- **Por curso** (`comunicadoCurso`): **Nota del profesor** (a un representante o
+  a todo el curso, visible de 1 a 7 días) o **Evento** (texto largo expandible,
+  visible hasta la fecha de expiración que fija el docente).
+- Los anuncios no entran en el cálculo del puntaje ni en la bitácora del
+  acumulado.
 - Estados de una acción: `VIGENTE` (cuenta), `ANULADA` (0 puntos, "anulada por el
   docente"), `MODIFICADA` (0 puntos, "resuelta con el representante").
 - **Solo las negativas** se pueden anular y reclamar.
@@ -141,24 +122,24 @@ el servidor, nunca solo en la app.
   matrícula con puntaje 60.
 - Camino secundario: el docente puede importar la lista por CSV. El archivo se
   parsea y **se descarta**; nunca se almacena.
-- **Un solo representante legal por estudiante** en la v1. Un segundo intento
-  devuelve `409`.
+- **Un solo representante legal por estudiante** en la v1
+  (`exigirVinculo`; segundo intento = conflicto).
 - Un representante puede tener hijos en colegios distintos; cambia con una barra
   superior.
-- El consentimiento de tratamiento de datos se guarda con la **versión del
-  documento** aceptado, no como booleano.
+- El consentimiento se guarda con la **versión del documento** aceptado, no como
+  booleano.
 
 ### Reportes
 - El reporte general del curso es **opcional**; ningún campo es obligatorio.
-- Los campos vienen de la tabla `plantilla_campo`, no del código.
+- Los campos vienen de `plantillaCampo`, no del código: Anuncios, Novedades del
+  día, Tareas enviadas (texto largo) y Consejo del día (texto corto) — DP-004.
 - Si no hay reporte general pero hubo acciones, **igual se genera** el reporte del
   estudiante.
-- Si no hay reporte de hoy, el endpoint devuelve `204` y la app muestra
-  "Aún no tienes reporte nuevo, pero puedes ver el anterior".
-- Solo el más reciente es visible en la pantalla principal.
+- Si no hay reporte de hoy, la app muestra "Aún no tienes reporte nuevo, pero
+  puedes ver el anterior".
 - Historial: plan gratuito **2** reportes anteriores, premium **7**.
 - El representante **sí ve** los puntos de cada acción.
-- `reporte_estudiante` es una fotografía inmutable del día.
+- `reporteEstudiante` es una fotografía inmutable del día.
 
 ### Interacción
 - **Inconformidades:** solo sobre acciones negativas vigentes. El docente tiene
@@ -167,142 +148,105 @@ el servidor, nunca solo en la app.
 - **Citas:** el docente publica su horario, se parte en bloques de **15 minutos**.
   El representante reserva y nace `SOLICITADA`; **requiere confirmación** del
   docente.
-- **Alertas de emergencia:** el docente debe **reingresar su contraseña** antes de
-  activar (se guarda `reautenticado_en`). Alcance `CURSO` o `ESTUDIANTE`. Queda
-  auditada. La app debe declarar visiblemente que **no sustituye al ECU 911**. El
+- **Alertas de emergencia:** el docente debe **reautenticarse** antes de activar
+  (se guarda `reautenticadoEn`). Alcance `CURSO` o `ESTUDIANTE`. Queda auditada.
+  La app debe declarar visiblemente que **no sustituye al ECU 911**. El
   representante confirma lectura.
 
-### Monetización
-- Cinco planes: `REP_FREE`, `REP_PREMIUM_MENSUAL`, `REP_PREMIUM_BIMESTRAL`,
-  `DOC_FREE`, `DOC_PRO`.
-- Premium del representante es **por cuenta** (cubre a todos sus hijos): sin
-  publicidad, 7 reportes anteriores, acumulado enriquecido, PDF libre.
+### Monetización (DP-005)
+- Cinco planes: `REP_FREE`, `REP_PREMIUM_MENSUAL` ($1.99),
+  `REP_PREMIUM_BIMESTRAL` ($2.99), `DOC_FREE`, `DOC_PRO` ($4.99/mes).
+- Dos entitlements separados: `premium` (representante) y `docente_pro`.
+- Premium del representante es **por cuenta** (cubre a todos sus hijos).
 - El docente **sí tiene límites de pago**: `DOC_FREE` = 1 curso activo y 40
-  estudiantes; `DOC_PRO` = 5 cursos y 60 estudiantes. Esto reemplaza una regla
-  anterior que declaraba al docente siempre gratuito.
-- "Por parcial" se mapea a suscripción **bimestral** (Google Play no tiene ciclo
-  de 6 semanas).
-- Publicidad: red publicitaria (AdMob). El plan gratuito puede exportar el PDF del
-  acumulado viendo un **anuncio recompensado**.
-- Al alcanzar un límite el endpoint devuelve `402 LIMITE_PLAN` y la app muestra el
-  paywall en ese momento exacto.
+  estudiantes; `DOC_PRO` = 5 cursos y 60 estudiantes.
+- "Por parcial" se mapea a suscripción **bimestral**.
+- Publicidad: AdMob, siempre en contenedor visual propio, separado del contenido
+  real. El plan gratuito puede exportar el PDF del acumulado viendo un **anuncio
+  recompensado**.
+- Al alcanzar un límite, la app muestra el paywall en ese momento exacto.
 
 ### Datos y cumplimiento
-- Al retirarse un estudiante: los datos se **archivan**. El representante pierde
-  acceso; la institución conserva. Estados de matrícula: `CURSANDO`, `RETIRADA`,
-  `TRASLADADA`, `FINALIZADA`.
+- Al retirarse un estudiante los datos se **archivan**: el representante pierde
+  acceso, la institución conserva.
 - El representante puede descargar la información de su hijo en PDF (derecho de
-  acceso).
+  acceso), generado en memoria y devuelto en la respuesta, sin almacenamiento.
 - **No se guardan archivos ni fotos** en ninguna parte.
-- Timestamps en UTC; zona `America/Guayaquil`. Solo Guayaquil en la v1.
+- Auditoría en v1: `LOGIN`, `LEER_SENSIBLE`, `CREAR`/`ANULAR` acción, `APROBAR`
+  estudiante (DP-006). `EXPORTAR` y `ALERTA` van a v2.
+- Retención y derecho al olvido: se declara en el aviso de privacidad para v1;
+  la anonimización real es v2 (DP-007).
+- Fechas del dominio en `America/Guayaquil`; marcas de tiempo en epoch ms UTC.
 
 ## 6. Estado del repositorio
 
-**Ya existe y está verificado** — ejecutado con Node 24.19.0 el 8 de agosto,
-no estimado:
-- `db/schema/` — 4 archivos; `npm run typecheck` pasa limpio y la migración
-  `0000_cresco_inicial.sql` produce 41 tablas con 57 restricciones CHECK y 41
-  índices. Incluye ya las correcciones **E1** (sin `defaultNow()` en columnas
-  `date`) y **E2** (índice parcial de documento). Correr `db:generate` dos veces
-  seguidas no produce migración adicional.
-- `package.json` + `package-lock.json` — `npm install` instala 36 paquetes sin
-  errores. Las versiones están fijadas; se clona con `npm ci`.
-- `api/openapi.yaml` — v1.1.0, 32 rutas / 36 operaciones, YAML válido y sin
-  referencias `$ref` rotas
-- `docs/01-arquitectura/adr/` — 7 ADR
-- `LICENSE` — AGPL-3.0, texto canónico de la FSF (661 líneas), sin modificar
-- `docs/01-arquitectura/matriz-permisos.md` — incluye las 7 pruebas de seguridad
-  obligatorias (S-1 a S-7)
-- `docs/02-equipo/backlog-y-reparto.md` — 31 pantallas, historias, plan semanal
-- `Contexto/reglas-shipaton-next-gen.md` — reglas oficiales ya verificadas
-- `README.md`, `.gitignore`, `.env.example`, `package.json`, `drizzle.config.ts`,
-  `tsconfig.json`
+Verificado el 22 de agosto de 2026 — `npm run typecheck` y `npm test` pasan
+limpios desde la raíz.
 
-**No existe todavía:** el código de la aplicación. No hay proyecto Next, no hay
-proyecto Expo, no hay semillas (`db/seeds/` está vacía), no hay capa
-`db/acceso/`, no hay CI y no hay pruebas — `npm test` es todavía un aviso, no un
-runner; Persona C lo conecta al montar CI.
+| Pieza | Estado |
+|---|---|
+| App Expo (`movil/`) | ✅ arranque, sesión y cierre de sesión |
+| Clerk → Convex | ✅ `auth.config.ts` + `viewer.ts` prueban que la identidad llega al backend |
+| Esquema (41 tablas) | ✅ `convex/schema.ts` |
+| Constantes de dominio | ✅ `convex/lib/enums.ts` |
+| Guardas de integridad | ✅ `convex/lib/guardas.ts` |
+| Capa de permisos | ✅ `convex/lib/permisos.ts` |
+| Datos semilla | ✅ `convex/semillas.ts`, cargadas en al menos un despliegue |
+| Webhook de RevenueCat | ✅ `convex/http.ts` + `suscripciones.ts`, con pruebas |
+| Tokens visuales | ✅ `movil/src/theme/Theme.ts` |
+| Integración continua | ✅ `.github/workflows/ci.yml` |
+| Propiedad por módulo | ✅ `.github/CODEOWNERS` |
+| `convex/nucleo.ts` (A) | ⬜ por escribir |
+| `convex/conducta.ts` (B) | ⬜ por escribir |
+| `convex/interaccion.ts` (C) | ⬜ por escribir |
+| **Las 31 pantallas** | ⬜ **es el grueso de lo que falta** |
+| Los 6 componentes base | ⬜ Persona A, sobre `Theme.ts` |
 
-**El repositorio no tiene ningún commit todavía.** El primero debe ser el
-`.gitignore` solo, antes que cualquier otro archivo (ver NEXT_STEPS, Paso 0).
+La especificación de las operaciones del backend está archivada en
+`docs/99-archivo/openapi-v1.1.0-archivado.yaml` (32 rutas) — ya no es un contrato
+ejecutable, pero sigue siendo la descripción más completa de qué debe hacer cada
+función.
 
----
+## 7. Pendiente de definir — no asumir ni inventar
 
-## 7. PENDIENTE DE DEFINIR — no asumir ni inventar
-
-Estas cosas **no están decididas**. Si el trabajo las toca, pregunta al usuario.
-
-### Bloqueantes o de alto impacto
-1. **Diferenciador del producto.** Se discutió una posible capa de IA que redacte
-   el reporte general a partir de notas rápidas del docente, pero **no se ha
-   decidido**. Si se adopta, la pantalla D13 debe construirse con espacio para
-   ello. No implementar sin confirmación.
-2. **Dirección visual.** El guion de preguntas ya está escrito en
-   `docs/00-producto/cuestionario-direccion-visual.md`. Persona C entrega las
-   respuestas la noche del 8 de agosto (~22:00); con eso se escribe
-   `movil/theme/Theme.ts` y los seis componentes base (tarjeta, botón, campo,
-   chip de estado, encabezado, estado vacío). Dueño del archivo: Persona A.
-   **Bloquea la semana 2**, que es cuando empiezan las pantallas: hasta que
-   exista, nadie debe inventar colores ni componentes. Ver también el bloque C
-   del cuestionario — las seis franjas de conducta necesitan color y no dependen
-   solo del color (daltonismo, sol en pantalla).
+### Bloqueantes
+1. **Validación con un profesor real.** Sigue sin ocurrir. Es el mayor riesgo
+   abierto del proyecto: ningún stack protege de que un docente diga "esto no es
+   lo que necesito". La presentación y el FAQ están escritos desde el 7 de agosto,
+   sin usar. Dueño: Persona C.
+2. **Configuración de GitHub pendiente de permisos de Admin** (Daniel): branch
+   protection sobre `main`, CI como check obligatorio, "Require review from Code
+   Owners", y borrado automático de ramas fusionadas. Ver
+   `docs/02-equipo/flujo-de-trabajo.md`.
 
 ### Técnicas
-3. **Proveedor de hosting de PostgreSQL** (Neon, Railway, Supabase como base de
-   datos). Solo se decidió el motor, no el proveedor.
-4. **Dónde se despliega Next.js.**
-5. **Estrategia offline.** Se identificó como decisión necesaria pero no se tomó.
-   Caso relevante: un docente tomando asistencia sin señal.
-6. **Manejo de estado en la app Expo.** Nunca se discutió.
-7. **Librería de gráficos** para el reporte acumulado (P6).
-8. **Cómo demostrar RevenueCat sin Play Console.** Ahora que la cuenta de
-   desarrollador dejó de ser necesaria, hay que confirmar en la documentación
-   oficial qué modo de prueba aplica y si `getOfferings()` devuelve datos.
-   Tarea de Persona C, esta semana.
-9. **`dispositivo.plataforma` no tiene dominio definido.** Es `text` con default
-   `'ANDROID'`, sin `CHECK` y sin constante en `enums.ts`; el contrato declara
-   `enum: [ANDROID]`. Es la única columna de estado del esquema que no sale de
-   `enums.ts`, así que incumple la regla 1 del proyecto. Corregirlo es añadir
-   `PLATAFORMA` a `enums.ts` (superficie compartida) y un `CHECK` en
-   `interaccion.ts`. **Conviene hacerlo en el mismo lote que E1/E2**, para no
-   regenerar la migración dos veces.
-
-### De producto
-10. **Campos exactos de la plantilla del reporte general.** Propuesta no
-    confirmada: `ANUNCIOS`, `NOVEDADES`, `TAREAS`, `CONSEJO`. El usuario dijo
-    "anuncios, novedades, nota, etc." — ese "etc." sigue abierto.
-11. **Catálogo exacto de tipos de acción con sus puntos.** Hay una propuesta
-    (excelente taller, no trajo la tarea, interrumpió la clase, etc.) pero no está
-    confirmada. Son datos semilla, no código.
-12. **Precios de los planes.** Nunca se definieron montos.
+3. **Despliegue de Convex: ¿uno compartido o uno por desarrollador?** Hoy cada
+   quien corre su propio `npx convex dev`. Afecta a si `EXPO_PUBLIC_CONVEX_URL`
+   puede ser un único secreto compartido.
+4. **Vault de Bitwarden sin configurar.** `movil/.env.schema` apunta a UUID de
+   relleno; `npm run dev` falla sin `BITWARDEN_ACCESS_TOKEN`. Alternativa
+   funcionando: pasar las variables a mano.
+5. **Material Symbols como fuente variable.** Hay que probar
+   `fontVariationSettings` en un Android real **antes** de apoyar las 31 pantallas
+   sobre ese patrón — `@expo/vector-icons` no sirve (trae la versión clásica sin
+   eje de relleno).
+6. **Estrategia offline.** Identificada como necesaria, nunca decidida. Caso
+   relevante: un docente tomando asistencia sin señal.
+7. **Manejo de estado en la app Expo.** Convex trae reactividad propia, pero no se
+   ha decidido qué se maneja localmente.
+8. **Librería de gráficos** para el reporte acumulado (P6). Diferida
+   explícitamente.
+9. **Modelo del diferenciador de IA:** Claude Haiku 4.5 o GPT-5 Nano, tras probar
+   con notas reales de un docente (DP-008).
 
 ### Legales y del piloto
-13. **Texto del aviso de privacidad y del consentimiento**, con versión. Se
-    necesita **antes** de construir la pantalla P3.
-14. **Carta de acuerdo del piloto** con el profesor o el colegio.
+10. **Aviso de privacidad y texto de consentimiento**, con versión. Se necesita
+    **antes** de construir P3. Dueño: Persona C, comprometido para el 21 de
+    agosto.
+11. **Carta de acuerdo del piloto** con el profesor o el colegio. Es donde se
+    negocia la retención de datos (DP-007), no se decide unilateralmente.
 
-### Resueltas desde la última revisión
-- ~~Criterios de la categoría Next Gen~~ → verificados, en
-  `reglas-shipaton-next-gen.md`.
-- ~~Cuota de Google Play Console~~ → **Next Gen no exige cuenta de desarrollador
-  ni publicación en tienda.** Deja de ser un costo y un riesgo.
-- ~~Nombre definitivo del producto~~ → **Cresco**, decidido el 7 de agosto.
-- ~~Licencia de código abierto~~ → **AGPL-3.0** con licenciamiento comercial en
-  paralelo. `LICENSE` ya está en la raíz (decisión L1/L2, 8 de agosto).
-- ~~Cómo se entrega el PDF del acumulado~~ → **en memoria, en la respuesta**, sin
-  storage (decisión V3, 8 de agosto). El contrato ya lo refleja.
-- ~~Alcance del rol `DOCENTE_COLABORADOR`~~ → **diferido a la v2** (decisión V1).
-- ~~`CITACION` en el reporte sin `cita_id`~~ → se resuelve con `texto_libre`;
-  se reevalúa en semana 3 (decisión V4).
-- ~~Dónde vive el código de aplicación (`theme/`, `components/base/`,
-  `lib/puntaje.ts`, el proyecto Next, las apps Expo)~~ → **una sola app Expo**
-  (`movil/`) + **un servidor Next** (`servidor/`), hermanas en la raíz, sin
-  monorepo. Ver decisiones S1-S6 en `DECISIONS.md`.
-- ~~Quién corre `npx create-next-app` / `npx create-expo-app` y cuándo~~ →
-  **Persona C, el día 1 de la semana 1**, junto con el repositorio y el CI
-  (decisión S6).
-
-### Diferidas explícitamente a la v2
-Administrador de institución · licencia institucional y cómo se activa · segundo
-representante por estudiante · preguntas del representante sobre un reporte
-(tabla `pregunta_reporte` existe pero sin endpoints ni pantallas).
+### Cuentas por crear
+12. RevenueCat (con Test Store y los 3 productos en un *offering* — sin ese paso
+    `getOfferings()` devuelve vacío), Expo/EAS, Devpost. Development build de
+    Expo: `react-native-purchases` es módulo nativo y no corre en Expo Go.

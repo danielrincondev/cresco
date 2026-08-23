@@ -1,0 +1,36 @@
+# Dueños por módulo. GitHub pide automáticamente su aprobación cuando un PR
+# toca estas rutas. Ver docs/02-equipo/manual-equipo.md para la regla de
+# propiedad completa ("nadie edita el módulo de otro sin pedirlo").
+#
+# Se lista al dueño y un respaldo en cada módulo, nunca uno solo: si el único
+# dueño listado es quien abre el PR, GitHub no tiene a nadie más que pueda
+# aprobarlo — y el manual ya exige que nadie fusione su propio PR. Con dos
+# nombres, cualquiera de los dos puede aprobar el PR del otro.
+#
+# GitHub usa el ÚLTIMO patrón que matchea una ruta dada, así que las reglas
+# más específicas van después de las generales.
+
+# Núcleo: curso, año lectivo, períodos, invitación, vinculación — Daniel (A)
+/movil/convex/nucleo.ts        @danielrincondev @Kenny28-176
+
+# Conducta: acciones, puntaje, asistencia, reportes, cron — Persona B
+/movil/convex/conducta.ts      @JerePoveda @Kenny28-176
+
+# Interacción: citas, inconformidades, alertas, notificaciones — Persona C
+/movil/convex/interaccion.ts   @Kenny28-176 @danielrincondev
+
+# Tema visual y componentes base — Daniel construye sobre esto (NEXT_STEPS §3)
+/movil/src/theme/               @danielrincondev @Kenny28-176
+/movil/src/components/          @danielrincondev @Kenny28-176
+
+# Superficie compartida: cambia solo con acuerdo de los tres
+# (docs/02-equipo/manual-equipo.md, sección "Propiedad")
+/movil/convex/schema.ts         @danielrincondev @JerePoveda @Kenny28-176
+/movil/convex/lib/enums.ts      @danielrincondev @JerePoveda @Kenny28-176
+/movil/convex/lib/guardas.ts    @danielrincondev @JerePoveda @Kenny28-176
+/movil/convex/lib/permisos.ts   @danielrincondev @JerePoveda @Kenny28-176
+/movil/convex/lib/flags.ts      @danielrincondev @JerePoveda @Kenny28-176
+
+# Proceso del equipo: cambiar como trabajamos requiere que los tres lo vean.
+/.github/CODEOWNERS             @danielrincondev @JerePoveda @Kenny28-176
+/docs/02-equipo/                @danielrincondev @JerePoveda @Kenny28-176

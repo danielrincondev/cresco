@@ -17,7 +17,17 @@ y backend de Convex:
 | Aplicación Expo (`movil/`) | Implementado: arranque, sesión y cierre de sesión |
 | Clerk para Expo | Implementado: proveedor, caché segura de token y flujo alojado |
 | Convex (`movil/convex/`) | Implementado: configuración de Clerk y consulta autenticada |
-| Bitwarden Secrets Manager | Implementado: resolución por token de máquina y UUID |
+| Esquema de datos (`convex/schema.ts`) | Implementado: 41 tablas, portadas del modelo relacional original |
+| Reglas de negocio y guardas (`convex/lib/`) | Implementado: constantes de dominio, guardas de integridad, capa de permisos |
+| Datos semilla (`convex/semillas.ts`) | Implementado y cargado en al menos un despliegue de desarrollo |
+| Webhook de RevenueCat (`convex/http.ts`) | Implementado, con pruebas (`npm test`) |
+| Sistema de diseño (`movil/src/theme/Theme.ts`) | Implementado: color, tipografía, espaciado, iconografía |
+| Integración continua (`.github/workflows/ci.yml`) | Implementado: tipos y 19 pruebas en cada PR |
+| Propiedad por módulo (`.github/CODEOWNERS`) | Implementado — falta activar branch protection en GitHub |
+| Banderas de activación (`convex/lib/flags.ts`) | Implementado |
+| Bitwarden Secrets Manager | Estructura lista en `.env.schema`, **sin vault compartido configurado todavía** — ver más abajo |
+| **Las 31 pantallas del producto** | **Sin construir — es el trabajo que queda** |
+| `convex/{nucleo,conducta,interaccion}.ts` | Sin construir — un módulo por persona |
 
 No existe un servidor HTTP ni una base de datos SQL separados. `servidor/`,
 `db/`, Better Auth, Next.js, PostgreSQL y Drizzle fueron retirados al adoptar
@@ -32,9 +42,26 @@ Clerk + Convex.
 - `.devcontainer/devcontainer.json`: entorno Node 24 con estado persistente de
   Varlock y Convex.
 
+## Cómo trabaja el equipo
+
+Ramas cortas desde `main` → PR → revisión automática por `CODEOWNERS` → CI en
+verde → fusión. El ciclo completo, paso a paso, está en
+[`docs/02-equipo/flujo-de-trabajo.md`](docs/02-equipo/flujo-de-trabajo.md).
+
+Las decisiones se registran **una por archivo y nunca se editan**: arquitectura
+en [`docs/01-arquitectura/adr/`](docs/01-arquitectura/adr/), producto en
+[`docs/00-producto/decisiones/`](docs/00-producto/decisiones/). Si una decisión
+cambia, se escribe otra que la reemplaza y la anterior queda marcada
+`Reemplazada`, no borrada.
+
+Las reglas de negocio con valor concreto (puntajes, topes, plazos, colores) no
+viven en ningún documento: viven en `movil/convex/lib/enums.ts`,
+`movil/convex/schema.ts` y `movil/src/theme/Theme.ts`, donde no pueden
+desincronizarse de lo que la aplicación realmente hace.
+
 Los documentos de producto siguen en `docs/`. Las decisiones de arquitectura
-anteriores a este cambio se conservan como contexto histórico, pero el código y
-este README describen el runtime vigente.
+anteriores a este cambio se conservan como contexto histórico en
+`docs/99-archivo/`, pero el código y este README describen el runtime vigente.
 
 ## Arranque en una máquina limpia
 
@@ -47,9 +74,20 @@ npm ci
 npm run convex:dev
 ```
 
-El primer `convex:dev` autentica la CLI y crea `movil/.env.local`. Guarda en
-Bitwarden el URL generado y los valores de Clerk; después entrega al proceso las
-cuatro variables bootstrap documentadas en `.env.example`.
+El primer `convex:dev` autentica la CLI y crea `movil/.env.local`. Ese archivo
+**no se comparte por git**: cada persona del equipo tiene su propio despliegue
+de desarrollo de Convex, igual que antes cada quien tenía su propia base de
+datos local.
+
+> **Sobre Bitwarden:** `movil/.env.schema` ya tiene la estructura para traer las
+> variables sensibles (`EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY`,
+> `EXPO_PUBLIC_CONVEX_URL`) desde un vault de Bitwarden Secrets Manager
+> automáticamente al correr `npm run dev`. **Ese vault todavía no está
+> configurado** — los `bitwarden(...)` de `.env.schema` apuntan a un UUID de
+> relleno. Mientras el equipo decide si vale la pena terminarlo de conectar,
+> `CLERK_JWT_ISSUER_DOMAIN` no es secreto (es la URL pública de la instancia de
+> Clerk) y puede pegarse directo en `movil/.env.local` con
+> `npx convex env set CLERK_JWT_ISSUER_DOMAIN <valor>`.
 
 En Clerk activa la Native API y la integración de Convex. La integración debe
 añadir `aud: "convex"` a los claims de sesión. Mientras la app no implemente un

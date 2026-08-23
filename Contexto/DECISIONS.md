@@ -1,14 +1,29 @@
-# DECISIONS.md — Registro de decisiones cerradas
+# DECISIONS.md — Registro histórico de decisiones
 
-Todo lo que está aquí **está decidido**. No se cuestiona sin una razón nueva y
-concreta. Si Claude Code propone algo que contradice una fila de estas tablas,
-debe señalar explícitamente que contradice una decisión previa y esperar
-confirmación del usuario.
-
-> **Reemplazo confirmado por el usuario el 16 de agosto de 2026:** Expo + Clerk +
-> Convex es la arquitectura vigente. Las decisiones anteriores sobre Next.js,
-> Better Auth, PostgreSQL, Drizzle, RLS y el contrato OpenAPI quedan históricas y
-> no deben guiar nuevas implementaciones.
+> **Qué es este archivo y qué no.** Es el **registro original** de las sesiones
+> de diseño de agosto de 2026. Se conserva sin reescribir porque sus
+> identificadores (C2, D2, E4, F3, H1, I3…) están citados en los comentarios de
+> `movil/convex/lib/enums.ts` y del esquema: renumerarlos rompería esas
+> referencias.
+>
+> **No es la fuente de verdad vigente.** A partir del 22 de agosto de 2026:
+>
+> | Para saber… | Consulta |
+> |---|---|
+> | Arquitectura vigente | `docs/01-arquitectura/adr/` (ADR-001..008) |
+> | Decisiones de producto vigentes | `docs/00-producto/decisiones/` (DP-001..008) |
+> | Cómo trabaja el equipo | `docs/02-equipo/flujo-de-trabajo.md` |
+> | El valor exacto de una regla | El código: `enums.ts`, `schema.ts`, `Theme.ts` |
+>
+> La tabla **"Arquitectura y stack"** de abajo describe en su totalidad el stack
+> retirado (PostgreSQL, Drizzle, Next.js, BetterAuth, RLS): está **superada por
+> los ADR** y no debe guiar ninguna implementación nueva. Lo mismo con las
+> decisiones S1–S6 ("Estructura de código"), que hablan de una carpeta
+> `servidor/` que ya no existe.
+>
+> Las tablas de **producto y reglas de negocio** (A1–I4) siguen siendo válidas,
+> con las correcciones que introdujeron DP-002 (catálogo de acciones) y DP-003
+> (anuncios reemplazan el concepto de "Nota").
 
 Formato de fecha: aproximada, dentro de la sesión de diseño del 3 de agosto de
 2026 salvo indicación distinta.
@@ -16,6 +31,9 @@ Formato de fecha: aproximada, dentro de la sesión de diseño del 3 de agosto de
 ---
 
 ## Arquitectura y stack
+
+> ⚠️ **Tabla histórica en su totalidad.** Cada fila describe el stack retirado el
+> 16 de agosto de 2026. Vigente: Convex + Clerk + Expo (ver los ADR).
 
 | # | Decisión | Razón | Fecha |
 |---|---|---|---|
@@ -145,14 +163,19 @@ qué calendario usar ahora que la semana 1 real empieza el 9 de agosto y no el 4
 
 ## Equipo y proceso
 
+> Vigente en `docs/02-equipo/flujo-de-trabajo.md`, que detalla el ciclo completo
+> (rama corta desde `main` → PR → CODEOWNERS → CI → fusión). Las filas marcadas
+> ⚠️ quedaron superadas.
+
 | # | Decisión | Razón | Fecha |
 |---|---|---|---|
-| — | Tres módulos con dueño único; nadie edita el módulo de otro | Evita el 90 % de los conflictos de fusión | 2026-08-02 |
-| — | Superficie compartida: `db/schema/enums.ts` y `api/openapi.yaml` | Cambiarlos exige acuerdo de los tres | 2026-08-02 |
-| — | Nadie fusiona su propio PR | — | 2026-08-02 |
-| — | Punto de control el viernes 28 de agosto | Si el bloque obligatorio no está cerrado, se sacrifica todo lo opcional | 2026-08-02 |
-| — | Deadline interno 15 de septiembre; deadline real 28 de septiembre | Las 3 semanas de margen son para diferenciador, pulido y prueba con usuarios; **no para ampliar alcance** | 2026-08-03 |
-| — | ~~Deadline interno 15 sep.~~ → **deadline interno 20 de septiembre**, tras el reinicio del calendario | Ver sección "Estructura de código y calendario" arriba. El envío real (28 sep.) no cambió | 2026-08-08 |
+| — | Tres módulos con dueño único; nadie edita el módulo de otro | Evita el 90 % de los conflictos de fusión. Desde el 22 de agosto lo aplica `.github/CODEOWNERS`, no la memoria de cada uno | 2026-08-02 |
+| ⚠️ | ~~Superficie compartida: `db/schema/enums.ts` y `api/openapi.yaml`~~ → ahora `convex/schema.ts`, `convex/lib/enums.ts`, `guardas.ts`, `permisos.ts` y `flags.ts` | Cambiarlos exige acuerdo de los tres | 2026-08-22 |
+| — | Nadie fusiona su propio PR | Desde el 22 de agosto se hace cumplir con branch protection, no por acuerdo | 2026-08-02 |
+| ⚠️ | ~~Punto de control el viernes 28 de agosto~~ → **miércoles 2 de septiembre** | Ver `CONTEXT.md` §2 | 2026-08-14 |
+| ⚠️ | ~~Deadline interno 15 de septiembre~~ → **domingo 20 de septiembre**, tras el reinicio del calendario | El envío real (28 sep.) no cambió: lo fija el patrocinador | 2026-08-08 |
+| ⚠️ | ~~Ramas desde `develop`~~ → **ramas cortas desde `main`** | La rama `develop` nunca llegó a existir en el repositorio. GitFlow tiene sentido con ciclos de release que estabilizar; aquí se entrega sin tienda y el intermediario solo agregaba desincronización | 2026-08-22 |
 | — | La documentación vive en `docs/` numerado por pregunta | Un documento que no está en `docs/README.md` no existe para el equipo | 2026-08-03 |
 | — | La dirección visual será **código**, no documento | Un archivo de diseño aparte siempre termina desincronizado | 2026-08-03 |
-| — | Dueño del archivo de tema: **Persona A**, decidido en sesión de los tres | A construye las pantallas con más variedad de componentes | 2026-08-03 |
+| — | Dueño del archivo de tema: **Persona A** | A construye las pantallas con más variedad de componentes | 2026-08-03 |
+| — | Las decisiones se registran **una por archivo, nunca se editan** (ADR y DP) | Un documento consolidado que se reescribe encima produce versiones obsoletas circulando y borra el porqué de lo anterior | 2026-08-22 |

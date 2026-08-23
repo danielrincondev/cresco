@@ -8,6 +8,13 @@
  * @module
  */
 
+import type * as http from "../http.js";
+import type * as lib_enums from "../lib/enums.js";
+import type * as lib_guardas from "../lib/guardas.js";
+import type * as lib_permisos from "../lib/permisos.js";
+import type * as lib_revenuecat from "../lib/revenuecat.js";
+import type * as semillas from "../semillas.js";
+import type * as suscripciones from "../suscripciones.js";
 import type * as viewer from "../viewer.js";
 
 import type {
@@ -17,6 +24,13 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  http: typeof http;
+  "lib/enums": typeof lib_enums;
+  "lib/guardas": typeof lib_guardas;
+  "lib/permisos": typeof lib_permisos;
+  "lib/revenuecat": typeof lib_revenuecat;
+  semillas: typeof semillas;
+  suscripciones: typeof suscripciones;
   viewer: typeof viewer;
 }>;
 

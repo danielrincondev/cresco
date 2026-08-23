@@ -12,6 +12,12 @@
     "skipLibCheck": true,
     "allowSyntheticDefaultImports": true,
 
+    /* Las funciones de Convex leen variables de entorno con `process.env`
+     * (por ejemplo CLERK_JWT_ISSUER_DOMAIN en auth.config.ts). Sin esto,
+     * `tsc` no conoce `process` y el typecheck falla aunque el codigo corra
+     * bien en el runtime de Convex. */
+    "types": ["node"],
+
     /* These compiler options are required by Convex */
     "target": "ESNext",
     "lib": ["ES2023", "dom"],

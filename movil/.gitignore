@@ -1,0 +1,11 @@
+
+.env.local
+
+# Skills de asistentes de IA para Convex, instaladas por `npx convex dev` /
+# `npx convex ai-files install`. Son un espejo de get-convex/agent-skills,
+# reinstalable con un comando — no vale la pena versionar ~230 KB de contenido
+# de terceros. `AGENTS.md`, `CLAUDE.md` y `convex/_generated/ai/` SÍ se
+# versionan: son las guías propias del proyecto, pequeñas y útiles.
+/.claude/skills/
+/.agents/skills/
+/skills-lock.json
