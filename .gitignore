@@ -1,6 +1,65 @@
+# Dependencies
 node_modules/
-/movil/.expo/
-/.env
-/movil/.env.local
+
+# Turborepo & Build Outputs
+.turbo/
+**/.turbo/
+dist/
+build/
+web-build/
+*.tsbuildinfo
+
+# Expo, Metro & Mobile
+.expo/
+**/.expo/
+.expo-shared/
+**/.expo-shared/
+.metro/
+**/.metro/
+
+# Convex
+.convex/
+**/.convex/
+
+# Environment Variables & Secrets
+**/.env
+**/.env.*
+**/.env*.local
+!**/.env.example
+!**/.env.schema
+*.keystore
+*.jks
+*.p8
+*.p12
+*.pem
+*.key
+google-services.json
+GoogleService-Info.plist
+
+# Testing & Coverage
+coverage/
+.vitest/
+.nyc_output/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# OS & Editors
+.DS_Store
+Thumbs.db
+.idea/
+*.swp
+*.swo
+*~
+
+# AI Harness & Skills
+.agents/
+skills-lock.json
+
+# Pilot Documents
 /docs/03-piloto/firmados/*
 !/docs/03-piloto/firmados/.gitkeep
