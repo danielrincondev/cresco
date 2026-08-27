@@ -39,8 +39,6 @@ Clerk + Convex.
 - `movil/convex/auth.config.ts`: valida en Convex los JWT emitidos por Clerk.
 - `movil/convex/viewer.ts`: ejemplo de función Convex autenticada.
 - `movil/.env.schema`: contrato de configuración de Clerk y Convex.
-- `.devcontainer/devcontainer.json`: entorno Node 24 con estado persistente de
-  Varlock y Convex.
 
 ## Cómo trabaja el equipo
 
