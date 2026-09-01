@@ -87,7 +87,7 @@ Vive fuera de `docs/` porque Claude Code lo carga en cada sesión.
 | Documento | Estado | Dueño |
 |---|---|---|
 | `faq-sesion.md` | ✅ | Todos |
-| `guion-entrevistas.md` | ⬜ | Todos |
+| `guion-entrevistas.md` | ✅ diseño antes/después, individual por persona | Todos |
 | `hallazgos.md` | ⬜ tras las sesiones | Todos |
 
 ## 99-archivo — Documentos reemplazados
