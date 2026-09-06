@@ -20,6 +20,7 @@ a `docs/99-archivo/`.
 | 006 | Auditoría: alcance de la v1, resto diferido a v2 | Aceptada |
 | 007 | Retención y derecho al olvido: se declara en v1, se implementa en v2 | Aceptada |
 | 008 | Diferenciador de IA: entra a la v1, condicionado a cerrar los 18 Must | Aceptada |
+| 011 | Iconografía: MaterialCommunityIcons con pares de contorno | Aceptada |
 
 Cuándo escribir una DP nueva en vez de editar el código o un ADR: cuando la
 decisión es de **producto o negocio** (qué construye la app, para quién, con
