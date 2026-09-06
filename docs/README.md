@@ -62,8 +62,8 @@ Vive fuera de `docs/` porque Claude Code lo carga en cada sesión.
 
 | Documento | Estado | Dueño |
 |---|---|---|
-| `aviso-privacidad.md` | ⬜ **necesario antes de P3**; declara la política de DP-007 | Persona C |
-| `texto-consentimiento.md` | ⬜ **necesario antes de P3**; se guarda su versión, no un booleano | Persona C |
+| `aviso-privacidad.md` | 🚧 borrador completo, versión `2026-09-v1` — **pendiente de revisión jurídica** | Persona C |
+| `texto-consentimiento.md` | 🚧 borrador, versión `2026-09-v1` — se guarda la versión, no un booleano | Persona C |
 | `carta-acuerdo-piloto.md` | ⬜ antes del piloto; ahí se negocia la retención (DP-007) | Persona C |
 | `firmados/` | 🚫 ignorada por Git | — |
 
