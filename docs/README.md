@@ -64,7 +64,7 @@ Vive fuera de `docs/` porque Claude Code lo carga en cada sesión.
 |---|---|---|
 | `aviso-privacidad.md` | 🚧 borrador completo, versión `2026-09-v1` — **pendiente de revisión jurídica** | Persona C |
 | `texto-consentimiento.md` | 🚧 borrador, versión `2026-09-v1` — se guarda la versión, no un booleano | Persona C |
-| `carta-acuerdo-piloto.md` | ⬜ antes del piloto; ahí se negocia la retención (DP-007) | Persona C |
+| `carta-acuerdo-piloto.md` | 🚧 borrador `2026-09-v1` — los puntos 🔲 se acuerdan con la institución | Persona C |
 | `firmados/` | 🚫 ignorada por Git | — |
 
 ## 04-guias — ¿Cómo se usa y se opera?
