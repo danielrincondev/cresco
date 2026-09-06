@@ -8,6 +8,7 @@
  * @module
  */
 
+import type * as conducta from "../conducta.js";
 import type * as http from "../http.js";
 import type * as lib_enums from "../lib/enums.js";
 import type * as lib_flags from "../lib/flags.js";
@@ -26,6 +27,7 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  conducta: typeof conducta;
   http: typeof http;
   "lib/enums": typeof lib_enums;
   "lib/flags": typeof lib_flags;
