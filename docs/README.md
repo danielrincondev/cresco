@@ -87,8 +87,8 @@ Vive fuera de `docs/` porque Claude Code lo carga en cada sesión.
 | Documento | Estado | Dueño |
 |---|---|---|
 | `faq-sesion.md` | ✅ | Todos |
-| `guion-entrevistas.md` | ⬜ | Todos |
-| `hallazgos.md` | ⬜ tras las sesiones | Todos |
+| `guion-entrevistas.md` | ✅ diseño antes/después, individual por persona | Todos |
+| `hallazgos.md` | ✅ 4 docentes entrevistados el 1-sep; 8 hallazgos, 3 candidatos a DP | Persona C |
 
 ## 99-archivo — Documentos reemplazados
 
