@@ -73,7 +73,7 @@ Vive fuera de `docs/` porque Claude Code lo carga en cada sesión.
 |---|---|---|
 | `guia-docente.md` | ⬜ semana 5 | Persona B |
 | `guia-representante.md` | ⬜ semana 5 | Persona B |
-| `integracion-revenuecat.md` | ⬜ semana 2 | Persona C |
+| `integracion-revenuecat.md` | ✅ development build + RevenueCat, con las trampas conocidas | Persona C |
 
 > **Los cuatro manuales de rol (v1.1, 8 de agosto) se archivaron el 22 de agosto**
 > en `99-archivo/manuales-v1.1-stack-retirado/`. Instruían instalar Better Auth,
