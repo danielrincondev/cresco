@@ -19,9 +19,15 @@
 # Interacción: citas, inconformidades, alertas, notificaciones — Persona C
 /movil/convex/interaccion.ts   @Kenny28-176 @danielrincondev
 
-# Tema visual y componentes base — Daniel construye sobre esto (NEXT_STEPS §3)
-/movil/src/theme/               @danielrincondev @Kenny28-176
-/movil/src/components/          @danielrincondev @Kenny28-176
+# Interfaz: tema, componentes base y pantallas — Persona D (@krriveram),
+# incorporada el 31 de agosto de 2026 como responsable de UI. Consume las
+# funciones de convex/ que exponen A, B y C; no las edita.
+# Kenny es el respaldo aqui ademas de en su propio modulo — si esto se vuelve
+# un cuello de botella (muchos PR de D esperando a una sola persona), se
+# reparte por pantalla en vez de concentrarlo en Kenny.
+/movil/src/theme/               @krriveram @Kenny28-176
+/movil/src/components/          @krriveram @Kenny28-176
+/movil/src/screens/             @krriveram @Kenny28-176
 
 # Superficie compartida: cambia solo con acuerdo de los tres
 # (docs/02-equipo/manual-equipo.md, sección "Propiedad")
