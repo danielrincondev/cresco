@@ -281,7 +281,7 @@ export const crearCurso = mutation({
     anioInicio: v.string(),
     anioFin: v.string(),
   },
-  handler: async (ctx, args) => {
+  handler: (ctx, args) => conErroresPublicos(async () => {
     const docente = await exigirDocente(ctx);
     const cursosActivos = await cursosActivosDelDocente(ctx, docente._id);
     const limitePlan = await limiteDelDocente(ctx, docente.perfilUsuarioId);
@@ -370,7 +370,7 @@ export const crearCurso = mutation({
     const curso = await ctx.db.get("curso", cursoId);
     if (curso === null) throw new Error("Convex no devolvió el curso recién creado.");
     return await presentarCurso(ctx, curso);
-  },
+  }),
 });
 
 /** Define de dos a tres parciales no solapados dentro del año lectivo. */
@@ -379,7 +379,7 @@ export const definirPeriodos = mutation({
     cursoId: v.id("curso"),
     periodos: v.array(periodo),
   },
-  handler: async (ctx, args) => {
+  handler: (ctx, args) => conErroresPublicos(async () => {
     const docente = await exigirTitularDelCurso(ctx, args.cursoId);
     if (args.periodos.length < 2 || args.periodos.length > 3) {
       throw new ErrorDominio("VALIDACION", "Debes definir entre 2 y 3 parciales.");
@@ -471,7 +471,7 @@ export const definirPeriodos = mutation({
       );
     }
     return ids;
-  },
+  }),
 });
 
 // Invitaciones y alta de estudiantes — #7.
@@ -823,5 +823,19 @@ export const listarMisEstudiantes = query({
         cursoId: matricula?.cursoId ?? invitacion?.cursoId ?? null });
     }
     return { ...resultado, page };
+  }),
+});
+
+/** Calendario del curso para mostrar parciales definidos aunque aún estén planificados. */
+export const obtenerCalendarioCurso = query({
+  args: { cursoId: v.id("curso") },
+  handler: (ctx, args) => conErroresPublicos(async () => {
+    await exigirTitularDelCurso(ctx, args.cursoId);
+    const { anio } = await contextoCurso(ctx, args.cursoId);
+    const periodos = await ctx.db.query("periodoAcademico")
+      .withIndex("por_anio_orden", (q) => q.eq("anioLectivoId", anio._id)).take(4);
+    return { fechaInicio: anio.fechaInicio, fechaFin: anio.fechaFin, periodos: periodos.map((p) => ({
+      id: p._id, nombre: p.nombre, orden: p.orden, fechaInicio: p.fechaInicio, fechaFin: p.fechaFin, estado: p.estado,
+    })) };
   }),
 });

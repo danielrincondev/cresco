@@ -173,6 +173,22 @@ describe("nucleo — periodos", () => {
     return { cliente, cursoId: curso.id };
   }
 
+  it("muestra el año y los parciales planificados solo a su titular", async () => {
+    const t = convexTest(schema, modules);
+    const { cliente, cursoId } = await cursoDe(t);
+    expect(await cliente.query(api.nucleo.obtenerCalendarioCurso, { cursoId })).toEqual({
+      fechaInicio: datosCurso.anioInicio,
+      fechaFin: datosCurso.anioFin,
+      periodos: [],
+    });
+    await cliente.mutation(api.nucleo.definirPeriodos, { cursoId, periodos: [...periodosValidos].reverse() });
+    const calendario = await cliente.query(api.nucleo.obtenerCalendarioCurso, { cursoId });
+    expect(calendario.periodos).toMatchObject(periodosValidos.map((p) => ({ ...p, estado: "PLANIFICADO" })));
+    const otro = await sembrarDocente(t, "docente_2");
+    await expect(otro.cliente.query(api.nucleo.obtenerCalendarioCurso, { cursoId })).rejects.toThrow("No eres el docente titular");
+    await expect(t.query(api.nucleo.obtenerCalendarioCurso, { cursoId })).rejects.toThrow("Inicia sesión para continuar");
+  });
+
   it("solo permite que el docente titular defina los periodos", async () => {
     const t = convexTest(schema, modules);
     const { cursoId } = await cursoDe(t);
