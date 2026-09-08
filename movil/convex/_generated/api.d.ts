@@ -9,6 +9,7 @@
  */
 
 import type * as http from "../http.js";
+import type * as interaccion from "../interaccion.js";
 import type * as lib_enums from "../lib/enums.js";
 import type * as lib_flags from "../lib/flags.js";
 import type * as lib_guardas from "../lib/guardas.js";
@@ -27,6 +28,7 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   http: typeof http;
+  interaccion: typeof interaccion;
   "lib/enums": typeof lib_enums;
   "lib/flags": typeof lib_flags;
   "lib/guardas": typeof lib_guardas;
