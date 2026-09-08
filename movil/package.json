@@ -37,7 +37,7 @@
     "@varlock/bitwarden-plugin": "^2.0.0",
     "convex-test": "^0.0.55",
     "typescript": "~6.0.3",
-    "varlock": "^1.16.1",
+    "varlock": "^1.18.0",
     "vite": "^8.2.1",
     "vitest": "^4.0.0"
   }
