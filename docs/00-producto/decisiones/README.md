@@ -20,6 +20,8 @@ a `docs/99-archivo/`.
 | 006 | Auditoría: alcance de la v1, resto diferido a v2 | Aceptada |
 | 007 | Retención y derecho al olvido: se declara en v1, se implementa en v2 | Aceptada |
 | 008 | Diferenciador de IA: entra a la v1, condicionado a cerrar los 18 Must | Aceptada |
+| 009 | Informe imprimible para el docente: se difiere a la v2 | Aceptada |
+| 010 | Cresco es el canal de comunicación, no un mecanismo de control sobre la familia | Aceptada |
 
 Cuándo escribir una DP nueva en vez de editar el código o un ADR: cuando la
 decisión es de **producto o negocio** (qué construye la app, para quién, con
