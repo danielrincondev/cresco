@@ -18,7 +18,7 @@ async function sembrarEscenario(t: ReturnType<typeof convexTest>) {
     const ahora = Date.now();
 
     const perfilDocente = await ctx.db.insert("perfilUsuario", {
-      authSubject: "docente_1", tipoDocumento: "CEDULA", numeroDocumento: "0900000001",
+      authSubject: "https://convex.test|docente_1", tipoDocumento: "CEDULA", numeroDocumento: "0900000001",
       actualizadoEn: ahora,
     });
     const docenteId = await ctx.db.insert("docente", {
@@ -26,7 +26,7 @@ async function sembrarEscenario(t: ReturnType<typeof convexTest>) {
     });
 
     const perfilRep = await ctx.db.insert("perfilUsuario", {
-      authSubject: "rep_1", tipoDocumento: "CEDULA", numeroDocumento: "0900000002",
+      authSubject: "https://convex.test|rep_1", tipoDocumento: "CEDULA", numeroDocumento: "0900000002",
       actualizadoEn: ahora,
     });
     const representanteId = await ctx.db.insert("representante", {
@@ -184,7 +184,7 @@ describe("interaccion — citas", () => {
 
     const ajeno = await t.run(async (ctx) => {
       const perfil = await ctx.db.insert("perfilUsuario", {
-        authSubject: "rep_2", tipoDocumento: "CEDULA", numeroDocumento: "0900000003",
+        authSubject: "https://convex.test|rep_2", tipoDocumento: "CEDULA", numeroDocumento: "0900000003",
         actualizadoEn: Date.now(),
       });
       await ctx.db.insert("representante", { perfilUsuarioId: perfil, actualizadoEn: Date.now() });
@@ -207,7 +207,7 @@ describe("interaccion — citas", () => {
 
     await t.run(async (ctx) => {
       const perfil = await ctx.db.insert("perfilUsuario", {
-        authSubject: "rep_2", tipoDocumento: "CEDULA", numeroDocumento: "0900000003",
+        authSubject: "https://convex.test|rep_2", tipoDocumento: "CEDULA", numeroDocumento: "0900000003",
         actualizadoEn: Date.now(),
       });
       await ctx.db.insert("representante", { perfilUsuarioId: perfil, actualizadoEn: Date.now() });
@@ -282,7 +282,7 @@ describe("interaccion — inconformidades", () => {
 
     await t.run(async (ctx) => {
       const perfil = await ctx.db.insert("perfilUsuario", {
-        authSubject: "rep_2", tipoDocumento: "CEDULA", numeroDocumento: "0900000003",
+        authSubject: "https://convex.test|rep_2", tipoDocumento: "CEDULA", numeroDocumento: "0900000003",
         actualizadoEn: Date.now(),
       });
       await ctx.db.insert("representante", { perfilUsuarioId: perfil, actualizadoEn: Date.now() });
@@ -378,7 +378,7 @@ describe("interaccion — inconformidades", () => {
 
     await t.run(async (ctx) => {
       const perfil = await ctx.db.insert("perfilUsuario", {
-        authSubject: "docente_2", tipoDocumento: "CEDULA", numeroDocumento: "0900000004",
+        authSubject: "https://convex.test|docente_2", tipoDocumento: "CEDULA", numeroDocumento: "0900000004",
         actualizadoEn: Date.now(),
       });
       await ctx.db.insert("docente", { perfilUsuarioId: perfil, actualizadoEn: Date.now() });

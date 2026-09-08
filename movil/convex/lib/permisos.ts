@@ -47,7 +47,7 @@ type Ctx = QueryCtx | MutationCtx;
 /**
  * Resuelve la identidad de Clerk al perfil del dominio.
  *
- * `identity.subject` es el id de Clerk. Se busca por `authSubject`, **nunca se
+ * `identity.tokenIdentifier` incluye emisor e id de Clerk. Se busca por `authSubject`, **nunca se
  * usa como clave** en ninguna otra tabla: el identificador canónico del sistema
  * es `perfilUsuario._id`. Esa separación es lo que hace que cambiar de
  * proveedor de autenticación algún día cueste actualizar un campo por usuario
@@ -58,6 +58,16 @@ export async function perfilActual(ctx: Ctx): Promise<Doc<"perfilUsuario"> | nul
   const identity = await ctx.auth.getUserIdentity();
   if (identity === null) return null;
 
+  const perfil = await ctx.db
+    .query("perfilUsuario")
+    .withIndex("por_auth_subject", (q) => q.eq("authSubject", identity.tokenIdentifier))
+    .unique();
+  if (perfil !== null) return perfil;
+
+  // Compatibilidad con perfiles anteriores: solo el emisor Clerk configurado
+  // puede reclamar un subject antiguo. Nunca se vinculan cuentas por correo.
+  const emisor = process.env.CLERK_JWT_ISSUER_DOMAIN;
+  if (!emisor || identity.issuer !== emisor) return null;
   return await ctx.db
     .query("perfilUsuario")
     .withIndex("por_auth_subject", (q) => q.eq("authSubject", identity.subject))
