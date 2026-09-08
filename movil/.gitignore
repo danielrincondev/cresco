@@ -1,4 +1,6 @@
 
+# Secretos locales. `.env.schema` SI se versiona (es el contrato, sin valores).
+.env
 .env.local
 
 # Skills de asistentes de IA para Convex, instaladas por `npx convex dev` /
