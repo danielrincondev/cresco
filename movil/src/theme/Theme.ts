@@ -218,9 +218,26 @@ export type PatronCarga = (typeof PatronCarga)[keyof typeof PatronCarga];
  * esto: el soporte de `fontVariationSettings` en React Native no es parejo
  * entre versiones.
  */
+/**
+ * Iconografía.
+ *
+ * ⚠️ **Cambió el 6 de septiembre de 2026 (issue #21, DP-011).** La decisión
+ * original era Google Material Symbols con el eje variable `FILL`. No se puede:
+ * React Native no soporta `fontVariationSettings`, y las fuentes de Material
+ * Symbols que se distribuyen por npm son estáticas (sin tabla `fvar`). Está
+ * comprobado, no supuesto.
+ *
+ * Lo que sí da el mismo resultado visual: `MaterialCommunityIcons`, que trae
+ * 1889 pares `nombre` / `nombre-outline`. La distinción contorno/relleno se
+ * resuelve con dos glifos en vez de con un eje variable.
+ *
+ * **No uses estos valores directamente: usa el componente `Icono.tsx`**, que
+ * ya resuelve el par y cae al relleno si un icono no tiene contorno.
+ */
 export const Icono = {
-  familia: "MaterialSymbolsOutlined",
-  fill: { inactivo: "'FILL' 0", activo: "'FILL' 1" },
+  familia: "MaterialCommunityIcons",
+  /** Sufijo del glifo de contorno. El relleno es el nombre sin sufijo. */
+  sufijoContorno: "-outline",
 } as const;
 
 /* --------------------------------------------------------------------------
