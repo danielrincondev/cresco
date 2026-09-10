@@ -43,12 +43,14 @@ import {
 } from "../components/NucleoUI";
 import {
   AgendaDocente,
+  Ajustes,
   AlertaDocente,
   AlertasFamilia,
   CitasFamilia,
   Notificaciones,
   ReclamosDocente,
 } from "./InteraccionScreen";
+import { parrafosLegibles } from "../lib/texto";
 import {
   avisoPrivacidad,
   textoConsentimiento,
@@ -73,7 +75,7 @@ type Ruta =
   | { tipo: "inicio" | "perfil" | "registro" | "crearCurso" }
   // Interaccion (#33). Las de familia no llevan curso: el permiso sale del
   // vinculo del representante, no de un curso que la pantalla elija.
-  | { tipo: "notificaciones" | "citas" | "alertas" }
+  | { tipo: "notificaciones" | "citas" | "alertas" | "ajustes" }
   | { tipo: "curso" | "periodos" | "reclamos" | "agenda" | "alerta"; curso: Curso }
   | { tipo: "invitacion"; invitacion: Invitacion; curso: Curso }
   | { tipo: "aprobar"; curso: Curso; alumno: Alumno };
@@ -157,6 +159,14 @@ export function NucleoScreen() {
             >
               <Icono nombre="account" decorativo />
             </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Ajustes"
+              onPress={() => setRuta({ tipo: "ajustes" })}
+              style={styles.iconButton}
+            >
+              <Icono nombre="cog" decorativo />
+            </Pressable>
           </>
         )}
         <Pressable
@@ -198,6 +208,8 @@ export function NucleoScreen() {
           <RegistroForm perfil={perfil} onGuardar={volver} />
         ) : ruta.tipo === "notificaciones" ? (
           <Notificaciones />
+        ) : ruta.tipo === "ajustes" ? (
+          <Ajustes />
         ) : ruta.tipo === "reclamos" ? (
           <ReclamosDocente />
         ) : ruta.tipo === "agenda" ? (
@@ -1228,16 +1240,15 @@ function RegistroForm({
 function TextoDocumento({ texto }: { texto: string }) {
   return (
     <>
-      {texto.split(/\n\s*\n/).map((p, i) => (
-        <Cuerpo key={i}>
-          {p
-            .replace(/^#+\s*/gm, "")
-            .replace(/^>\s?/gm, "")
-            .replaceAll("**", "")
-            .replaceAll("`", "")
-            .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
-            .replace(/\n/g, " ")}
-        </Cuerpo>
+      {/*
+        La limpieza vive en `lib/texto.ts`, con pruebas sobre el documento
+        real. Lo que había aquí quitaba negritas y títulos pero dejaba las
+        tuberías de las tablas: las secciones 5, 6 y 7 del aviso —quién ve los
+        datos, qué proveedores participan, qué derechos hay— son justamente
+        tablas, y son las que más se consultan.
+      */}
+      {parrafosLegibles(texto).map((p, i) => (
+        <Cuerpo key={i}>{p}</Cuerpo>
       ))}
     </>
   );

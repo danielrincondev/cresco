@@ -3,6 +3,10 @@
  * **estado vacío**. Los otros cuatro (tarjeta, botón, campo de texto y
  * encabezado) ya viven en `NucleoUI.tsx`.
  *
+ * Aquí no hay ni un `#hex`: los cinco tonos del chip son `TonoEstado` en
+ * `Theme.ts`, con su razón de contraste anotada al lado. La regla del issue no
+ * admitía excepciones y no tenía por qué admitirlas.
+ *
  * El chip es el que más variantes necesitaba —6 franjas de conducta, 3 estados
  * de acción, 7 de cita, 6 de reclamo— y el issue pedía explícitamente *«una
  * mecánica reutilizable, no 15 chips distintos»*. La mecánica es: el chip solo
@@ -20,39 +24,11 @@ import {
   Espacio,
   Marca,
   Radio,
-  Semantico,
   Superficie,
   Tamano,
-  Texto,
+  TonoEstado,
 } from "../theme/Theme";
 import { Boton, Cuerpo, Subtitulo } from "./NucleoUI";
-
-/**
- * Fondo y texto de cada tono.
- *
- * Todos los fondos son claros y el texto siempre va oscuro. No es estética: el
- * `Semantico.negativa` del tema advierte que da 4.1:1 con texto blanco encima
- * —por debajo de AA— y que se use como fondo de chip **con texto oscuro**. Un
- * chip con texto blanco sobre rojo no se lee al sol, que es donde el docente
- * usa esto.
- */
-const TONOS: Record<Tono, { fondo: string; borde: string; texto: string }> = {
-  neutro: {
-    fondo: Superficie.fondo,
-    borde: Superficie.borde,
-    texto: Texto.secundario,
-  },
-  positivo: { fondo: "#E7F6EE", borde: Semantico.positiva, texto: "#14532D" },
-  atencion: { fondo: "#FDF4E3", borde: "#E0A44A", texto: "#7A4A12" },
-  negativo: { fondo: "#FCEAEA", borde: Semantico.negativa, texto: "#7A1C1C" },
-  critico: {
-    fondo: Semantico.emergencia,
-    borde: Semantico.emergencia,
-    // Único caso con texto blanco: `Semantico.emergencia` da 7.5:1 con blanco
-    // encima — pasa AAA. Es el tono que tiene que gritar.
-    texto: Texto.sobreColor,
-  },
-};
 
 /**
  * Chip de estado.
@@ -62,7 +38,7 @@ const TONOS: Record<Tono, { fondo: string; borde: string; texto: string }> = {
  * texto justamente para que no se pueda pedir la franja sin el número (C3).
  */
 export function Chip({ etiqueta }: { etiqueta: Etiqueta }) {
-  const tono = TONOS[etiqueta.tono];
+  const tono = TonoEstado[etiqueta.tono];
   return (
     <View
       // Un lector de pantalla lee "Estado: sin responder", no un color.

@@ -6,6 +6,7 @@
  *   D17  Alerta de emergencia
  *   P8   El representante agenda una cita
  *   P10  Alertas recibidas y su confirmación
+ *   P12  Ajustes
  *   —    Bandeja de notificaciones, que usan los dos
  *
  * Todo esto corre sobre `convex/interaccion.ts`, que está en `main` desde el
@@ -20,8 +21,8 @@
  */
 
 import { useState } from "react";
-import { Linking, Pressable, StyleSheet, Text, View } from "react-native";
-import { useAuth } from "@clerk/expo";
+import { Linking, Modal, Pressable, StyleSheet, Text, View } from "react-native";
+import { useAuth, useClerk } from "@clerk/expo";
 import { useMutation, usePaginatedQuery, useQuery } from "convex/react";
 import type { FunctionReturnType } from "convex/server";
 
@@ -43,6 +44,7 @@ import {
   Tarjeta,
   useOperacion,
 } from "../components/NucleoUI";
+import { avisoPrivacidad } from "../content/consentimiento";
 import {
   etiquetaAlerta,
   etiquetaCita,
@@ -51,13 +53,14 @@ import {
   textoModalidad,
   textoMotivo,
 } from "../lib/estados";
+import { parrafosLegibles } from "../lib/texto";
 import {
   fechaHoraLegible,
   fechaLegible,
   hoyISO,
   plazoLegible,
 } from "../lib/fechas";
-import { Espacio, Semantico, Superficie, Tamano, Texto } from "../theme/Theme";
+import { Espacio, Radio, Semantico, Superficie, Tamano, Texto } from "../theme/Theme";
 
 type Curso = FunctionReturnType<typeof api.nucleo.listarCursos>["cursos"][number];
 type Reclamo = FunctionReturnType<
@@ -689,6 +692,111 @@ export function AlertasFamilia() {
 }
 
 /* ==========================================================================
+ * P12 — Ajustes
+ * ======================================================================= */
+
+/**
+ * Lo que esta pantalla **no** hace, y por qué se dice en vez de esconderse.
+ *
+ * Un ajuste que no ajusta nada es peor que no tenerlo: entrena a la persona a
+ * no creerle a la pantalla. Así que aquí no hay un interruptor de
+ * notificaciones que no encienda nada, ni un botón de exportar que no exporte,
+ * ni un "retirar consentimiento" que no retire. Hay tres explicaciones de por
+ * qué todavía no, cada una con su motivo real.
+ *
+ * El texto del consentimiento ya le promete al representante que podrá
+ * retirarlo desde Ajustes. Mientras eso no exista, este es el sitio donde
+ * tiene que encontrarse la verdad — si busca aquí y no halla nada, la promesa
+ * queda como una mentira en vez de como un pendiente declarado.
+ */
+export function Ajustes() {
+  const { signOut } = useClerk();
+  const [privacidad, setPrivacidad] = useState(false);
+  const op = useOperacion();
+
+  return (
+    <Pagina titulo="Ajustes">
+      <Tarjeta>
+        <Subtitulo>Avisos en el teléfono</Subtitulo>
+        <Cuerpo>
+          Las novedades ya te llegan a la bandeja de la aplicación. El aviso que
+          suena en el teléfono todavía no está disponible: necesita una versión
+          de la aplicación instalada, no la de desarrollo.
+        </Cuerpo>
+        <Cuerpo>
+          Mientras tanto, revisa Novedades desde la campana de la barra superior.
+        </Cuerpo>
+      </Tarjeta>
+
+      <Tarjeta>
+        <Subtitulo>Privacidad y datos</Subtitulo>
+        <Cuerpo>
+          Puedes leer completo qué guardamos, quién lo ve y qué derechos tienes.
+        </Cuerpo>
+        <Boton secundario onPress={() => setPrivacidad(true)}>
+          Leer el aviso de privacidad
+        </Boton>
+        <Aviso>
+          Retirar el consentimiento todavía no se puede hacer desde aquí. El
+          texto que aceptaste dice que podrás, y va a poder ser — pero en esta
+          versión no está construido. Si quieres retirarlo ahora, pídeselo al
+          docente o a la institución.
+        </Aviso>
+      </Tarjeta>
+
+      <Tarjeta>
+        <Subtitulo>Exportar un informe</Subtitulo>
+        <Cuerpo>
+          El informe imprimible no entra en esta versión. Está decidido y
+          escrito (DP-009): es la primera función de la siguiente, porque de las
+          entrevistas salió que para un docente fiscal lo que vale ante el
+          distrito es el papel.
+        </Cuerpo>
+        <Cuerpo>
+          Cresco no reemplaza el expediente en papel de la institución.
+        </Cuerpo>
+      </Tarjeta>
+
+      <Tarjeta>
+        <Subtitulo>Emergencias</Subtitulo>
+        <Cuerpo>
+          Las alertas de Cresco sirven para que el docente avise a las familias
+          del curso. No sustituyen al ECU 911 ni a ningún servicio de
+          emergencia. Ante una emergencia real, llama al 911.
+        </Cuerpo>
+        <Boton secundario onPress={() => void Linking.openURL("tel:911")}>
+          Llamar al 911
+        </Boton>
+      </Tarjeta>
+
+      <ErrorMensaje mensaje={op.error} />
+      <Boton
+        secundario
+        pendiente={op.pendiente}
+        onPress={() => void op.ejecutar(() => signOut())}
+      >
+        Cerrar sesión
+      </Boton>
+
+      <Modal
+        visible={privacidad}
+        animationType="slide"
+        onRequestClose={() => setPrivacidad(false)}
+      >
+        <Pagina titulo="Aviso de privacidad">
+          <Boton secundario onPress={() => setPrivacidad(false)}>
+            Volver a Ajustes
+          </Boton>
+          {parrafosLegibles(avisoPrivacidad).map((parrafo, indice) => (
+            <Cuerpo key={indice}>{parrafo}</Cuerpo>
+          ))}
+        </Pagina>
+      </Modal>
+    </Pagina>
+  );
+}
+
+/* ==========================================================================
  * Bandeja de notificaciones — la usan los dos roles
  * ======================================================================= */
 
@@ -752,7 +860,7 @@ const i = StyleSheet.create({
   mitad: { flex: 1 },
   ecu: {
     backgroundColor: Semantico.emergencia,
-    borderRadius: 16,
+    borderRadius: Radio.lg,
     padding: Espacio.base,
     gap: Espacio.sm,
   },
@@ -772,7 +880,7 @@ const i = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: Texto.sobreColor,
-    borderRadius: 8,
+    borderRadius: Radio.base,
     paddingHorizontal: Espacio.base,
   },
   ecuBotonTexto: {
@@ -784,7 +892,7 @@ const i = StyleSheet.create({
     backgroundColor: Superficie.tarjeta,
     borderWidth: 1,
     borderColor: Superficie.borde,
-    borderRadius: 16,
+    borderRadius: Radio.lg,
     padding: Espacio.base,
     gap: Espacio.xs,
   },

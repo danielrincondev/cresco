@@ -107,6 +107,38 @@ export const Franja = {
   EXCELENTE: "#2E8B72",
 } as const;
 
+/**
+ * Los cinco tonos del chip de estado (componente 4 del issue #5).
+ *
+ * El issue pedia "una mecanica reutilizable, no 15 chips distintos": estos
+ * cinco tonos son esa mecanica, y `src/lib/estados.ts` es la tabla que decide
+ * que estado del dominio cae en cual. Viven aqui y no en el componente porque
+ * la regla del propio issue no admite excepciones: **ningun `#hex` fuera de
+ * este archivo**.
+ *
+ * Todos llevan fondo claro y texto oscuro, menos `critico`. No es estetica:
+ * `Semantico.negativa` da 4.1:1 con texto blanco encima, por debajo de AA, y
+ * este mismo archivo lo advierte arriba. El unico con texto blanco es
+ * `critico`, sobre `Semantico.emergencia`, que da 7.5:1 y pasa AAA — es el
+ * tono que tiene que gritar, y por eso es el unico que puede.
+ */
+export const TonoEstado = {
+  /** Sin carga: informativo, en curso, o el punto de partida. */
+  neutro: { fondo: Superficie.fondo, borde: Superficie.borde, texto: Texto.secundario },
+  /** Algo salio bien, o quedo cerrado a favor. 8.0:1 sobre su fondo. */
+  positivo: { fondo: "#E7F6EE", borde: Semantico.positiva, texto: "#14532D" },
+  /** Pide accion de quien lo ve, todavia sin gravedad. 7.4:1 sobre su fondo. */
+  atencion: { fondo: "#FDF4E3", borde: Franja.BAJO, texto: "#7A4A12" },
+  /** Algo negativo registrado, o cerrado en contra. 8.6:1 sobre su fondo. */
+  negativo: { fondo: "#FCEAEA", borde: Semantico.negativa, texto: "#7A1C1C" },
+  /** Solo emergencias reales. Escaso a proposito. */
+  critico: {
+    fondo: Semantico.emergencia,
+    borde: Semantico.emergencia,
+    texto: Texto.sobreColor,
+  },
+} as const;
+
 /* --------------------------------------------------------------------------
  * TIPOGRAFÍA
  * ----------------------------------------------------------------------- */
@@ -272,6 +304,7 @@ export const Tema = {
   Texto,
   Semantico,
   Franja,
+  TonoEstado,
   Fuente,
   Tamano,
   Espacio,
