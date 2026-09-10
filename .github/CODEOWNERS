@@ -24,6 +24,14 @@
 # unico control compensatorio que quedo tras perder RLS.
 /movil/convex/auditoria.ts     @Kenny28-176 @danielrincondev
 
+# Tareas recurrentes: Convex exige que los crons vivan en un unico crons.ts, asi
+# que es el segundo sitio del proyecto donde dos personas escriben en el mismo
+# archivo. La regla: cada quien anade su bloque debajo, nadie edita el de otro.
+/movil/convex/crons.ts         @Kenny28-176 @JerePoveda @danielrincondev
+
+# Entrega de notificaciones al telefono -- Persona C.
+/movil/convex/push.ts          @Kenny28-176 @danielrincondev
+
 # Interfaz: tema, componentes base y pantallas — Persona D (@krriveram),
 # incorporada el 31 de agosto de 2026 como responsable de UI. Consume las
 # funciones de convex/ que exponen A, B y C; no las edita.
