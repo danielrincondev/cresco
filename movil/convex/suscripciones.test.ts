@@ -2,7 +2,7 @@
 /// <reference types="vite/client" />
 
 import { convexTest } from "convex-test";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { api } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
@@ -90,7 +90,19 @@ async function sembrarSuscripcion(
   });
 }
 
-beforeEach(() => vi.useFakeTimers().setSystemTime(AHORA));
+/**
+ * convex-test firma las identidades con el emisor `https://convex.test`, y
+ * `perfilActual` las resuelve por `tokenIdentifier` -- emisor + subject --,
+ * con respaldo al subject a secas solo para el emisor que declare
+ * `CLERK_JWT_ISSUER_DOMAIN`. Declararlo aqui hace que sembrar por
+ * `authSubject` siga funcionando sin que la prueba fije el formato interno de
+ * la identidad, que no es asunto suyo.
+ */
+beforeEach(() => {
+  vi.useFakeTimers().setSystemTime(AHORA);
+  vi.stubEnv("CLERK_JWT_ISSUER_DOMAIN", "https://convex.test");
+});
+afterEach(() => vi.unstubAllEnvs());
 
 describe("suscripciones — miSuscripcion", () => {
   it("exige sesión", async () => {
