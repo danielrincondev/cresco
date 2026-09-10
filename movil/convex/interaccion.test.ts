@@ -2,6 +2,7 @@
 /// <reference types="vite/client" />
 
 import { convexTest } from "convex-test";
+import { ConvexError } from "convex/values";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { api } from "./_generated/api";
@@ -515,5 +516,67 @@ describe("interaccion — dispositivos y notificaciones", () => {
         notificacionId: delDocente[0]._id,
       }),
     ).rejects.toThrow("no es tuya");
+  });
+});
+
+describe("interaccion — los errores llegan utiles a la pantalla", () => {
+  /**
+   * Sin envolverlos, un `ErrorDominio` cruza la frontera de Convex como un
+   * fallo generico y la unica frase que la pantalla puede mostrar es "no
+   * pudimos completar la solicitud". El representante que reserva un horario
+   * que acaban de tomar merece leer por que.
+   */
+  async function capturar(fn: () => Promise<unknown>) {
+    try {
+      await fn();
+    } catch (error) {
+      return error;
+    }
+    throw new Error("se esperaba un error y no hubo ninguno");
+  }
+
+  it("un choque de reglas viaja con su codigo y su mensaje", async () => {
+    const t = convexTest(schema, modules);
+    const e = await sembrarEscenario(t);
+    const bloque = { fecha: "2026-09-10", horaInicio: "12:30", horaFin: "13:30" };
+    await e.docente.mutation(api.interaccion.publicarDisponibilidad, bloque);
+
+    const error = await capturar(() =>
+      e.docente.mutation(api.interaccion.publicarDisponibilidad, {
+        ...bloque, horaInicio: "13:00", horaFin: "14:00",
+      }),
+    );
+
+    expect(error).toBeInstanceOf(ConvexError);
+    expect((error as ConvexError<{ codigo: string; mensaje: string }>).data).toMatchObject({
+      codigo: "CONFLICTO",
+    });
+    expect((error as ConvexError<{ mensaje: string }>).data.mensaje).toContain("se cruza");
+  });
+
+  it("una falta de permiso tambien, y sin filtrar detalles de mas", async () => {
+    const t = convexTest(schema, modules);
+    const e = await sembrarEscenario(t);
+
+    const error = await capturar(() =>
+      e.representante.mutation(api.interaccion.publicarDisponibilidad, {
+        fecha: "2026-09-10", horaInicio: "12:30", horaFin: "13:00",
+      }),
+    );
+
+    expect((error as ConvexError<{ codigo: string; mensaje: string }>).data).toMatchObject({
+      codigo: "SIN_PERMISO",
+      mensaje: "Esta acción es solo para docentes.",
+    });
+  });
+
+  it("las query tambien, no solo las mutation", async () => {
+    const t = convexTest(schema, modules);
+    const error = await capturar(() =>
+      t.query(api.interaccion.inconformidadesDelDocente),
+    );
+    expect((error as ConvexError<{ codigo: string }>).data).toMatchObject({
+      codigo: "NO_AUTENTICADO",
+    });
   });
 });

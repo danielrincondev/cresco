@@ -42,6 +42,14 @@ import {
   useOperacion,
 } from "../components/NucleoUI";
 import {
+  AgendaDocente,
+  AlertaDocente,
+  AlertasFamilia,
+  CitasFamilia,
+  Notificaciones,
+  ReclamosDocente,
+} from "./InteraccionScreen";
+import {
   avisoPrivacidad,
   textoConsentimiento,
 } from "../content/consentimiento";
@@ -62,8 +70,11 @@ type Alumno = FunctionReturnType<
 type Perfil = NonNullable<FunctionReturnType<typeof api.nucleo.obtenerPerfil>>;
 type Invitacion = FunctionReturnType<typeof api.nucleo.crearInvitacion>;
 type Ruta =
-  | { tipo: "inicio" | "perfil" | "crearCurso" | "registro" }
-  | { tipo: "curso" | "periodos"; curso: Curso }
+  | { tipo: "inicio" | "perfil" | "registro" | "crearCurso" }
+  // Interaccion (#33). Las de familia no llevan curso: el permiso sale del
+  // vinculo del representante, no de un curso que la pantalla elija.
+  | { tipo: "notificaciones" | "citas" | "alertas" }
+  | { tipo: "curso" | "periodos" | "reclamos" | "agenda" | "alerta"; curso: Curso }
   | { tipo: "invitacion"; invitacion: Invitacion; curso: Curso }
   | { tipo: "aprobar"; curso: Curso; alumno: Alumno };
 
@@ -129,14 +140,24 @@ export function NucleoScreen() {
           </Text>
         </View>
         {perfil && ruta.tipo === "inicio" && (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Mi perfil y roles"
-            onPress={() => setRuta({ tipo: "perfil" })}
-            style={styles.iconButton}
-          >
-            <Icono nombre="account" decorativo />
-          </Pressable>
+          <>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Novedades"
+              onPress={() => setRuta({ tipo: "notificaciones" })}
+              style={styles.iconButton}
+            >
+              <Icono nombre="bell" decorativo />
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Mi perfil y roles"
+              onPress={() => setRuta({ tipo: "perfil" })}
+              style={styles.iconButton}
+            >
+              <Icono nombre="account" decorativo />
+            </Pressable>
+          </>
         )}
         <Pressable
           accessibilityRole="button"
@@ -175,6 +196,18 @@ export function NucleoScreen() {
           />
         ) : ruta.tipo === "registro" ? (
           <RegistroForm perfil={perfil} onGuardar={volver} />
+        ) : ruta.tipo === "notificaciones" ? (
+          <Notificaciones />
+        ) : ruta.tipo === "reclamos" ? (
+          <ReclamosDocente />
+        ) : ruta.tipo === "agenda" ? (
+          <AgendaDocente curso={ruta.curso} />
+        ) : ruta.tipo === "alerta" ? (
+          <AlertaDocente curso={ruta.curso} />
+        ) : ruta.tipo === "citas" ? (
+          <CitasFamilia />
+        ) : ruta.tipo === "alertas" ? (
+          <AlertasFamilia />
         ) : (
           <>
             {perfil.docenteId && perfil.representanteId && (
@@ -195,6 +228,7 @@ export function NucleoScreen() {
               <MisHijos
                 nombre={user?.firstName ?? ""}
                 registrar={() => setRuta({ tipo: "registro" })}
+                navegar={setRuta}
               />
             )}
           </>
@@ -482,6 +516,15 @@ function DetalleCurso({
         Invitar representantes
       </Boton>
       <ErrorMensaje mensaje={op.error} />
+      <Boton secundario onPress={() => navegar({ tipo: "reclamos", curso })}>
+        Reclamos de las familias
+      </Boton>
+      <Boton secundario onPress={() => navegar({ tipo: "agenda", curso })}>
+        Atención a familias
+      </Boton>
+      <Boton secundario onPress={() => navegar({ tipo: "alerta", curso })}>
+        Alerta de emergencia
+      </Boton>
       <Opciones
         valor={pestana}
         opciones={[
@@ -830,9 +873,11 @@ function AprobarForm({
 function MisHijos({
   nombre,
   registrar,
+  navegar,
 }: {
   nombre: string;
   registrar: () => void;
+  navegar: (ruta: Ruta) => void;
 }) {
   const { results, status, loadMore } = usePaginatedQuery(
     api.nucleo.listarMisEstudiantes,
@@ -885,6 +930,12 @@ function MisHijos({
       )}
       <Mas status={status} cargar={() => loadMore(20)} />
       <Boton onPress={registrar}>Registrar a mi hijo</Boton>
+      <Boton secundario onPress={() => navegar({ tipo: "citas" })}>
+        Pedir una cita
+      </Boton>
+      <Boton secundario onPress={() => navegar({ tipo: "alertas" })}>
+        Alertas del curso
+      </Boton>
     </Pagina>
   );
 }

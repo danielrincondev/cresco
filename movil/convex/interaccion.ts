@@ -10,7 +10,7 @@
  * cada función pública empieza llamando a `permisos.ts`, sin excepción.
  */
 
-import { v } from "convex/values";
+import { ConvexError, v } from "convex/values";
 
 import type { Doc, Id } from "./_generated/dataModel";
 import { mutation, query, type MutationCtx, type QueryCtx } from "./_generated/server";
@@ -30,6 +30,7 @@ import {
   hoyEnGuayaquil,
 } from "./lib/guardas";
 import {
+  ErrorPermiso,
   auditar,
   exigirDocente,
   exigirPerfil,
@@ -37,6 +38,29 @@ import {
   exigirTitularDelCurso,
   exigirVinculo,
 } from "./lib/permisos";
+
+/**
+ * Los errores esperados conservan codigo y mensaje al llegar al cliente.
+ *
+ * Sin esto, un `ErrorDominio` cruza la frontera de Convex como un fallo
+ * generico y la pantalla solo puede decir "no pudimos completar la solicitud":
+ * el representante que reserva un horario que acaban de tomar merece leer
+ * *"ese horario ya no esta disponible"*, no una disculpa sin informacion.
+ *
+ * Es gemela de la de `nucleo.ts`. Se duplica a proposito: moverla a `lib/`
+ * convertiria diez lineas de traduccion de errores en superficie compartida,
+ * que pide el acuerdo de los tres para cambiarse.
+ */
+async function conErroresPublicos<T>(operacion: () => Promise<T>): Promise<T> {
+  try {
+    return await operacion();
+  } catch (error) {
+    if (error instanceof ErrorDominio || error instanceof ErrorPermiso) {
+      throw new ConvexError({ codigo: error.codigo, mensaje: error.message });
+    }
+    throw error;
+  }
+}
 
 const modalidad = v.union(...MODALIDAD.map((x) => v.literal(x)));
 const motivoInconformidad = v.union(...MOTIVO_INCONFORMIDAD.map((x) => v.literal(x)));
@@ -103,7 +127,7 @@ export const publicarDisponibilidad = mutation({
     cursoId: v.optional(v.id("curso")),
     lugarOEnlace: v.optional(v.string()),
   },
-  handler: async (ctx, args) => {
+  handler: (ctx, args) => conErroresPublicos(async () => {
     const docente = await exigirDocente(ctx);
     exigirFormatoHora(args.horaInicio, "La hora de inicio");
     exigirFormatoHora(args.horaFin, "La hora de fin");
@@ -141,7 +165,7 @@ export const publicarDisponibilidad = mutation({
       estado: "DISPONIBLE",
       actualizadoEn: Date.now(),
     });
-  },
+  }),
 });
 
 /**
@@ -154,7 +178,7 @@ export const publicarDisponibilidad = mutation({
  */
 export const bloquesDisponibles = query({
   args: { estudianteId: v.id("estudiante"), desde: v.string() },
-  handler: async (ctx, args) => {
+  handler: (ctx, args) => conErroresPublicos(async () => {
     await exigirVinculo(ctx, args.estudianteId);
 
     const matricula = await ctx.db
@@ -191,7 +215,7 @@ export const bloquesDisponibles = query({
         lugarOEnlace: b.lugarOEnlace,
         duracionMinutos: REGLAS.CITA_MINUTOS,
       }));
-  },
+  }),
 });
 
 /**
@@ -204,7 +228,7 @@ export const solicitarCita = mutation({
     estudianteId: v.id("estudiante"),
     motivo: v.optional(v.string()),
   },
-  handler: async (ctx, args) => {
+  handler: (ctx, args) => conErroresPublicos(async () => {
     const representante = await exigirRepresentante(ctx);
     await exigirVinculo(ctx, args.estudianteId);
 
@@ -260,7 +284,7 @@ export const solicitarCita = mutation({
       );
     }
     return citaId;
-  },
+  }),
 });
 
 /** El docente confirma o rechaza. Rechazar libera el bloque. */
@@ -270,7 +294,7 @@ export const responderCita = mutation({
     aceptar: v.boolean(),
     notasDocente: v.optional(v.string()),
   },
-  handler: async (ctx, args) => {
+  handler: (ctx, args) => conErroresPublicos(async () => {
     const docente = await exigirDocente(ctx);
     const cita = await ctx.db.get(args.citaId);
     if (cita === null) throw new ErrorDominio("NO_ENCONTRADO", "La cita no existe.");
@@ -308,33 +332,33 @@ export const responderCita = mutation({
       );
     }
     return cita._id;
-  },
+  }),
 });
 
 /** Citas del representante autenticado (P8). */
 export const misCitasRepresentante = query({
   args: {},
-  handler: async (ctx) => {
+  handler: (ctx) => conErroresPublicos(async () => {
     const representante = await exigirRepresentante(ctx);
     const citas = await ctx.db
       .query("cita")
       .withIndex("por_representante", (q) => q.eq("representanteId", representante._id))
       .collect();
     return citas.sort((a, b) => b.fechaHoraInicio - a.fechaHoraInicio);
-  },
+  }),
 });
 
 /** Citas del docente autenticado (D16). */
 export const misCitasDocente = query({
   args: {},
-  handler: async (ctx) => {
+  handler: (ctx) => conErroresPublicos(async () => {
     const docente = await exigirDocente(ctx);
     const citas = await ctx.db
       .query("cita")
       .withIndex("por_docente", (q) => q.eq("docenteId", docente._id))
       .collect();
     return citas.sort((a, b) => a.fechaHoraInicio - b.fechaHoraInicio);
-  },
+  }),
 });
 
 /* ------------------------------------------------------------------ *
@@ -364,7 +388,7 @@ export const abrirInconformidad = mutation({
     motivo: motivoInconformidad,
     mensaje: v.string(),
   },
-  handler: async (ctx, args) => {
+  handler: (ctx, args) => conErroresPublicos(async () => {
     const representante = await exigirRepresentante(ctx);
 
     const accion = await ctx.db.get(args.accionRegistradaId);
@@ -420,7 +444,7 @@ export const abrirInconformidad = mutation({
       );
     }
     return inconformidadId;
-  },
+  }),
 });
 
 /**
@@ -436,7 +460,7 @@ export const abrirInconformidad = mutation({
  */
 export const inconformidadesDelDocente = query({
   args: {},
-  handler: async (ctx) => {
+  handler: (ctx) => conErroresPublicos(async () => {
     const docente = await exigirDocente(ctx);
 
     const enCurso: Doc<"inconformidad">[] = [];
@@ -468,7 +492,7 @@ export const inconformidadesDelDocente = query({
       });
     }
     return mias.sort((a, b) => a.venceEn - b.venceEn);
-  },
+  }),
 });
 
 /**
@@ -496,7 +520,7 @@ export const resolverInconformidad = mutation({
     ),
     respuestaDocente: v.string(),
   },
-  handler: async (ctx, args) => {
+  handler: (ctx, args) => conErroresPublicos(async () => {
     const docente = await exigirDocente(ctx);
 
     const inconformidad = await ctx.db.get(args.inconformidadId);
@@ -564,7 +588,7 @@ export const resolverInconformidad = mutation({
       );
     }
     return inconformidad._id;
-  },
+  }),
 });
 
 /* ------------------------------------------------------------------ *
@@ -593,7 +617,7 @@ export const activarAlerta = mutation({
     esSimulacro: v.boolean(),
     reautenticadoEn: v.number(),
   },
-  handler: async (ctx, args) => {
+  handler: (ctx, args) => conErroresPublicos(async () => {
     const docente = await exigirTitularDelCurso(ctx, args.cursoId);
     exigirAlcanceCoherente(args.alcance, args.estudianteId);
 
@@ -685,7 +709,7 @@ export const activarAlerta = mutation({
     });
 
     return { id: alertaId, entregas };
-  },
+  }),
 });
 
 /**
@@ -698,7 +722,7 @@ export const activarAlerta = mutation({
  */
 export const misAlertas = query({
   args: {},
-  handler: async (ctx) => {
+  handler: (ctx) => conErroresPublicos(async () => {
     const representante = await exigirRepresentante(ctx);
 
     const vinculos = await ctx.db
@@ -748,13 +772,13 @@ export const misAlertas = query({
       }
     }
     return mias.sort((a, b) => b.activadaEn - a.activadaEn);
-  },
+  }),
 });
 
 /** G3: el representante confirma que la leyó. */
 export const confirmarAlerta = mutation({
   args: { entregaAlertaId: v.id("entregaAlerta") },
-  handler: async (ctx, args) => {
+  handler: (ctx, args) => conErroresPublicos(async () => {
     const representante = await exigirRepresentante(ctx);
     const entrega = await ctx.db.get(args.entregaAlertaId);
     if (entrega === null) throw new ErrorDominio("NO_ENCONTRADO", "Esa alerta no existe.");
@@ -766,7 +790,7 @@ export const confirmarAlerta = mutation({
     const ahora = Date.now();
     await ctx.db.patch(entrega._id, { leidoEn: entrega.leidoEn ?? ahora, confirmadoEn: ahora });
     return entrega._id;
-  },
+  }),
 });
 
 /* ------------------------------------------------------------------ *
@@ -780,7 +804,7 @@ export const registrarDispositivo = mutation({
     plataforma: v.optional(plataforma),
     versionApp: v.optional(v.string()),
   },
-  handler: async (ctx, args) => {
+  handler: (ctx, args) => conErroresPublicos(async () => {
     const perfil = await exigirPerfil(ctx);
     const token = exigirTexto(args.tokenPush, "El token del dispositivo");
     const ahora = Date.now();
@@ -810,26 +834,26 @@ export const registrarDispositivo = mutation({
       activo: true,
       actualizadoEn: ahora,
     });
-  },
+  }),
 });
 
 /** Bandeja de notificaciones del usuario autenticado. */
 export const misNotificaciones = query({
   args: {},
-  handler: async (ctx) => {
+  handler: (ctx) => conErroresPublicos(async () => {
     const perfil = await exigirPerfil(ctx);
     const notificaciones = await ctx.db
       .query("notificacion")
       .withIndex("por_usuario", (q) => q.eq("perfilUsuarioId", perfil._id))
       .collect();
     return notificaciones.sort((a, b) => b._creationTime - a._creationTime);
-  },
+  }),
 });
 
 /** Marca una notificación como leída. Solo el dueño puede. */
 export const marcarNotificacionLeida = mutation({
   args: { notificacionId: v.id("notificacion") },
-  handler: async (ctx, args) => {
+  handler: (ctx, args) => conErroresPublicos(async () => {
     const perfil = await exigirPerfil(ctx);
     const notificacion = await ctx.db.get(args.notificacionId);
     if (notificacion === null) {
@@ -842,5 +866,5 @@ export const marcarNotificacionLeida = mutation({
       await ctx.db.patch(notificacion._id, { leidaEn: Date.now() });
     }
     return notificacion._id;
-  },
+  }),
 });
