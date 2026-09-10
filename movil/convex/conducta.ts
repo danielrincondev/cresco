@@ -1,12 +1,14 @@
 import { ConvexError, v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
-import { mutation, query, type MutationCtx, type QueryCtx } from "./_generated/server";
-import { ENTITLEMENTS, ESTADO_ASISTENCIA, REGLAS } from "./lib/enums";
-import { ErrorDominio, exigirTopeDiario, calcularPuntaje, hoyEnGuayaquil } from "./lib/guardas";
+import { internalMutation, mutation, query, type MutationCtx, type QueryCtx } from "./_generated/server";
+import { ALCANCE_COMUNICADO, ENTITLEMENTS, ESTADO_ASISTENCIA, REGLAS, TIPO_COMUNICADO } from "./lib/enums";
+import { ErrorDominio, exigirAlcanceCoherente, exigirDuracionNota, exigirFechaEvento, exigirTopeDiario, exigirVentanaComunicado, calcularPuntaje, hoyEnGuayaquil, sumarDias } from "./lib/guardas";
 import { ErrorPermiso, auditar, exigirAccesoDocenteAEstudiante, exigirDocente, exigirTitularDelCurso, exigirVinculo } from "./lib/permisos";
 import { tieneAccesoVigente } from "./lib/revenuecat";
 
 const estadoAsistencia = v.union(...ESTADO_ASISTENCIA.map((estado) => v.literal(estado)));
+const tipoComunicado = v.union(...TIPO_COMUNICADO.map((tipo) => v.literal(tipo)));
+const alcanceComunicado = v.union(...ALCANCE_COMUNICADO.map((alcance) => v.literal(alcance)));
 
 /** Traduce fallos esperados al formato que entiende el cliente. */
 async function conErroresPublicos<T>(operacion: () => Promise<T>): Promise<T> {
@@ -378,4 +380,57 @@ export const publicarReporteGeneral = mutation({
     }
     return { fecha, generados: await generarReportesDelCurso(ctx, args.cursoId, periodo._id, fecha, general) };
   }),
+});
+
+/** Publica una nota o evento; los anuncios no alteran conducta ni puntaje. */
+export const publicarComunicado = mutation({
+  args: {
+    cursoId: v.id("curso"), tipo: tipoComunicado, alcance: alcanceComunicado,
+    estudianteId: v.optional(v.id("estudiante")), titulo: v.string(), contenido: v.string(),
+    fechaEvento: v.optional(v.string()), horaEvento: v.optional(v.string()),
+    visibleDesde: v.optional(v.string()), diasVisible: v.optional(v.number()),
+  },
+  handler: (ctx, args) => conErroresPublicos(async () => {
+    const docente = await exigirTitularDelCurso(ctx, args.cursoId);
+    const titulo = args.titulo.trim(); const contenido = args.contenido.trim();
+    if (!titulo || !contenido) throw new ErrorDominio("VALIDACION", "El título y el contenido son obligatorios.");
+    exigirAlcanceCoherente(args.alcance, args.estudianteId);
+    if (args.alcance === "ESTUDIANTE") {
+      const { matricula } = await exigirAccesoDocenteAEstudiante(ctx, args.estudianteId!);
+      if (matricula.cursoId !== args.cursoId) throw new ErrorDominio("VALIDACION", "El estudiante no pertenece a este curso.");
+    }
+    if (args.tipo === "NOTA_PROFESOR") {
+      if (args.fechaEvento !== undefined) throw new ErrorDominio("VALIDACION", "Una nota no puede tener fecha de evento.");
+      exigirDuracionNota(args.diasVisible ?? REGLAS.NOTA_PROFESOR_DIAS_MIN);
+    } else {
+      exigirFechaEvento(args.tipo, args.fechaEvento);
+    }
+    const visibleDesde = args.visibleDesde ?? hoyEnGuayaquil();
+    const visibleHasta = args.tipo === "EVENTO" ? args.fechaEvento! : sumarDias(visibleDesde, args.diasVisible!);
+    exigirVentanaComunicado(visibleDesde, visibleHasta);
+    const periodo = await periodoDelCurso(ctx, args.cursoId);
+    return await ctx.db.insert("comunicadoCurso", {
+      cursoId: args.cursoId, periodoAcademicoId: periodo._id, tipo: args.tipo, alcance: args.alcance,
+      estudianteId: args.estudianteId, titulo, contenido, fechaEvento: args.fechaEvento, horaEvento: args.horaEvento,
+      visibleDesde, visibleHasta, creadoPorDocenteId: docente._id, activo: true, actualizadoEn: Date.now(),
+    });
+  }),
+});
+
+/** Solo invocable por cron. Publica borradores de la fecha y evita duplicar reportes. */
+export const cierreNocturno = internalMutation({
+  args: { fecha: v.optional(v.string()) },
+  handler: async (ctx, args) => {
+    const fecha = args.fecha ?? hoyEnGuayaquil();
+    const borradores = await ctx.db.query("reporteGeneral")
+      .filter((q) => q.and(q.eq(q.field("fecha"), fecha), q.eq(q.field("estado"), "BORRADOR"))).take(50);
+    let publicados = 0; let generados = 0;
+    for (const reporte of borradores) {
+      await ctx.db.patch(reporte._id, { estado: "PUBLICADO", publicadoEn: Date.now(), actualizadoEn: Date.now() });
+      const actualizado = (await ctx.db.get(reporte._id))!;
+      generados += await generarReportesDelCurso(ctx, reporte.cursoId, reporte.periodoAcademicoId, fecha, actualizado);
+      publicados++;
+    }
+    return { publicados, generados };
+  },
 });
