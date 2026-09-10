@@ -1,8 +1,11 @@
 import { ConvexError, v } from "convex/values";
-import type { Id } from "./_generated/dataModel";
-import { mutation, type MutationCtx } from "./_generated/server";
+import type { Doc, Id } from "./_generated/dataModel";
+import { mutation, query, type MutationCtx, type QueryCtx } from "./_generated/server";
+import { ESTADO_ASISTENCIA } from "./lib/enums";
 import { ErrorDominio, exigirTopeDiario, calcularPuntaje, hoyEnGuayaquil } from "./lib/guardas";
-import { ErrorPermiso, auditar, exigirAccesoDocenteAEstudiante } from "./lib/permisos";
+import { ErrorPermiso, auditar, exigirAccesoDocenteAEstudiante, exigirDocente, exigirTitularDelCurso, exigirVinculo } from "./lib/permisos";
+
+const estadoAsistencia = v.union(...ESTADO_ASISTENCIA.map((estado) => v.literal(estado)));
 
 /** Traduce fallos esperados al formato que entiende el cliente. */
 async function conErroresPublicos<T>(operacion: () => Promise<T>): Promise<T> {
@@ -107,5 +110,249 @@ export const anularAccion = mutation({
     await recalcularPuntaje(ctx, matricula._id, accion.periodoAcademicoId);
     await auditar(ctx, { accion: "ANULAR", entidadTipo: "accionRegistrada", entidadId: accion._id, institucionId: institucion._id, datosAntes: { estado: "VIGENTE", puntosAplicados: accion.puntosAplicados }, datosDespues: { estado: "ANULADA", motivo } });
     return accion._id;
+  }),
+});
+
+/** Registra el curso completo en una sola transacción; repetir el día corrige, no duplica. */
+export const tomarAsistencia = mutation({
+  args: {
+    cursoId: v.id("curso"),
+    fecha: v.optional(v.string()),
+    marcas: v.array(v.object({
+      estudianteId: v.id("estudiante"),
+      estado: estadoAsistencia,
+      observacion: v.optional(v.string()),
+    })),
+  },
+  handler: (ctx, args) => conErroresPublicos(async () => {
+    const docente = await exigirTitularDelCurso(ctx, args.cursoId);
+    const fecha = args.fecha ?? hoyEnGuayaquil();
+    if (fecha > hoyEnGuayaquil()) {
+      throw new ErrorDominio("FECHAS_INVALIDAS", "No se puede tomar asistencia de un día futuro.");
+    }
+    if (new Set(args.marcas.map((marca) => marca.estudianteId)).size !== args.marcas.length) {
+      throw new ErrorDominio("VALIDACION", "Un estudiante solo puede tener una marca por día.");
+    }
+    const curso = await ctx.db.get(args.cursoId);
+    if (curso === null) throw new ErrorDominio("NO_ENCONTRADO", "El curso no existe.");
+    const periodo = await ctx.db.query("periodoAcademico")
+      .withIndex("por_anio_orden", (q) => q.eq("anioLectivoId", curso.anioLectivoId))
+      .filter((q) => q.eq(q.field("estado"), "EN_CURSO"))
+      .first();
+    if (periodo === null) throw new ErrorDominio("PERIODO_NO_VIGENTE", "No hay un parcial en curso.");
+
+    let creadas = 0;
+    let actualizadas = 0;
+    const ahora = Date.now();
+    for (const marca of args.marcas) {
+      const { matricula } = await exigirAccesoDocenteAEstudiante(ctx, marca.estudianteId);
+      if (matricula.cursoId !== args.cursoId) {
+        throw new ErrorDominio("VALIDACION", "Ese estudiante no pertenece a este curso.");
+      }
+      const previa = await ctx.db.query("registroAsistencia")
+        .withIndex("por_matricula_fecha", (q) => q.eq("matriculaId", matricula._id).eq("fecha", fecha))
+        .unique();
+      const datos = {
+        estado: marca.estado,
+        observacion: marca.observacion?.trim() || undefined,
+        registradoPorDocenteId: docente._id,
+        actualizadoEn: ahora,
+      };
+      if (previa === null) {
+        await ctx.db.insert("registroAsistencia", {
+          matriculaId: matricula._id,
+          periodoAcademicoId: periodo._id,
+          fecha,
+          ...datos,
+        });
+        creadas++;
+      } else {
+        await ctx.db.patch(previa._id, datos);
+        actualizadas++;
+      }
+    }
+    return { creadas, actualizadas, fecha };
+  }),
+});
+
+export const asistenciaDelDia = query({
+  args: { cursoId: v.id("curso"), fecha: v.optional(v.string()) },
+  handler: (ctx, args) => conErroresPublicos(async () => {
+    await exigirTitularDelCurso(ctx, args.cursoId);
+    const fecha = args.fecha ?? hoyEnGuayaquil();
+    const matriculas = await ctx.db.query("matricula")
+      .withIndex("por_curso_estado", (q) => q.eq("cursoId", args.cursoId).eq("estado", "CURSANDO"))
+      .collect();
+    const estudiantes = await Promise.all(matriculas.map(async (matricula) => {
+      const estudiante = await ctx.db.get(matricula.estudianteId);
+      if (estudiante === null) return null;
+      const marca = await ctx.db.query("registroAsistencia")
+        .withIndex("por_matricula_fecha", (q) => q.eq("matriculaId", matricula._id).eq("fecha", fecha))
+        .unique();
+      return {
+        estudianteId: estudiante._id,
+        nombres: estudiante.nombres,
+        apellidos: estudiante.apellidos,
+        estado: marca?.estado ?? null,
+        observacion: marca?.observacion ?? null,
+      };
+    }));
+    return {
+      fecha,
+      estudiantes: estudiantes.filter((x): x is NonNullable<typeof x> => x !== null)
+        .sort((a, b) => a.apellidos.localeCompare(b.apellidos)),
+    };
+  }),
+});
+
+async function plantillaActiva(ctx: QueryCtx | MutationCtx) {
+  const plantilla = await ctx.db.query("plantillaReporte")
+    .withIndex("por_institucion", (q) => q.eq("institucionId", undefined).eq("activa", true))
+    .first();
+  if (plantilla === null) throw new ErrorDominio("NO_ENCONTRADO", "No hay plantilla de reporte.");
+  return plantilla;
+}
+
+export const camposDelReporte = query({
+  args: {},
+  handler: (ctx) => conErroresPublicos(async () => {
+    await exigirDocente(ctx);
+    // No se acepta una plantilla desde el cliente: la vigente es la fuente de verdad.
+    const plantilla = await plantillaActiva(ctx);
+    const campos = await ctx.db.query("plantillaCampo")
+      .withIndex("por_plantilla_codigo", (q) => q.eq("plantillaReporteId", plantilla._id)).collect();
+    return { plantillaReporteId: plantilla._id, campos: campos.filter((c) => c.activo).sort((a, b) => a.orden - b.orden)
+      .map((c) => ({ id: c._id, codigo: c.codigo, etiqueta: c.etiqueta, tipoDato: c.tipoDato, textoAyuda: c.textoAyuda ?? null, longitudMaxima: c.longitudMaxima ?? null })) };
+  }),
+});
+
+async function periodoDelCurso(ctx: QueryCtx | MutationCtx, cursoId: Id<"curso">) {
+  const curso = await ctx.db.get(cursoId);
+  if (curso === null) throw new ErrorDominio("NO_ENCONTRADO", "El curso no existe.");
+  const periodo = await ctx.db.query("periodoAcademico")
+    .withIndex("por_anio_orden", (q) => q.eq("anioLectivoId", curso.anioLectivoId))
+    .filter((q) => q.eq(q.field("estado"), "EN_CURSO")).first();
+  if (periodo === null) throw new ErrorDominio("PERIODO_NO_VIGENTE", "No hay un parcial en curso.");
+  return periodo;
+}
+
+export const guardarReporteGeneral = mutation({
+  args: { cursoId: v.id("curso"), fecha: v.optional(v.string()), valores: v.array(v.object({ plantillaCampoId: v.id("plantillaCampo"), valorTexto: v.string() })) },
+  handler: (ctx, args) => conErroresPublicos(async () => {
+    await exigirTitularDelCurso(ctx, args.cursoId);
+    const fecha = args.fecha ?? hoyEnGuayaquil();
+    const periodo = await periodoDelCurso(ctx, args.cursoId);
+    let reporte = await ctx.db.query("reporteGeneral")
+      .withIndex("por_curso_fecha", (q) => q.eq("cursoId", args.cursoId).eq("fecha", fecha)).unique();
+    if (reporte !== null && reporte.estado !== "BORRADOR") {
+      throw new ErrorDominio("CONFLICTO", "El reporte de ese día ya fue publicado.");
+    }
+    if (reporte === null) {
+      const plantilla = await plantillaActiva(ctx);
+      const id = await ctx.db.insert("reporteGeneral", { cursoId: args.cursoId, periodoAcademicoId: periodo._id, plantillaReporteId: plantilla._id, fecha, estado: "BORRADOR", actualizadoEn: Date.now() });
+      reporte = (await ctx.db.get(id))!;
+    }
+    for (const valor of args.valores) {
+      const campo = await ctx.db.get(valor.plantillaCampoId);
+      if (campo === null || campo.plantillaReporteId !== reporte.plantillaReporteId || !campo.activo) {
+        throw new ErrorDominio("VALIDACION", "El campo no pertenece a la plantilla activa.");
+      }
+      const texto = valor.valorTexto.trim();
+      if (campo.longitudMaxima !== undefined && texto.length > campo.longitudMaxima) {
+        throw new ErrorDominio("VALIDACION", "El valor supera la longitud permitida.");
+      }
+      const previo = await ctx.db.query("reporteGeneralValor")
+        .withIndex("por_reporte_campo", (q) => q.eq("reporteGeneralId", reporte._id).eq("plantillaCampoId", campo._id)).unique();
+      if (previo === null) await ctx.db.insert("reporteGeneralValor", { reporteGeneralId: reporte._id, plantillaCampoId: campo._id, valorTexto: texto || undefined });
+      else await ctx.db.patch(previo._id, { valorTexto: texto || undefined });
+    }
+    return reporte._id;
+  }),
+});
+
+async function generarReportesDelCurso(ctx: MutationCtx, cursoId: Id<"curso">, periodoId: Id<"periodoAcademico">, fecha: string, general: Doc<"reporteGeneral"> | null) {
+  const matriculas = await ctx.db.query("matricula").withIndex("por_curso_estado", (q) => q.eq("cursoId", cursoId).eq("estado", "CURSANDO")).collect();
+  let generados = 0;
+  for (const matricula of matriculas) {
+    const existe = await ctx.db.query("reporteEstudiante").withIndex("por_matricula_fecha", (q) => q.eq("matriculaId", matricula._id).eq("fecha", fecha)).unique();
+    if (existe !== null) continue;
+    const acciones = await ctx.db.query("accionRegistrada").withIndex("por_matricula_fecha", (q) => q.eq("matriculaId", matricula._id).eq("fechaOcurrencia", fecha)).collect();
+    const vigentes = acciones.filter((a) => a.estado === "VIGENTE");
+    const asistencia = await ctx.db.query("registroAsistencia").withIndex("por_matricula_fecha", (q) => q.eq("matriculaId", matricula._id).eq("fecha", fecha)).unique();
+    const puntaje = await ctx.db.query("puntajePeriodo").withIndex("por_matricula_periodo", (q) => q.eq("matriculaId", matricula._id).eq("periodoAcademicoId", periodoId)).unique();
+    const actual = puntaje?.puntajeActual ?? 60;
+    const reporteId = await ctx.db.insert("reporteEstudiante", { matriculaId: matricula._id, periodoAcademicoId: periodoId, reporteGeneralId: general?._id, fecha, tieneNovedades: vigentes.length > 0, puntajeAlCierre: actual, franjaConductaId: await franjaDe(ctx, actual), estadoAsistencia: asistencia?.estado, generadoEn: Date.now() });
+    let orden = 0;
+    for (const accion of vigentes) await ctx.db.insert("reporteEstudianteItem", { reporteEstudianteId: reporteId, tipoItem: "ACCION", accionRegistradaId: accion._id, orden: orden++ });
+    if (asistencia !== null) await ctx.db.insert("reporteEstudianteItem", { reporteEstudianteId: reporteId, tipoItem: "ASISTENCIA", registroAsistenciaId: asistencia._id, orden });
+    const vinculo = await ctx.db.query("vinculoRepresentacion").withIndex("por_estudiante_estado", (q) => q.eq("estudianteId", matricula.estudianteId).eq("estado", "ACTIVO")).unique();
+    if (vinculo !== null) await ctx.db.insert("entregaReporte", { reporteEstudianteId: reporteId, representanteId: vinculo.representanteId, entregadoEn: Date.now() });
+    generados++;
+  }
+  return generados;
+}
+
+async function presentarReporte(ctx: QueryCtx, reporte: Doc<"reporteEstudiante">) {
+  const items = await ctx.db.query("reporteEstudianteItem").withIndex("por_reporte", (q) => q.eq("reporteEstudianteId", reporte._id)).collect();
+  const acciones = [] as { id: Id<"accionRegistrada">; categoria: string; signo: Doc<"accionRegistrada">["signo"]; puntos: number; descripcion: string; estado: Doc<"accionRegistrada">["estado"] }[];
+  for (const item of items) {
+    if (item.tipoItem !== "ACCION" || item.accionRegistradaId === undefined) continue;
+    const accion = await ctx.db.get(item.accionRegistradaId);
+    if (accion === null) continue;
+    const categoria = await ctx.db.get(accion.categoriaAccionId);
+    acciones.push({ id: accion._id, categoria: categoria?.nombre ?? "", signo: accion.signo, puntos: accion.puntosAplicados, descripcion: accion.descripcion, estado: accion.estado });
+  }
+  const franja = reporte.franjaConductaId === undefined ? null : await ctx.db.get(reporte.franjaConductaId);
+  const general: { etiqueta: string; texto: string; orden: number }[] = [];
+  if (reporte.reporteGeneralId !== undefined) {
+    const valores = await ctx.db.query("reporteGeneralValor").withIndex("por_reporte_campo", (q) => q.eq("reporteGeneralId", reporte.reporteGeneralId!)).collect();
+    for (const valor of valores) {
+      if (!valor.valorTexto) continue;
+      const campo = await ctx.db.get(valor.plantillaCampoId);
+      if (campo !== null) general.push({ etiqueta: campo.etiqueta, texto: valor.valorTexto, orden: campo.orden });
+    }
+  }
+  return { id: reporte._id, fecha: reporte.fecha, tieneNovedades: reporte.tieneNovedades, puntaje: reporte.puntajeAlCierre, franja: franja === null ? null : { nombre: franja.nombre, frase: franja.fraseRepresentante, color: franja.colorHex ?? null }, asistencia: reporte.estadoAsistencia ?? null, acciones, general: general.sort((a, b) => a.orden - b.orden).map(({ etiqueta, texto }) => ({ etiqueta, texto })) };
+}
+
+export const reporteDeHoy = query({
+  args: { estudianteId: v.id("estudiante"), fecha: v.optional(v.string()) },
+  handler: (ctx, args) => conErroresPublicos(async () => {
+    await exigirVinculo(ctx, args.estudianteId);
+    const fecha = args.fecha ?? hoyEnGuayaquil();
+    const matricula = await ctx.db.query("matricula").withIndex("por_estudiante_estado", (q) => q.eq("estudianteId", args.estudianteId).eq("estado", "CURSANDO")).unique();
+    if (matricula === null) return { fecha, hay: false as const, reporte: null };
+    const reporte = await ctx.db.query("reporteEstudiante").withIndex("por_matricula_fecha", (q) => q.eq("matriculaId", matricula._id).eq("fecha", fecha)).unique();
+    return reporte === null ? { fecha, hay: false as const, reporte: null } : { fecha, hay: true as const, reporte: await presentarReporte(ctx, reporte) };
+  }),
+});
+
+export const reporteAcumulado = query({
+  args: { estudianteId: v.id("estudiante") },
+  handler: (ctx, args) => conErroresPublicos(async () => {
+    await exigirVinculo(ctx, args.estudianteId);
+    const matricula = await ctx.db.query("matricula").withIndex("por_estudiante_estado", (q) => q.eq("estudianteId", args.estudianteId).eq("estado", "CURSANDO")).unique();
+    if (matricula === null) throw new ErrorDominio("NO_ENCONTRADO", "El estudiante no tiene matrícula vigente.");
+    const periodo = await periodoDelCurso(ctx, matricula.cursoId);
+    const puntaje = await ctx.db.query("puntajePeriodo").withIndex("por_matricula_periodo", (q) => q.eq("matriculaId", matricula._id).eq("periodoAcademicoId", periodo._id)).unique();
+    const acciones = await ctx.db.query("accionRegistrada").withIndex("por_matricula_periodo", (q) => q.eq("matriculaId", matricula._id).eq("periodoAcademicoId", periodo._id)).collect();
+    const franja = puntaje?.franjaConductaId === undefined ? null : await ctx.db.get(puntaje.franjaConductaId);
+    return { periodo: { nombre: periodo.nombre, fechaInicio: periodo.fechaInicio, fechaFin: periodo.fechaFin }, puntaje: puntaje?.puntajeActual ?? 60, puntosPositivos: puntaje?.puntosPositivos ?? 0, puntosNegativos: puntaje?.puntosNegativos ?? 0, congelado: puntaje?.congelado ?? false, franja: franja === null ? null : { nombre: franja.nombre, frase: franja.fraseRepresentante, color: franja.colorHex ?? null }, bitacora: acciones.sort((a, b) => b.fechaOcurrencia.localeCompare(a.fechaOcurrencia)).map((a) => ({ id: a._id, fecha: a.fechaOcurrencia, signo: a.signo, puntos: a.estado === "VIGENTE" ? a.puntosAplicados : 0, descripcion: a.descripcion, estado: a.estado })) };
+  }),
+});
+
+export const publicarReporteGeneral = mutation({
+  args: { cursoId: v.id("curso"), fecha: v.optional(v.string()) },
+  handler: (ctx, args) => conErroresPublicos(async () => {
+    const docente = await exigirTitularDelCurso(ctx, args.cursoId);
+    const fecha = args.fecha ?? hoyEnGuayaquil();
+    const periodo = await periodoDelCurso(ctx, args.cursoId);
+    let general = await ctx.db.query("reporteGeneral").withIndex("por_curso_fecha", (q) => q.eq("cursoId", args.cursoId).eq("fecha", fecha)).unique();
+    if (general?.estado === "PUBLICADO") throw new ErrorDominio("CONFLICTO", "Ese reporte ya fue publicado.");
+    if (general !== null) {
+      await ctx.db.patch(general._id, { estado: "PUBLICADO", publicadoEn: Date.now(), publicadoPorDocenteId: docente._id, actualizadoEn: Date.now() });
+      general = (await ctx.db.get(general._id))!;
+    }
+    return { fecha, generados: await generarReportesDelCurso(ctx, args.cursoId, periodo._id, fecha, general) };
   }),
 });

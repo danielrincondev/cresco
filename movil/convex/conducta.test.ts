@@ -23,7 +23,7 @@ async function sembrar(t: ReturnType<typeof convexTest>) {
     const categoria = await ctx.db.insert("categoriaAccion", { institucionId, codigo: "DISCIPLINA", nombre: "Disciplina", aplicaA: "ESTUDIANTE", orden: 1, activa: true, actualizadoEn: ahora });
     const negativaId = await ctx.db.insert("tipoAccion", { institucionId, categoriaAccionId: categoria, codigo: "NEG", nombre: "Neg", signo: "NEGATIVA", puntosDefecto: -1, puntosMin: -3, puntosMax: -1, requiereDescripcion: true, admiteInconformidad: true, cuentaEnBitacora: true, activa: true, actualizadoEn: ahora });
     const positivaId = await ctx.db.insert("tipoAccion", { institucionId, categoriaAccionId: categoria, codigo: "POS", nombre: "Pos", signo: "POSITIVA", puntosDefecto: 1, puntosMin: 1, puntosMax: 2, requiereDescripcion: true, admiteInconformidad: false, cuentaEnBitacora: true, activa: true, actualizadoEn: ahora });
-    return { estudianteId, matriculaId, periodoAcademicoId, negativaId, positivaId };
+    return { estudianteId, matriculaId, periodoAcademicoId, cursoId, negativaId, positivaId };
   });
   return { ...ids, docente: t.withIdentity({ subject: "docente_1" }) };
 }
@@ -47,5 +47,18 @@ describe("conducta", () => {
     await e.docente.mutation(api.conducta.registrarAccion, { estudianteId: e.estudianteId, tipoAccionId: e.positivaId, descripcion: "Ayuda", puntosAplicados: 2 });
     const puntaje = await t.run((ctx) => ctx.db.query("puntajePeriodo").withIndex("por_matricula_periodo", (q) => q.eq("matriculaId", e.matriculaId).eq("periodoAcademicoId", e.periodoAcademicoId)).unique());
     expect(puntaje?.puntajeActual).toBe(59);
+  });
+  it("corrige la asistencia del día sin crear una segunda fila", async () => {
+    const t = convexTest(schema, modules); const e = await sembrar(t);
+    await e.docente.mutation(api.conducta.tomarAsistencia, { cursoId: e.cursoId, marcas: [{ estudianteId: e.estudianteId, estado: "AUSENTE" }] });
+    const resultado = await e.docente.mutation(api.conducta.tomarAsistencia, { cursoId: e.cursoId, marcas: [{ estudianteId: e.estudianteId, estado: "PRESENTE", observacion: "Llegó" }] });
+    expect(resultado).toMatchObject({ creadas: 0, actualizadas: 1 });
+    const filas = await t.run((ctx) => ctx.db.query("registroAsistencia").collect());
+    expect(filas).toHaveLength(1); expect(filas[0]).toMatchObject({ estado: "PRESENTE", observacion: "Llegó" });
+  });
+  it("muestra a los estudiantes cursando sin marca como pendientes", async () => {
+    const t = convexTest(schema, modules); const e = await sembrar(t);
+    const respuesta = await e.docente.query(api.conducta.asistenciaDelDia, { cursoId: e.cursoId });
+    expect(respuesta.estudiantes).toEqual([expect.objectContaining({ estudianteId: e.estudianteId, estado: null, observacion: null })]);
   });
 });
