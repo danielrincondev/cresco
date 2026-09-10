@@ -123,7 +123,7 @@ export default defineSchema({
    * ux_perfil_documento → índice `por_documento`, unicidad en la mutation
    */
   perfilUsuario: defineTable({
-    /** El `subject` del JWT de Clerk. Ver `viewer.ts`. */
+    /** tokenIdentifier (emisor + subject); admite subject legado del emisor configurado. */
     authSubject: v.string(),
     tipoDocumento: enumDe(TIPO_DOCUMENTO),
     numeroDocumento: v.string(),

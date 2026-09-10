@@ -6,16 +6,121 @@
  * para conservar las garantías transaccionales de Convex.
  */
 
-import { v } from "convex/values";
+import { ConvexError, v } from "convex/values";
 
 import type { Doc } from "./_generated/dataModel";
 import { mutation, query, type QueryCtx } from "./_generated/server";
 import { JORNADA, REGLAS } from "./lib/enums";
 import { ErrorDominio, exigirRangoFechas, hoyEnGuayaquil } from "./lib/guardas";
-import { exigirDocente, exigirTitularDelCurso } from "./lib/permisos";
+import { ErrorPermiso, exigirDocente, exigirTitularDelCurso, perfilActual } from "./lib/permisos";
 import { tieneAccesoVigente } from "./lib/revenuecat";
 
 const jornada = v.union(...JORNADA.map((valor) => v.literal(valor)));
+
+/** Los errores esperados conservan código y mensaje al llegar al cliente. */
+async function conErroresPublicos<T>(operacion: () => Promise<T>): Promise<T> {
+  try {
+    return await operacion();
+  } catch (error) {
+    if (error instanceof ErrorDominio || error instanceof ErrorPermiso) {
+      throw new ConvexError({ codigo: error.codigo, mensaje: error.message });
+    }
+    throw error;
+  }
+}
+
+function normalizarDocumento(tipo: "CEDULA" | "PASAPORTE" | "SIN_DOCUMENTO", valor: string) {
+  const numero = valor.trim().toUpperCase();
+  if (tipo === "SIN_DOCUMENTO") {
+    if (numero !== "") throw new ErrorDominio("VALIDACION", "Sin documento, deja el número vacío.");
+    return "";
+  }
+  if (tipo === "CEDULA" ? !/^\d{10}$/.test(numero) : !/^[A-Z0-9-]{3,30}$/.test(numero)) {
+    throw new ErrorDominio("VALIDACION", "Revisa el formato del documento de identidad.");
+  }
+  return numero;
+}
+
+async function presentarPerfil(ctx: QueryCtx, perfil: Doc<"perfilUsuario">) {
+  const docente = await ctx.db.query("docente")
+    .withIndex("por_perfil", (q) => q.eq("perfilUsuarioId", perfil._id)).unique();
+  const representante = await ctx.db.query("representante")
+    .withIndex("por_perfil", (q) => q.eq("perfilUsuarioId", perfil._id)).unique();
+  return {
+    perfilUsuarioId: perfil._id,
+    docenteId: docente?._id ?? null,
+    representanteId: representante?._id ?? null,
+  };
+}
+
+/** null significa que falta completar el perfil, no que haya que cerrar sesión. */
+export const obtenerPerfil = query({
+  args: {},
+  handler: (ctx) => conErroresPublicos(async () => {
+    if (!(await ctx.auth.getUserIdentity())) {
+      throw new ErrorPermiso("NO_AUTENTICADO", "Inicia sesión para continuar.");
+    }
+    const perfil = await perfilActual(ctx);
+    return perfil ? await presentarPerfil(ctx, perfil) : null;
+  }),
+});
+
+/** Alta idempotente. Añadir un rol nunca elimina el otro ni reasigna una cuenta. */
+export const completarPerfil = mutation({
+  args: {
+    tipoDocumento: v.union(v.literal("CEDULA"), v.literal("PASAPORTE")),
+    numeroDocumento: v.string(),
+    telefono: v.optional(v.string()),
+    roles: v.array(v.union(v.literal("DOCENTE"), v.literal("REPRESENTANTE"))),
+  },
+  handler: (ctx, args) => conErroresPublicos(async () => {
+    const identidad = await ctx.auth.getUserIdentity();
+    if (!identidad) throw new ErrorPermiso("NO_AUTENTICADO", "Inicia sesión para continuar.");
+    if (args.roles.length < 1 || args.roles.length > 2 || new Set(args.roles).size !== args.roles.length) {
+      throw new ErrorDominio("VALIDACION", "Selecciona uno o ambos roles, sin repetirlos.");
+    }
+    const numeroDocumento = normalizarDocumento(args.tipoDocumento, args.numeroDocumento);
+    const telefono = args.telefono?.trim();
+    if (telefono !== undefined && !/^\+?[0-9 ()-]{7,25}$/.test(telefono)) {
+      throw new ErrorDominio("VALIDACION", "Revisa el número de teléfono.");
+    }
+    let perfil = await perfilActual(ctx);
+    const duplicado = await ctx.db.query("perfilUsuario")
+      .withIndex("por_documento", (q) => q.eq("tipoDocumento", args.tipoDocumento).eq("numeroDocumento", numeroDocumento))
+      .unique();
+    if (duplicado && duplicado._id !== perfil?._id) {
+      throw new ErrorDominio("CONFLICTO", "No se puede registrar este documento con esta cuenta.");
+    }
+    if (perfil && (perfil.tipoDocumento !== args.tipoDocumento || perfil.numeroDocumento !== numeroDocumento)) {
+      throw new ErrorDominio("CONFLICTO", "El perfil ya tiene otro documento. El alta no modifica la identidad.");
+    }
+    const actualizadoEn = Date.now();
+    if (!perfil) {
+      const id = await ctx.db.insert("perfilUsuario", {
+        authSubject: identidad.tokenIdentifier,
+        tipoDocumento: args.tipoDocumento,
+        numeroDocumento,
+        telefono,
+        actualizadoEn,
+      });
+      perfil = (await ctx.db.get("perfilUsuario", id))!;
+    } else {
+      // Migra en el lugar: conserva el _id que usan suscripciones y permisos.
+      await ctx.db.patch("perfilUsuario", perfil._id, {
+        authSubject: identidad.tokenIdentifier,
+        ...(telefono === undefined ? {} : { telefono }),
+        actualizadoEn,
+      });
+    }
+    for (const rol of args.roles) {
+      const tabla = rol === "DOCENTE" ? "docente" : "representante";
+      const existente = await ctx.db.query(tabla)
+        .withIndex("por_perfil", (q) => q.eq("perfilUsuarioId", perfil._id)).unique();
+      if (!existente) await ctx.db.insert(tabla, { perfilUsuarioId: perfil._id, actualizadoEn });
+    }
+    return await presentarPerfil(ctx, perfil);
+  }),
+});
 
 const periodo = v.object({
   nombre: v.string(),
