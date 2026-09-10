@@ -19,6 +19,19 @@
 # Interacción: citas, inconformidades, alertas, notificaciones — Persona C
 /movil/convex/interaccion.ts   @Kenny28-176 @danielrincondev
 
+# Auditoria: los productores de la bitacora (LOGIN y LEER_SENSIBLE) -- Persona C.
+# Modulo nuevo (#19): sin esta linea GitHub no pide revision de nadie sobre el
+# unico control compensatorio que quedo tras perder RLS.
+/movil/convex/auditoria.ts     @Kenny28-176 @danielrincondev
+
+# Tareas programadas: Convex exige que TODAS vivan en un unico crons.ts, asi
+# que es el segundo sitio del proyecto donde dos personas escriben en el mismo
+# archivo. La regla: cada quien anade su bloque debajo, nadie edita el de otro.
+/movil/convex/crons.ts         @Kenny28-176 @JerePoveda @danielrincondev
+
+# Entrega de notificaciones al telefono -- Persona C.
+/movil/convex/push.ts          @Kenny28-176 @danielrincondev
+
 # Interfaz: tema, componentes base y pantallas — Persona D (@krriveram),
 # incorporada el 31 de agosto de 2026 como responsable de UI. Consume las
 # funciones de convex/ que exponen A, B y C; no las edita.
