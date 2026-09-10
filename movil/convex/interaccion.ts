@@ -13,7 +13,13 @@
 import { v } from "convex/values";
 
 import type { Doc, Id } from "./_generated/dataModel";
-import { mutation, query, type MutationCtx, type QueryCtx } from "./_generated/server";
+import {
+  internalMutation,
+  mutation,
+  query,
+  type MutationCtx,
+  type QueryCtx,
+} from "./_generated/server";
 import {
   ALCANCE_ALERTA,
   MODALIDAD,
@@ -439,8 +445,13 @@ export const inconformidadesDelDocente = query({
   handler: async (ctx) => {
     const docente = await exigirDocente(ctx);
 
+    // `VENCIDA` sigue en la bandeja a proposito: el esquema dice que al vencer
+    // "sube de prioridad", no que desaparezca. Como se ordena por `venceEn`
+    // ascendente y las vencidas son las mas antiguas, quedan primeras solas.
+    // Y `resolverInconformidad` las sigue aceptando: responder tarde es mejor
+    // que no responder.
     const enCurso: Doc<"inconformidad">[] = [];
-    for (const estado of ["ABIERTA", "EN_REVISION"] as const) {
+    for (const estado of ["ABIERTA", "EN_REVISION", "VENCIDA"] as const) {
       const lote = await ctx.db
         .query("inconformidad")
         .withIndex("por_estado_vence", (q) => q.eq("estado", estado))
@@ -564,6 +575,77 @@ export const resolverInconformidad = mutation({
       );
     }
     return inconformidad._id;
+  },
+});
+
+/**
+ * F3: el reclamo que el docente dejo pasar 30 dias sin responder vence.
+ *
+ * Va en un cron y no en la consulta de la bandeja porque `Date.now()` dentro
+ * de un `query` de Convex rompe la reactividad: el resultado dejaria de
+ * depender solo de los datos. El estado tiene que quedar **escrito**.
+ *
+ * Interna a proposito: la dispara `crons.ts`, nunca el cliente. Un docente no
+ * puede vencer su propio reclamo para quitarselo de encima.
+ *
+ * Idempotente: al pasar a `VENCIDA` el reclamo sale de los estados que este
+ * lote recorre, asi que correrlo dos veces no vuelve a notificar.
+ */
+export const vencerInconformidades = internalMutation({
+  args: { limite: v.optional(v.number()) },
+  handler: async (ctx, args) => {
+    const ahora = Date.now();
+    // El lote se acota para no pasarse de los limites de una transaccion de
+    // Convex si un dia hay muchos atrasados. El cron del dia siguiente toma
+    // los que hayan quedado; un reclamo ya vencido no empeora por esperar 24h.
+    const limite = args.limite ?? 100;
+    if (limite < 1) throw new ErrorDominio("VALIDACION", "El limite debe ser al menos 1.");
+
+    let vencidas = 0;
+    for (const estado of ["ABIERTA", "EN_REVISION"] as const) {
+      if (vencidas >= limite) break;
+      const lote = await ctx.db
+        .query("inconformidad")
+        .withIndex("por_estado_vence", (q) => q.eq("estado", estado).lte("venceEn", ahora))
+        .take(limite - vencidas);
+
+      for (const inconformidad of lote) {
+        await ctx.db.patch(inconformidad._id, { estado: "VENCIDA", actualizadoEn: ahora });
+        vencidas++;
+
+        // Al representante se le avisa siempre: abrio un reclamo sobre su hijo
+        // y nadie le respondio. Enterarse por silencio es justo lo que las
+        // entrevistas del 1 de septiembre decian que rompe la confianza.
+        const representante = await ctx.db.get(inconformidad.representanteId);
+        if (representante !== null) {
+          await notificar(
+            ctx,
+            representante.perfilUsuarioId,
+            "RESPUESTA_INCONFORMIDAD",
+            "Tu reclamo venció sin respuesta",
+            "Pasaron 30 días sin que el docente respondiera. El reclamo sigue " +
+              "registrado y el docente todavía puede responderlo.",
+            "inconformidad",
+            inconformidad._id,
+          );
+        }
+
+        const accion = await ctx.db.get(inconformidad.accionRegistradaId);
+        const docente = accion === null ? null : await ctx.db.get(accion.registradaPorDocenteId);
+        if (docente !== null) {
+          await notificar(
+            ctx,
+            docente.perfilUsuarioId,
+            "RESPUESTA_INCONFORMIDAD",
+            "Un reclamo venció sin tu respuesta",
+            "Se cumplieron los 30 días. Sigue en tu bandeja y aún puedes responderlo.",
+            "inconformidad",
+            inconformidad._id,
+          );
+        }
+      }
+    }
+    return { vencidas, revisadoEn: ahora };
   },
 });
 

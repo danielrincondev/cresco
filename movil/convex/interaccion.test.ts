@@ -4,7 +4,7 @@
 import { convexTest } from "convex-test";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { api } from "./_generated/api";
+import { api, internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import schema from "./schema";
 
@@ -515,5 +515,125 @@ describe("interaccion — dispositivos y notificaciones", () => {
         notificacionId: delDocente[0]._id,
       }),
     ).rejects.toThrow("no es tuya");
+  });
+});
+
+const DIA = 24 * 60 * 60 * 1000;
+
+/** Abre un reclamo sobre una accion negativa recien sembrada. */
+async function abrirReclamo(
+  t: ReturnType<typeof convexTest>,
+  e: Awaited<ReturnType<typeof sembrarEscenario>>,
+  mensaje = "No ocurrio asi",
+): Promise<Id<"inconformidad">> {
+  const accionId = await sembrarAccion(t, e);
+  return await e.representante.mutation(api.interaccion.abrirInconformidad, {
+    accionRegistradaId: accionId, motivo: "NO_OCURRIO", mensaje,
+  });
+}
+
+const vencer = (t: ReturnType<typeof convexTest>, limite?: number) =>
+  t.mutation(internal.interaccion.vencerInconformidades, limite === undefined ? {} : { limite });
+
+describe("interaccion — vencimiento de reclamos (F3)", () => {
+  it("vence el reclamo sin responder a los 30 dias y avisa a los dos", async () => {
+    const t = convexTest(schema, modules);
+    const e = await sembrarEscenario(t);
+    const id = await abrirReclamo(t, e);
+
+    vi.setSystemTime(AHORA.getTime() + 31 * DIA);
+    expect(await vencer(t)).toMatchObject({ vencidas: 1 });
+
+    expect((await t.run(async (ctx) => await ctx.db.get(id)))?.estado).toBe("VENCIDA");
+    // El docente ya tenia la notificacion de apertura; ahora suma la del vencimiento.
+    expect(await e.docente.query(api.interaccion.misNotificaciones)).toHaveLength(2);
+    const delRepresentante = await e.representante.query(api.interaccion.misNotificaciones);
+    expect(delRepresentante).toHaveLength(1);
+    expect(delRepresentante[0].titulo).toContain("venció sin respuesta");
+  });
+
+  it("no toca un reclamo que sigue dentro del plazo", async () => {
+    const t = convexTest(schema, modules);
+    const e = await sembrarEscenario(t);
+    const id = await abrirReclamo(t, e);
+
+    vi.setSystemTime(AHORA.getTime() + 29 * DIA);
+    expect(await vencer(t)).toMatchObject({ vencidas: 0 });
+
+    expect((await t.run(async (ctx) => await ctx.db.get(id)))?.estado).toBe("ABIERTA");
+    expect(await e.representante.query(api.interaccion.misNotificaciones)).toHaveLength(0);
+  });
+
+  it("no revive un reclamo que el docente ya resolvio", async () => {
+    const t = convexTest(schema, modules);
+    const e = await sembrarEscenario(t);
+    const id = await abrirReclamo(t, e);
+    await e.docente.mutation(api.interaccion.resolverInconformidad, {
+      inconformidadId: id, desenlace: "MANTENIDA", respuestaDocente: "Lo confirmo con el aula",
+    });
+
+    vi.setSystemTime(AHORA.getTime() + 31 * DIA);
+    expect(await vencer(t)).toMatchObject({ vencidas: 0 });
+
+    expect((await t.run(async (ctx) => await ctx.db.get(id)))?.estado).toBe("RESUELTA_MANTENIDA");
+  });
+
+  it("correrlo dos veces no vuelve a notificar", async () => {
+    const t = convexTest(schema, modules);
+    const e = await sembrarEscenario(t);
+    await abrirReclamo(t, e);
+
+    vi.setSystemTime(AHORA.getTime() + 31 * DIA);
+    await vencer(t);
+    expect(await vencer(t)).toMatchObject({ vencidas: 0 });
+
+    expect(await e.representante.query(api.interaccion.misNotificaciones)).toHaveLength(1);
+  });
+
+  it("el reclamo vencido sigue en la bandeja del docente y queda primero", async () => {
+    const t = convexTest(schema, modules);
+    const e = await sembrarEscenario(t);
+    const viejo = await abrirReclamo(t, e, "El primero");
+    vi.setSystemTime(AHORA.getTime() + 20 * DIA);
+    const reciente = await abrirReclamo(t, e, "El segundo");
+
+    vi.setSystemTime(AHORA.getTime() + 31 * DIA);
+    expect(await vencer(t)).toMatchObject({ vencidas: 1 });
+
+    const bandeja = await e.docente.query(api.interaccion.inconformidadesDelDocente);
+    expect(bandeja).toHaveLength(2);
+    expect(bandeja[0]).toMatchObject({ id: viejo, estado: "VENCIDA" });
+    expect(bandeja[1]).toMatchObject({ id: reciente, estado: "ABIERTA" });
+  });
+
+  it("el docente todavia puede responder un reclamo vencido", async () => {
+    const t = convexTest(schema, modules);
+    const e = await sembrarEscenario(t);
+    const id = await abrirReclamo(t, e);
+
+    vi.setSystemTime(AHORA.getTime() + 31 * DIA);
+    await vencer(t);
+
+    await e.docente.mutation(api.interaccion.resolverInconformidad, {
+      inconformidadId: id, desenlace: "ANULADA", respuestaDocente: "Tienes razon, la anulo",
+    });
+    expect((await t.run(async (ctx) => await ctx.db.get(id)))?.estado).toBe("RESUELTA_ANULADA");
+  });
+
+  it("el limite acota el lote y el resto espera al dia siguiente", async () => {
+    const t = convexTest(schema, modules);
+    const e = await sembrarEscenario(t);
+    await abrirReclamo(t, e, "Uno");
+    await abrirReclamo(t, e, "Dos");
+
+    vi.setSystemTime(AHORA.getTime() + 31 * DIA);
+    expect(await vencer(t, 1)).toMatchObject({ vencidas: 1 });
+
+    const estados = await t.run(async (ctx) =>
+      (await ctx.db.query("inconformidad").collect()).map((i) => i.estado).sort(),
+    );
+    expect(estados).toEqual(["ABIERTA", "VENCIDA"]);
+
+    expect(await vencer(t)).toMatchObject({ vencidas: 1 });
   });
 });
