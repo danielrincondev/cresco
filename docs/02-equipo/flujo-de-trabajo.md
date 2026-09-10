@@ -81,6 +81,37 @@ crear) — código real, compilado y probado, simplemente apagado hasta que est�
 listo. Ya lo decidimos así para el diferenciador de IA (`DP-008`); la idea es
 usarlo como práctica general.
 
+## El contrato con la interfaz (desde el 31 de agosto)
+
+Con A, B y C todos escribiendo backend, el reparto era limpio: un archivo, un
+dueño, sin superposición. Con D construyendo la interfaz de las 31 pantallas,
+aparece un tipo de dependencia que no existía antes: **su código llama al de
+los otros tres, en tiempo de ejecución, no solo en revisión de PR.**
+
+Qué cambia en la práctica:
+
+- **D no espera a que un módulo esté "terminado" para empezar su pantalla.**
+  Empieza en cuanto la función que necesita existe en `main` — puede pedirla
+  antes de que estén las 31, una por una, según el orden del inventario de
+  pantallas.
+- **Si cambias la firma de una función que D ya usa, avísale.** No hay forma
+  automática de saber quién construyó una pantalla sobre tu función — a
+  diferencia de un archivo compartido, esto no lo detecta CODEOWNERS. Un
+  comentario en el Issue de la pantalla afectada es suficiente.
+- **CODEOWNERS de D** (`movil/src/theme/`, `components/`, `screens/`) tiene a
+  Kenny como respaldo, igual que en los tres módulos de backend y en toda la
+  superficie compartida. Esto concentra en Kenny más superficies de revisión
+  obligatoria que en cualquier otro — es una decisión consciente, no un
+  descuido: si sus PR empiezan a acumularse esperando aprobación, la primera
+  señal es que hay que repartir el respaldo por pantalla (quien construyó el
+  backend de D14–D19 respalda esas pantallas, y así con cada módulo) en vez
+  de dejarlo todo sobre una persona.
+- **D no es parte de "cambiar superficie compartida exige acuerdo de los
+  tres"** — ese acuerdo sigue siendo de A, B y C sobre `schema.ts`,
+  `enums.ts`, `guardas.ts`, `permisos.ts` y `flags.ts`. Si D necesita un campo
+  o una función nueva, es la misma regla de siempre: la pide al dueño del
+  módulo, no la agrega ella.
+
 ## Qué falta configurar, y qué te toca a ti (Daniel)
 
 Esto requiere permisos de **Admin** sobre el repo, que hoy solo tienes tú:

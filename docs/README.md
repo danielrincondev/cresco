@@ -62,9 +62,9 @@ Vive fuera de `docs/` porque Claude Code lo carga en cada sesión.
 
 | Documento | Estado | Dueño |
 |---|---|---|
-| `aviso-privacidad.md` | ⬜ **necesario antes de P3**; declara la política de DP-007 | Persona C |
-| `texto-consentimiento.md` | ⬜ **necesario antes de P3**; se guarda su versión, no un booleano | Persona C |
-| `carta-acuerdo-piloto.md` | ⬜ antes del piloto; ahí se negocia la retención (DP-007) | Persona C |
+| `aviso-privacidad.md` | 🚧 borrador completo, versión `2026-09-v1` — **pendiente de revisión jurídica** | Persona C |
+| `texto-consentimiento.md` | 🚧 borrador, versión `2026-09-v1` — se guarda la versión, no un booleano | Persona C |
+| `carta-acuerdo-piloto.md` | 🚧 borrador `2026-09-v1` — los puntos 🔲 se acuerdan con la institución | Persona C |
 | `firmados/` | 🚫 ignorada por Git | — |
 
 ## 04-guias — ¿Cómo se usa y se opera?
@@ -73,7 +73,7 @@ Vive fuera de `docs/` porque Claude Code lo carga en cada sesión.
 |---|---|---|
 | `guia-docente.md` | ⬜ semana 5 | Persona B |
 | `guia-representante.md` | ⬜ semana 5 | Persona B |
-| `integracion-revenuecat.md` | ⬜ semana 2 | Persona C |
+| `integracion-revenuecat.md` | ✅ development build + RevenueCat, con las trampas conocidas | Persona C |
 
 > **Los cuatro manuales de rol (v1.1, 8 de agosto) se archivaron el 22 de agosto**
 > en `99-archivo/manuales-v1.1-stack-retirado/`. Instruían instalar Better Auth,
@@ -87,8 +87,8 @@ Vive fuera de `docs/` porque Claude Code lo carga en cada sesión.
 | Documento | Estado | Dueño |
 |---|---|---|
 | `faq-sesion.md` | ✅ | Todos |
-| `guion-entrevistas.md` | ⬜ | Todos |
-| `hallazgos.md` | ⬜ tras las sesiones | Todos |
+| `guion-entrevistas.md` | ✅ diseño antes/después, individual por persona | Todos |
+| `hallazgos.md` | ✅ 4 docentes entrevistados el 1-sep; 8 hallazgos, 3 candidatos a DP | Persona C |
 
 ## 99-archivo — Documentos reemplazados
 

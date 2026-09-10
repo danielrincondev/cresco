@@ -24,12 +24,20 @@ Cada persona es dueña de sus tablas, sus endpoints y sus pantallas. **Nadie
 modifica el módulo de otro**: si necesita un campo, lo pide y se agrega en una
 migración acordada.
 
-| | **Persona A — Núcleo** | **Persona B — Conducta** | **Persona C — Interacción e infra** |
-|---|---|---|---|
-| **Tablas** | `institucion`, `perfil_usuario`, `docente`, `representante`, `anio_lectivo`, `periodo_academico`, `dia_no_lectivo`, `curso`, `asignacion_docente`, `estudiante`, `matricula`, `invitacion_curso`, `vinculo_representacion`, `consentimiento` | `categoria_accion`, `tipo_accion`, `accion_registrada`, `comunicado_curso`, `franja_conducta`, `puntaje_periodo`, `registro_asistencia`, `plantilla_*`, `reporte_*`, `entrega_reporte` | `disponibilidad_docente`, `cita`, `inconformidad`, `alerta_emergencia`, `entrega_alerta`, `plan`, `suscripcion`, `evento_revenuecat`, `desbloqueo_recompensado`, `dispositivo`, `notificacion`, `auditoria` |
-| **Responsable de** | Clerk, capa de permisos, importación CSV, flujo de vinculación, tema y componentes base | Motor de puntaje, generación nocturna de reportes, gráfico de evolución | RevenueCat, notificaciones push, PDF, CI, despliegue |
-| **Su archivo de funciones** | `convex/nucleo.ts` | `convex/conducta.ts` | `convex/interaccion.ts` |
-| **Pantallas** | D1–D8, P1–P3 | D9–D13, P4–P6 | D14–D19, P7–P12 |
+> **Incorporación del 31 de agosto de 2026: Persona D (@krriveram), interfaz.**
+> Antes cada uno de A/B/C era dueño de su lógica de backend *y* de las
+> pantallas que la usan. Desde ahora D construye la interfaz de las **31
+> pantallas**, consumiendo las funciones que A, B y C exponen — ella no
+> escribe en `convex/`. El detalle de cómo se coordina esto vive en
+> `flujo-de-trabajo.md`, sección "El contrato con la interfaz".
+
+| | **Persona A — Núcleo** | **Persona B — Conducta** | **Persona C — Interacción e infra** | **Persona D — Interfaz** |
+|---|---|---|---|---|
+| **Tablas** | `institucion`, `perfil_usuario`, `docente`, `representante`, `anio_lectivo`, `periodo_academico`, `dia_no_lectivo`, `curso`, `asignacion_docente`, `estudiante`, `matricula`, `invitacion_curso`, `vinculo_representacion`, `consentimiento` | `categoria_accion`, `tipo_accion`, `accion_registrada`, `comunicado_curso`, `franja_conducta`, `puntaje_periodo`, `registro_asistencia`, `plantilla_*`, `reporte_*`, `entrega_reporte` | `disponibilidad_docente`, `cita`, `inconformidad`, `alerta_emergencia`, `entrega_alerta`, `plan`, `suscripcion`, `evento_revenuecat`, `desbloqueo_recompensado`, `dispositivo`, `notificacion`, `auditoria` | — (no toca tablas) |
+| **Responsable de** | Clerk, capa de permisos, importación CSV, flujo de vinculación | Motor de puntaje, generación nocturna de reportes, gráfico de evolución | RevenueCat, notificaciones push, PDF, CI, despliegue | Tema, los 6 componentes base y las 31 pantallas |
+| **Su archivo de funciones** | `convex/nucleo.ts` | `convex/conducta.ts` | `convex/interaccion.ts` | `movil/src/screens/`, `components/`, `theme/` |
+| **Pantallas — lógica de negocio** | D1–D8, P1–P3 | D9–D13, P4–P6 | D14–D19, P7–P12 | — |
+| **Pantallas — interfaz** | | | | **Las 31**, sobre las funciones de A/B/C |
 
 > Los nombres de tabla de la fila anterior están en `snake_case` porque vienen
 > del modelo relacional original. En Convex son **`camelCase`**
