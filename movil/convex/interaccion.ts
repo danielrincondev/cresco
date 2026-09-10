@@ -407,6 +407,10 @@ export const abrirInconformidad = mutation({
       motivo: args.motivo,
       mensaje: exigirTexto(args.mensaje, "El mensaje del reclamo"),
       estado: "ABIERTA",
+      // Se copia el docente de la accion reclamada: es lo que permite que su
+      // bandeja lea solo lo suyo. La accion ya esta leida aqui arriba, asi que
+      // no cuesta una lectura de mas (#48).
+      docenteId: accion.registradaPorDocenteId,
       // F3: el docente tiene 30 días. El plazo sale de REGLAS, no de un
       // número escrito aquí.
       venceEn: ahora + REGLAS.INCONFORMIDAD_DIAS_PLAZO * DIA,
@@ -432,60 +436,54 @@ export const abrirInconformidad = mutation({
 /**
  * Bandeja del docente (D15), con lo más próximo a vencer primero.
  *
+ * Lee **solo los reclamos de este docente**, por el índice `por_docente_estado`
+ * que empieza por `docenteId`. Antes filtraba por estado y descartaba en
+ * memoria, lo que significaba leer todos los reclamos abiertos de todas las
+ * instituciones para pintar la bandeja de una persona — y una `query` de
+ * Convex que llega a su límite de lectura no se degrada: falla (#48).
+ *
  * No calcula "vencida" aquí: `Date.now()` dentro de un `query` rompe la
  * reactividad de Convex, porque el resultado dejaría de depender solo de los
  * datos. Por eso el estado lo escribe el cron `vencerInconformidades`.
  *
- * ⚠️ **Esta consulta lee todos los reclamos abiertos del sistema, no solo los
- * de este docente**, y filtra en memoria. El comentario anterior afirmaba lo
- * contrario y era falso: `por_estado_vence` empieza por `estado`, así que
- * `eq("estado", "ABIERTA")` selecciona los de todos los docentes de todas las
- * instituciones.
- *
- * No se arregla aquí porque `inconformidad` no tiene por dónde filtrar por
- * docente: el vínculo con él va por `accionRegistrada.registradaPorDocenteId`,
- * a un salto de distancia. La solución es un campo `docenteId` y un índice
- * `por_docente_estado`, que es superficie compartida y va en su propio PR
- * (issue #48). Para el piloto —una institución, pocos reclamos— no muerde;
- * a escala sí.
+ * `VENCIDA` sigue en la lista a propósito: el esquema dice que al vencer "sube
+ * de prioridad", no que desaparezca. Como se ordena por `venceEn` ascendente y
+ * las vencidas son las más antiguas, quedan primeras solas. Y
+ * `resolverInconformidad` las sigue aceptando: responder tarde es mejor que no
+ * responder.
  */
 export const inconformidadesDelDocente = query({
   args: {},
   handler: async (ctx) => {
     const docente = await exigirDocente(ctx);
 
-    // `VENCIDA` sigue en la bandeja a proposito: el esquema dice que al vencer
-    // "sube de prioridad", no que desaparezca. Como se ordena por `venceEn`
-    // ascendente y las vencidas son las mas antiguas, quedan primeras solas.
-    // Y `resolverInconformidad` las sigue aceptando: responder tarde es mejor
-    // que no responder.
-    const enCurso: Doc<"inconformidad">[] = [];
+    const mias = [];
     for (const estado of ["ABIERTA", "EN_REVISION", "VENCIDA"] as const) {
       const lote = await ctx.db
         .query("inconformidad")
-        .withIndex("por_estado_vence", (q) => q.eq("estado", estado))
+        .withIndex("por_docente_estado", (q) =>
+          q.eq("docenteId", docente._id).eq("estado", estado),
+        )
         .collect();
-      enCurso.push(...lote);
-    }
 
-    const mias = [];
-    for (const i of enCurso) {
-      const accion = await ctx.db.get(i.accionRegistradaId);
-      if (accion === null || accion.registradaPorDocenteId !== docente._id) continue;
-      mias.push({
-        id: i._id,
-        motivo: i.motivo,
-        mensaje: i.mensaje,
-        estado: i.estado,
-        venceEn: i.venceEn,
-        accion: {
-          id: accion._id,
-          descripcion: accion.descripcion,
-          puntosAplicados: accion.puntosAplicados,
-          fechaOcurrencia: accion.fechaOcurrencia,
-          estado: accion.estado,
-        },
-      });
+      for (const i of lote) {
+        const accion = await ctx.db.get(i.accionRegistradaId);
+        if (accion === null) continue;
+        mias.push({
+          id: i._id,
+          motivo: i.motivo,
+          mensaje: i.mensaje,
+          estado: i.estado,
+          venceEn: i.venceEn,
+          accion: {
+            id: accion._id,
+            descripcion: accion.descripcion,
+            puntosAplicados: accion.puntosAplicados,
+            fechaOcurrencia: accion.fechaOcurrencia,
+            estado: accion.estado,
+          },
+        });
+      }
     }
     return mias.sort((a, b) => a.venceEn - b.venceEn);
   },
