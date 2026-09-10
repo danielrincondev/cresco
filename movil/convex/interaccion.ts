@@ -432,13 +432,22 @@ export const abrirInconformidad = mutation({
 /**
  * Bandeja del docente (D15), con lo más próximo a vencer primero.
  *
- * Recorre desde los estados abiertos usando el índice `por_estado_vence`, no
- * con un `collect()` de toda la tabla: una lectura completa crece con cada
- * reclamo que abra cualquier docente del sistema.
- *
  * No calcula "vencida" aquí: `Date.now()` dentro de un `query` rompe la
  * reactividad de Convex, porque el resultado dejaría de depender solo de los
- * datos. Se devuelve `venceEn` y la pantalla decide.
+ * datos. Por eso el estado lo escribe el cron `vencerInconformidades`.
+ *
+ * ⚠️ **Esta consulta lee todos los reclamos abiertos del sistema, no solo los
+ * de este docente**, y filtra en memoria. El comentario anterior afirmaba lo
+ * contrario y era falso: `por_estado_vence` empieza por `estado`, así que
+ * `eq("estado", "ABIERTA")` selecciona los de todos los docentes de todas las
+ * instituciones.
+ *
+ * No se arregla aquí porque `inconformidad` no tiene por dónde filtrar por
+ * docente: el vínculo con él va por `accionRegistrada.registradaPorDocenteId`,
+ * a un salto de distancia. La solución es un campo `docenteId` y un índice
+ * `por_docente_estado`, que es superficie compartida y va en su propio PR
+ * (issue #48). Para el piloto —una institución, pocos reclamos— no muerde;
+ * a escala sí.
  */
 export const inconformidadesDelDocente = query({
   args: {},
