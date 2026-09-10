@@ -1,0 +1,1361 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Manual de rol — Persona B · Conducta y Reportes · Cresco</title>
+<style>
+:root{--teal:#106b58;--teal-dark:#0b4f41;--cream:#fdf1e0;--gray-bg:#f4f5f3;--border:#d8ddd9;--text:#1a1a1a;--red:#9B2C2C;--redbg:#fceaea;}
+*{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+@page{size:letter;margin:0.8in 0.85in;}
+body{font-family:Georgia,'Times New Roman',serif;color:var(--text);font-size:10.5pt;line-height:1.5;margin:0;}
+h1,h2,h3,h4{font-family:Arial,Helvetica,sans-serif;font-weight:700;color:var(--teal);margin-top:0;page-break-after:avoid;}
+h1{font-size:20pt;border-bottom:2px solid var(--teal);padding-bottom:7px;margin-bottom:14px;}
+h2{font-size:14pt;margin-top:22px;margin-bottom:8px;}
+h3{font-size:11.5pt;color:#2c3e38;margin-top:16px;margin-bottom:5px;}
+h4{font-size:10.5pt;color:#444;margin-top:12px;margin-bottom:4px;}
+p{margin:0 0 9px 0;}
+ul,ol{margin:0 0 10px 0;padding-left:20px;}
+li{margin-bottom:3px;}
+hr{border:none;border-top:1.5px solid var(--teal);margin:14px 0;}
+.part{page-break-before:always;}
+.brand{font-family:Arial,Helvetica,sans-serif;font-weight:700;font-size:13pt;color:var(--teal);letter-spacing:1.5px;}
+table{border-collapse:collapse;width:100%;margin:10px 0 14px 0;font-family:Arial,Helvetica,sans-serif;font-size:8.8pt;page-break-inside:avoid;}
+th{background:var(--teal);color:#fff;text-align:left;padding:5px 7px;font-weight:600;}
+td{padding:5px 7px;border-bottom:1px solid var(--border);vertical-align:top;}
+tr:nth-child(even) td{background:#f7f8f7;}
+code{font-family:'Consolas','Courier New',monospace;background:var(--gray-bg);padding:1px 4px;border-radius:3px;color:#0b4f41;font-size:9pt;}
+pre{font-family:'Consolas','Courier New',monospace;font-size:8.4pt;line-height:1.42;background:#f7f8f7;border-left:3px solid var(--teal);padding:9px 12px;margin:10px 0;white-space:pre-wrap;color:#1f4a3f;overflow-wrap:break-word;page-break-inside:avoid;}
+pre code{background:none;padding:0;font-size:8.4pt;}
+.callout{background:var(--cream);border-left:4px solid var(--teal);padding:9px 13px;margin:12px 0;font-size:9.6pt;page-break-inside:avoid;}
+.stop{background:var(--redbg);border-left:4px solid var(--red);padding:9px 13px;margin:12px 0;font-size:9.6pt;page-break-inside:avoid;}
+.stop b,.stop strong{color:var(--red);}
+.meta{font-family:Arial,Helvetica,sans-serif;font-size:9.5pt;color:#444;}
+.small{font-size:9pt;color:#555;}
+.check{font-family:Arial,Helvetica,sans-serif;font-size:9.5pt;}
+.check li{margin-bottom:5px;list-style:none;margin-left:-14px;}
+.check li:before{content:"\2610";margin-right:7px;color:var(--teal);font-size:11pt;}
+.dia{background:var(--teal);color:#fff;font-family:Arial,Helvetica,sans-serif;font-size:9pt;font-weight:700;padding:3px 9px;border-radius:11px;display:inline-block;margin-bottom:6px;letter-spacing:.5px;}
+.toc{font-family:Arial,Helvetica,sans-serif;font-size:9.5pt;}
+.toc li{margin-bottom:3px;}
+</style>
+</head>
+<body>
+
+<p class="brand">CRESCO</p>
+<hr>
+<h1 style="margin-top:48px;border:none;font-size:25pt;">Manual de rol — Persona B<br><span style="color:#2c3e38;">Conducta y Reportes</span></h1>
+<p class="meta">Versión 2.0 · 9 de septiembre de 2026 · Escrito por Persona C<br>
+Cierre del Shipaton: <b>30 de septiembre, 23:45 PDT</b> — quedan 21 días.</p>
+<hr>
+
+<div class="callout" style="margin-top:26px;">
+<b>Este manual reemplaza al de agosto para tu rol.</b> Aquel describía el stack retirado (PostgreSQL, Drizzle, RLS, Better Auth) y seguirlo hoy te haría reconstruir cosas que el proyecto abandonó el 16 de agosto. Está archivado en <code>docs/99-archivo/</code>. Este es el vigente: Convex + Clerk, y solo lo que a ti te falta.
+</div>
+
+<h2 style="margin-top:26px;">Para qué sirve este documento</h2>
+<p>Para que en <b>una semana</b> termines todo lo que le falta a tu rol, sin tener que preguntar por dónde seguir. Cada tarea viene con el paso a paso, el código de ejemplo y cómo comprobar que quedó bien.</p>
+<p>Está escrito con lo que hay <b>hoy</b> en el repositorio, verificado archivo por archivo — no de memoria. Donde tus issues de GitHub dicen algo que ya no es cierto, aquí está corregido y señalado.</p>
+
+<h2>Tu rol en una frase</h2>
+<p><b>Construyes el corazón funcional del producto.</b></p>
+<p>El puntaje, las acciones, la asistencia y los reportes son tu módulo. Todo lo que hace que Cresco sea Cresco y no otra app de mensajería pasa por ahí. Eres quien más lógica de negocio escribe y quien más pruebas necesita, porque un error tuyo no se ve como un error: se ve como un estudiante con el puntaje equivocado, y eso es exactamente lo que un padre va a reclamar.</p>
+
+<div class="stop">
+<b>Y ahora mismo eres la ruta crítica del proyecto.</b> Sin <code>conducta.ts</code> no existe el puntaje, no existen los reportes, y no se pueden construir 10 de las 31 pantallas. Daniel terminó lo suyo, Kenny también. Tu módulo es lo único que separa al equipo de tener un producto completo.
+</div>
+
+<h2>Índice</h2>
+<ol class="toc">
+<li><b>Parte 1</b> — Dónde estás parado hoy</li>
+<li><b>Parte 2</b> — Tu alcance: qué es tuyo y qué no</li>
+<li><b>Parte 3</b> — Día 0: dejar la máquina lista (45 minutos)</li>
+<li><b>Parte 4</b> — Las cinco reglas que no se negocian</li>
+<li><b>Parte 5</b> — Cómo escribir una prueba (el andamio que vas a copiar 20 veces)</li>
+<li><b>Parte 6</b> — Día 1: cerrar el issue #9</li>
+<li><b>Parte 7</b> — Día 2: asistencia</li>
+<li><b>Parte 8</b> — Días 3 y 4: el reporte del día</li>
+<li><b>Parte 9</b> — Día 5: las tres consultas del representante</li>
+<li><b>Parte 10</b> — Día 6: comunicados y cron nocturno</li>
+<li><b>Parte 11</b> — Día 7: lo que los demás necesitan de ti</li>
+<li><b>Parte 12</b> — Cómo se entrega: rama, PR, CI</li>
+<li><b>Apéndices</b> — Tablas, guardas, reglas, semillas, errores comunes</li>
+</ol>
+
+<!-- ============================================================ -->
+<div class="part">
+<h1>Parte 1 — Dónde estás parado hoy</h1>
+
+<h2>1.1 Lo que ya escribiste, y está bien</h2>
+<p>El PR <b>#39</b> tiene <code>registrarAccion</code> funcionando. Lo revisé a fondo el 6 de septiembre y te lo digo otra vez porque importa: <b>el código está bien pensado.</b></p>
+<ul>
+<li><b>Respetaste ADR-005</b>, que es la regla más fácil de romper. No incrementas el puntaje: lo recalculas desde las acciones <code>VIGENTE</code> del período.</li>
+<li><b>No escribiste ni un valor a mano.</b> Los límites salen de <code>tipoAccion</code>; la base, el piso y el techo salen de <code>institucion</code>.</li>
+<li><b>El tope diario está bien resuelto, y no era obvio.</b> Sumas solo los puntos previos <i>del mismo signo</i>. Si hubieras sumado todos, una acción positiva del día habría compensado una negativa y el tope se calcularía mal.</li>
+<li><b>Respetas <code>congelado</code></b>: si el período ya cerró, no tocas el puntaje.</li>
+</ul>
+
+<h2>1.2 Lo que falta, y por qué está parado</h2>
+<p>El PR #39 lleva <b>un solo commit desde el 6 de septiembre</b> y sigue con cambios pedidos. Lo que bloquea la aprobación:</p>
+<table>
+<tr><th>Falta</th><th>Dónde</th><th>Tiempo estimado</th></tr>
+<tr><td>Las tres pruebas del issue #9</td><td><code>conducta.test.ts</code> (no existe todavía)</td><td>2–3 horas</td></tr>
+<tr><td><code>anularAccion</code></td><td><code>conducta.ts</code></td><td>1 hora</td></tr>
+<tr><td>Tres <code>throw new Error(...)</code> sueltos → <code>ErrorDominio</code></td><td><code>conducta.ts</code></td><td>10 minutos</td></tr>
+</table>
+<p>Nada de eso es difícil. Es media jornada. Lo que falta es empezar.</p>
+
+<h2>1.3 El plan de la semana</h2>
+<table>
+<tr><th>Día</th><th>Qué entregas</th><th>Cierra</th></tr>
+<tr><td>0 (hoy, 45 min)</td><td>Despliegue de Convex funcionando con semillas</td><td>#8</td></tr>
+<tr><td>1</td><td>Pruebas + <code>anularAccion</code> + errores públicos + auditoría</td><td><b>#9</b></td></tr>
+<tr><td>2</td><td>Asistencia</td><td>—</td></tr>
+<tr><td>3 y 4</td><td>Reporte general y reportes por estudiante</td><td>—</td></tr>
+<tr><td>5</td><td>Las tres consultas del representante (P4, P5, P6)</td><td>desbloquea las pantallas</td></tr>
+<tr><td>6</td><td>Comunicados (notas y eventos) + cron nocturno</td><td>—</td></tr>
+<tr><td>7</td><td>Recálculo expuesto para Kenny + repaso final</td><td><b>#10</b></td></tr>
+</table>
+
+<h2>1.4 Quién está esperando exactamente qué</h2>
+<table>
+<tr><th>Quién</th><th>Qué espera</th><th>Para</th></tr>
+<tr><td>Kenny (C)</td><td>Que <code>conducta.ts</code> llame a <code>auditar()</code> en <code>CREAR</code> y <code>ANULAR</code></td><td>Cerrar #19 — es el último de los cuatro eventos de DP-006</td></tr>
+<tr><td>Kenny (C)</td><td>Una función de recálculo exportada</td><td>El <code>RECALCULO_PENDIENTE</code> de <code>interaccion.ts</code>: cuando un reclamo se resuelve como <code>MODIFICADA</code>, hay que devolverle los puntos al estudiante</td></tr>
+<tr><td>Interfaz (D)</td><td><code>registrarAccion</code>, asistencia y reporte general</td><td>Pantallas D11–D14 (#31)</td></tr>
+<tr><td>Interfaz (D)</td><td>Las tres consultas del representante</td><td>Pantallas P4, P5 y P6 (#32) — <b>P4 es la pantalla más importante del producto</b></td></tr>
+</table>
+</div>
+
+<!-- ============================================================ -->
+<div class="part">
+<h1>Parte 2 — Tu alcance: qué es tuyo y qué no</h1>
+
+<h2>2.1 Tus archivos</h2>
+<table>
+<tr><th>Archivo</th><th>Estado</th><th>Qué va ahí</th></tr>
+<tr><td><code>movil/convex/conducta.ts</code></td><td>existe, a medias</td><td>Todas tus mutations y queries</td></tr>
+<tr><td><code>movil/convex/conducta.test.ts</code></td><td><b>no existe — lo creas tú</b></td><td>Todas tus pruebas</td></tr>
+<tr><td><code>movil/convex/crons.ts</code></td><td>existe (PR #46)</td><td>Añades tu cron nocturno <b>debajo</b> del que ya está</td></tr>
+</table>
+
+<h2>2.2 Tus tablas</h2>
+<p>Eres dueña de estas. Nadie más escribe en ellas:</p>
+<p><code>categoriaAccion</code> · <code>tipoAccion</code> · <code>accionRegistrada</code> · <code>comunicadoCurso</code> · <code>franjaConducta</code> · <code>puntajePeriodo</code> · <code>registroAsistencia</code> · <code>plantillaReporte</code> · <code>plantillaCampo</code> · <code>reporteGeneral</code> · <code>reporteGeneralValor</code> · <code>reporteEstudiante</code> · <code>reporteEstudianteItem</code> · <code>entregaReporte</code></p>
+<p>El detalle campo por campo está en el <b>Apéndice A</b>.</p>
+
+<h2>2.3 Lo que NO tocas</h2>
+<div class="stop">
+<b>Superficie compartida — cambiarla exige la aprobación de los tres, y GitHub la pide sola:</b><br>
+<code>convex/schema.ts</code> · <code>convex/lib/enums.ts</code> · <code>convex/lib/guardas.ts</code> · <code>convex/lib/permisos.ts</code> · <code>convex/lib/flags.ts</code>
+<br><br>
+Si necesitas un campo o una constante que no existe, <b>pídelo en el grupo</b>. No lo agregues por tu cuenta: el PR se va a quedar esperando tres aprobaciones y vas a perder un día.
+</div>
+<p>Tampoco toques <code>convex/nucleo.ts</code> (Daniel) ni <code>convex/interaccion.ts</code> (Kenny). Puedes <b>leer</b> sus tablas — de hecho vas a leer <code>matricula</code>, <code>curso</code>, <code>periodoAcademico</code> e <code>institucion</code> todo el tiempo — pero no escribes en ellas.</p>
+
+<h2>2.4 Dos correcciones a tus issues de GitHub</h2>
+<div class="stop">
+<b>Los issues #9 y #10 tienen dos firmas equivocadas.</b> Las verifiqué contra el código de hoy. Si copias lo que dice el issue, no compila.
+<table style="margin-top:8px;">
+<tr><th>El issue dice</th><th>La firma real</th></tr>
+<tr><td><code>calcularPuntaje(base, suma, piso, techo)</code></td><td><code>calcularPuntaje(puntos[], base?, piso?, techo?)</code><br><span class="small">El primer argumento es el <b>arreglo de puntos</b> de las acciones vigentes, no la base. Los otros tres son opcionales y ya traen los valores de <code>REGLAS</code>.</span></td></tr>
+<tr><td><code>exigirVinculo(ctx, representanteId, estudianteId)</code></td><td><code>exigirVinculo(ctx, estudianteId)</code><br><span class="small">El representante sale de la sesión, no de un argumento. Es a propósito: si viniera por argumento, cualquiera podría pasar el id de otro.</span></td></tr>
+</table>
+</div>
+</div>
+
+<!-- ============================================================ -->
+<div class="part">
+<h1>Parte 3 — Día 0: dejar la máquina lista</h1>
+<p class="meta">45 minutos. Cierra el issue #8.</p>
+
+<h2>3.1 Los pasos</h2>
+<pre><code># 1. El repositorio al día
+git checkout main
+git pull
+npm ci
+
+# 2. Tu propio despliegue de Convex (se decidió uno por persona, no compartido)
+cd movil
+npx convex dev</code></pre>
+<p><code>npx convex dev</code> te va a pedir iniciar sesión y crear un proyecto. Acepta. Al terminar escribe <code>movil/.env.local</code> con tu <code>CONVEX_DEPLOYMENT</code>. <b>Ese archivo no se sube a git</b> y no debe subirse nunca.</p>
+<p>Déjalo corriendo en una terminal: vigila los cambios y los sube a tu despliegue solo.</p>
+
+<pre><code># 3. En OTRA terminal, cargar los datos de prueba
+cd movil
+npx convex run semillas:cargar</code></pre>
+
+<h3>3.2 Conectar Clerk</h3>
+<p>En el panel de Convex (<code>dashboard.convex.dev</code>) → tu proyecto → <b>Settings</b> → <b>Environment Variables</b>, agrega:</p>
+<table>
+<tr><th>Variable</th><th>Valor</th></tr>
+<tr><td><code>CLERK_JWT_ISSUER_DOMAIN</code></td><td>La <i>Frontend API URL</i> que muestra Clerk, del estilo <code>https://algo.clerk.accounts.dev</code></td></tr>
+</table>
+<div class="callout">
+<b>Tiene que coincidir exactamente</b> con el <code>iss</code> del token de Clerk. Una barra final de más y los perfiles dejan de resolverse en silencio: la gente vería «completa tu perfil» con su perfil intacto en la base. Si no la tienes a mano, pídesela a Kenny.
+</div>
+
+<h3>3.3 Comprobar que quedó bien</h3>
+<pre><code>cd ..            # a la raíz del repositorio
+npm run typecheck   # tiene que pasar sin decir nada
+npm test            # tiene que pasar en verde</code></pre>
+<p>Y en el panel de Convex → <b>Data</b>, deberías ver poblado:</p>
+<ul>
+<li><b>6 franjas</b> de conducta, con color y frase</li>
+<li><b>6 categorías</b> de acción</li>
+<li><b>7 tipos</b> de acción</li>
+<li><b>5 planes</b></li>
+<li><b>1 plantilla</b> de reporte con <b>4 campos</b></li>
+</ul>
+<p>Si eso está, cierra el issue #8 con un comentario que diga que tu despliegue quedó configurado. <code>semillas:cargar</code> es idempotente: puedes correrlo las veces que quieras.</p>
+
+<h3>3.4 Lee esto antes de escribir código</h3>
+<p><code>Contexto/CLAUDE.md</code> — las 11 reglas del proyecto y dónde vive cada cosa. Son 10 minutos y te ahorran discusiones.</p>
+</div>
+
+<!-- ============================================================ -->
+<div class="part">
+<h1>Parte 4 — Las cinco reglas que no se negocian</h1>
+
+<h2>Regla 1 — El puntaje se recalcula, nunca se suma (ADR-005)</h2>
+<pre><code>puntaje = clamp(base + Σ puntos de acciones VIGENTES del período, piso, techo)</code></pre>
+<p><code>puntajePeriodo</code> es una <b>caché reconstruible</b>. La verdad son las acciones. Si en algún punto te encuentras escribiendo <code>puntajeActual = puntajeActual - 1</code>, para: está mal.</p>
+<p>La razón no es purismo. Una acción puede anularse o modificarse tras un reclamo, y en ambos casos pasa a valer 0. Si el puntaje fuera un contador, cualquier fallo lo desincronizaría de la bitácora de forma permanente <b>y sin manera de detectarlo</b>.</p>
+<p>Usa siempre <code>calcularPuntaje()</code>. Recalcula en tres momentos: al registrar una acción, al anularla o modificarla, y al cerrar el período.</p>
+
+<h2>Regla 2 — No hay catálogo de nombres de acción (DP-002)</h2>
+<p>El docente elige una <b>categoría</b> y escribe el mensaje con sus propias palabras. Esto se decidió con un profesor real. No inventes una lista de acciones predefinidas.</p>
+<table>
+<tr><th>Signo</th><th>Categorías</th><th>Rango de puntos</th></tr>
+<tr><td>Positiva</td><td>Desempeño · Convivencia · Responsabilidad · Puntualidad</td><td>+1 a +2, a criterio del docente</td></tr>
+<tr><td>Negativa</td><td>Indisciplina · Deshonestidad</td><td>−1 a −3, a criterio del docente</td></tr>
+<tr><td>Negativa</td><td>Responsabilidad (irresponsabilidad)</td><td><b>−1 fijo</b>, sin ajuste</td></tr>
+</table>
+
+<h2>Regla 3 — Los valores viven en el código, no en tu archivo</h2>
+<p>Todo sale de <code>REGLAS</code> en <code>convex/lib/enums.ts</code> (Apéndice C). Si escribes un <code>60</code> o un <code>-5</code> suelto en <code>conducta.ts</code>, ese número queda desactualizado el día que cambie la regla y nadie se entera.</p>
+<p>Los límites por tipo de acción salen de la fila de <code>tipoAccion</code>; la base, el piso y el techo del puntaje salen de la fila de <code>institucion</code>. Eso ya lo estás haciendo bien.</p>
+
+<h2>Regla 4 — Con Convex no hay RLS: <code>permisos.ts</code> es la única defensa</h2>
+<div class="stop">
+Con PostgreSQL había dos capas: el código y las políticas RLS de la base. <b>Convex no tiene la segunda.</b> Si olvidas una comprobación, la consulta <b>no falla: devuelve los datos</b> — al revés de como era antes.<br><br>
+Ninguna lectura ni escritura sobre <code>estudiante</code>, <code>matricula</code>, <code>accionRegistrada</code>, <code>reporteEstudiante</code> o <code>puntajePeriodo</code> ocurre sin pasar antes por <code>permisos.ts</code>. Es la regla 3 del proyecto y ahora nada más la respalda.
+</div>
+<table>
+<tr><th>Función</th><th>Cuándo</th><th>Devuelve</th></tr>
+<tr><td><code>exigirDocente(ctx)</code></td><td>Quien llama tiene que ser docente</td><td><code>Doc&lt;"docente"&gt;</code></td></tr>
+<tr><td><code>exigirAccesoDocenteAEstudiante(ctx, estudianteId)</code></td><td>Ese estudiante es de un curso suyo</td><td><code>{ docente, matricula }</code></td></tr>
+<tr><td><code>exigirTitularDelCurso(ctx, cursoId)</code></td><td>Es el titular vigente del curso</td><td><code>Doc&lt;"docente"&gt;</code></td></tr>
+<tr><td><code>exigirRepresentante(ctx)</code></td><td>Quien llama es representante</td><td><code>Doc&lt;"representante"&gt;</code></td></tr>
+<tr><td><code>exigirVinculo(ctx, estudianteId)</code></td><td>Ese estudiante es hijo suyo</td><td><code>Doc&lt;"vinculoRepresentacion"&gt;</code></td></tr>
+</table>
+
+<h2>Regla 5 — Los errores tienen que llegarle a la pantalla</h2>
+<p>Un <code>ErrorDominio</code> cruza la frontera de Convex como un fallo genérico, y entonces la app solo puede decir «no pudimos completar la solicitud». Por eso <code>nucleo.ts</code> e <code>interaccion.ts</code> envuelven sus handlers. <b>Haz lo mismo.</b> Copia esta función al principio de <code>conducta.ts</code>:</p>
+<pre><code>import { ConvexError, v } from "convex/values";
+import { ErrorDominio } from "./lib/guardas";
+import { ErrorPermiso } from "./lib/permisos";
+
+/** Los errores esperados conservan código y mensaje al llegar al cliente. */
+async function conErroresPublicos&lt;T&gt;(operacion: () =&gt; Promise&lt;T&gt;): Promise&lt;T&gt; {
+  try {
+    return await operacion();
+  } catch (error) {
+    if (error instanceof ErrorDominio || error instanceof ErrorPermiso) {
+      throw new ConvexError({ codigo: error.codigo, mensaje: error.message });
+    }
+    throw error;
+  }
+}</code></pre>
+<p>Y cada función se declara así — fíjate que el <code>async</code> se mueve adentro:</p>
+<pre><code>export const registrarAccion = mutation({
+  args: { /* ... */ },
+  handler: (ctx, args) =&gt; conErroresPublicos(async () =&gt; {
+    // ... tu código de siempre
+  }),
+});</code></pre>
+<div class="callout">
+<b>Y nunca uses <code>throw new Error(...)</code>.</b> Usa <code>ErrorDominio(codigo, mensaje)</code>, que la app sí puede distinguir de un fallo inesperado. En tu PR #39 hay tres: curso, año lectivo e institución no encontrados. Son un cambio de una línea cada uno.
+</div>
+</div>
+
+<!-- ============================================================ -->
+<div class="part">
+<h1>Parte 5 — Cómo escribir una prueba</h1>
+<p class="meta">Lee esta parte entera antes del día 1. Es el andamio que vas a copiar veinte veces.</p>
+
+<h2>5.1 Crea <code>movil/convex/conducta.test.ts</code></h2>
+<p>Este archivo no existe. Empiézalo con esto tal cual — es el sembrado completo de un docente con su curso, un estudiante matriculado y su representante:</p>
+<pre><code>// @vitest-environment edge-runtime
+/// &lt;reference types="vite/client" /&gt;
+
+import { convexTest } from "convex-test";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+import { api } from "./_generated/api";
+import type { Id } from "./_generated/dataModel";
+import schema from "./schema";
+
+const modules = import.meta.glob(["./conducta.ts", "./_generated/*.js"]);
+
+const AHORA = new Date("2026-09-15T15:00:00Z");
+
+/** Un curso con su docente titular, un estudiante matriculado y su representante. */
+async function sembrar(t: ReturnType&lt;typeof convexTest&gt;) {
+  const ids = await t.run(async (ctx) =&gt; {
+    const ahora = Date.now();
+
+    const perfilDocente = await ctx.db.insert("perfilUsuario", {
+      authSubject: "https://convex.test|docente_1",
+      tipoDocumento: "CEDULA", numeroDocumento: "0900000001", actualizadoEn: ahora,
+    });
+    const docenteId = await ctx.db.insert("docente", {
+      perfilUsuarioId: perfilDocente, actualizadoEn: ahora,
+    });
+
+    const perfilRep = await ctx.db.insert("perfilUsuario", {
+      authSubject: "https://convex.test|rep_1",
+      tipoDocumento: "CEDULA", numeroDocumento: "0900000002", actualizadoEn: ahora,
+    });
+    const representanteId = await ctx.db.insert("representante", {
+      perfilUsuarioId: perfilRep, actualizadoEn: ahora,
+    });
+
+    const institucionId = await ctx.db.insert("institucion", {
+      nombreDeclarado: "Unidad Educativa Piloto", verificada: false,
+      regimen: "COSTA_INSULAR", ciudad: "Guayaquil", zonaHoraria: "America/Guayaquil",
+      puntajeBase: 60, puntajeMinimo: 0, puntajeMaximo: 100,
+      topeDiarioPositivo: 4, topeDiarioNegativo: 5,
+      estado: "ACTIVA", actualizadoEn: ahora,
+    });
+    const anioLectivoId = await ctx.db.insert("anioLectivo", {
+      institucionId, nombre: "2026-2027",
+      fechaInicio: "2026-05-04", fechaFin: "2027-02-26",
+      estado: "EN_CURSO", actualizadoEn: ahora,
+    });
+    const periodoAcademicoId = await ctx.db.insert("periodoAcademico", {
+      anioLectivoId, nombre: "Primer parcial", orden: 1,
+      fechaInicio: "2026-05-04", fechaFin: "2026-11-10",
+      estado: "EN_CURSO", actualizadoEn: ahora,
+    });
+    const cursoId = await ctx.db.insert("curso", {
+      anioLectivoId, nombre: "Quinto A", nivel: "5to", paralelo: "A",
+      jornada: "MATUTINA", estado: "ACTIVO", actualizadoEn: ahora,
+    });
+    await ctx.db.insert("asignacionDocente", {
+      cursoId, docenteId, rol: "TITULAR",
+      vigenteDesde: "2026-05-04", actualizadoEn: ahora,
+    });
+
+    const estudianteId = await ctx.db.insert("estudiante", {
+      institucionId, nombres: "Ana", apellidos: "Perez",
+      tipoDocumento: "CEDULA", numeroDocumento: "0911111111",
+      origenRegistro: "REPRESENTANTE", estadoVerificacion: "APROBADO",
+      estado: "ACTIVO", actualizadoEn: ahora,
+    });
+    const matriculaId = await ctx.db.insert("matricula", {
+      estudianteId, cursoId, fechaIngreso: "2026-05-04",
+      estado: "CURSANDO", actualizadoEn: ahora,
+    });
+    await ctx.db.insert("vinculoRepresentacion", {
+      representanteId, estudianteId, parentesco: "MADRE",
+      estado: "ACTIVO", vigenteDesde: "2026-05-04", actualizadoEn: ahora,
+    });
+    await ctx.db.insert("puntajePeriodo", {
+      matriculaId, periodoAcademicoId,
+      puntajeBase: 60, puntosPositivos: 0, puntosNegativos: 0,
+      puntajeActual: 60, congelado: false, recalculadoEn: ahora,
+    });
+
+    // Un tipo de accion negativa y uno positivo, para tener con que probar.
+    const categoriaId = await ctx.db.insert("categoriaAccion", {
+      institucionId, codigo: "DISCIPLINA", nombre: "Indisciplina",
+      aplicaA: "ESTUDIANTE", orden: 1, activa: true, actualizadoEn: ahora,
+    });
+    const negativaId = await ctx.db.insert("tipoAccion", {
+      institucionId, categoriaAccionId: categoriaId, codigo: "NEG_INDISCIPLINA",
+      nombre: "Indisciplina", signo: "NEGATIVA",
+      puntosDefecto: -1, puntosMin: -3, puntosMax: -1,
+      requiereDescripcion: true, admiteInconformidad: true,
+      cuentaEnBitacora: true, activa: true, actualizadoEn: ahora,
+    });
+    const positivaId = await ctx.db.insert("tipoAccion", {
+      institucionId, categoriaAccionId: categoriaId, codigo: "POS_DESEMPENIO",
+      nombre: "Desempeno destacado", signo: "POSITIVA",
+      puntosDefecto: 1, puntosMin: 1, puntosMax: 2,
+      requiereDescripcion: true, admiteInconformidad: false,
+      cuentaEnBitacora: true, activa: true, actualizadoEn: ahora,
+    });
+
+    return {
+      docenteId, representanteId, estudianteId, matriculaId,
+      periodoAcademicoId, institucionId, cursoId, negativaId, positivaId,
+    };
+  });
+
+  return {
+    ...ids,
+    docente: t.withIdentity({ subject: "docente_1" }),
+    representante: t.withIdentity({ subject: "rep_1" }),
+  };
+}
+
+beforeEach(() =&gt; vi.useFakeTimers().setSystemTime(AHORA));</code></pre>
+
+<div class="stop">
+<b>Fíjate en el <code>authSubject</code>.</b> Lleva el prefijo <code>https://convex.test|</code>. Es el emisor que usa <code>convex-test</code> al firmar las identidades, y desde el PR #42 de Daniel la resolución de identidad va por ahí. Si siembras el subject a secas, <b>tus pruebas van a fallar con «tu cuenta existe pero aún no completaste tu perfil»</b> y vas a perder una hora buscando el motivo. A mí me pasó.
+</div>
+
+<h2>5.2 Cómo se ve una prueba</h2>
+<pre><code>describe("conducta — registrar accion", () =&gt; {
+  it("un docente de otro curso no puede registrar una accion", async () =&gt; {
+    const t = convexTest(schema, modules);
+    const e = await sembrar(t);
+
+    // Un docente ajeno, sin curso ni asignacion.
+    await t.run(async (ctx) =&gt; {
+      const perfil = await ctx.db.insert("perfilUsuario", {
+        authSubject: "https://convex.test|docente_2",
+        tipoDocumento: "CEDULA", numeroDocumento: "0900000009",
+        actualizadoEn: Date.now(),
+      });
+      await ctx.db.insert("docente", { perfilUsuarioId: perfil, actualizadoEn: Date.now() });
+    });
+
+    await expect(
+      t.withIdentity({ subject: "docente_2" }).mutation(api.conducta.registrarAccion, {
+        estudianteId: e.estudianteId, tipoAccionId: e.negativaId,
+        descripcion: "Interrumpio la clase", puntosAplicados: -1,
+      }),
+    ).rejects.toThrow("no pertenece a un curso tuyo");
+  });
+});</code></pre>
+
+<h2>5.3 Correr las pruebas</h2>
+<pre><code>npm test                       # todas, desde la raiz del repositorio
+npm test -- conducta           # solo las tuyas, mientras trabajas</code></pre>
+<p><code>convex-test</code> corre en memoria: <b>no toca tu despliegue</b> y no necesita internet. Cada <code>convexTest(schema, modules)</code> arranca con la base vacía.</p>
+</div>
+
+<!-- ============================================================ -->
+<div class="part">
+<h1>Parte 6 — Día 1: cerrar el issue #9</h1>
+<span class="dia">DÍA 1</span>
+<p>Media jornada de trabajo. Al final de hoy tu PR #39 queda aprobado.</p>
+
+<h2>6.1 Las tres pruebas que bloquean la aprobación</h2>
+<p>No es criterio mío: está en la definición de terminado (<code>backlog-y-reparto.md</code> §6) y en la plantilla del PR, que quedó sin marcar.</p>
+
+<h3>Prueba 1 — un docente que no es del curso recibe <code>ErrorPermiso</code></h3>
+<p>Es la de §5.2, cópiala tal cual. <b>Esta es la importante.</b> Sin RLS debajo, si un día alguien mueve una línea y se salta <code>exigirAccesoDocenteAEstudiante</code>, la consulta no falla: devuelve los datos de un menor a quien no le toca. Esta prueba es lo único que avisaría.</p>
+
+<h3>Prueba 2 — pasarse del tope diario rechaza la acción</h3>
+<pre><code>it("no deja pasar el tope diario de puntos negativos", async () =&gt; {
+  const t = convexTest(schema, modules);
+  const e = await sembrar(t);
+  const accion = (puntos: number) =&gt;
+    e.docente.mutation(api.conducta.registrarAccion, {
+      estudianteId: e.estudianteId, tipoAccionId: e.negativaId,
+      descripcion: "Interrumpio la clase", puntosAplicados: puntos,
+    });
+
+  await accion(-3);          // acumulado: -3
+  await accion(-2);          // acumulado: -5, justo en el tope
+  await expect(accion(-1)).rejects.toThrow("tope");   // -6 se pasa
+
+  const acciones = await t.run((ctx) =&gt; ctx.db.query("accionRegistrada").collect());
+  expect(acciones).toHaveLength(2);   // la tercera no se escribio
+});</code></pre>
+<div class="callout">
+Fíjate en la última afirmación: no basta con que lance el error, hay que comprobar que <b>no escribió nada</b>. Un error después de insertar deja la base sucia.
+</div>
+
+<h3>Prueba 3 — el recálculo da el número correcto</h3>
+<pre><code>it("el puntaje se recalcula desde las acciones vigentes", async () =&gt; {
+  const t = convexTest(schema, modules);
+  const e = await sembrar(t);
+
+  await e.docente.mutation(api.conducta.registrarAccion, {
+    estudianteId: e.estudianteId, tipoAccionId: e.negativaId,
+    descripcion: "Interrumpio la clase", puntosAplicados: -3,
+  });
+  await e.docente.mutation(api.conducta.registrarAccion, {
+    estudianteId: e.estudianteId, tipoAccionId: e.positivaId,
+    descripcion: "Ayudo a un companero", puntosAplicados: 2,
+  });
+
+  const puntaje = await t.run(async (ctx) =&gt;
+    await ctx.db.query("puntajePeriodo")
+      .withIndex("por_matricula_periodo", (q) =&gt;
+        q.eq("matriculaId", e.matriculaId).eq("periodoAcademicoId", e.periodoAcademicoId))
+      .unique(),
+  );
+  expect(puntaje?.puntajeActual).toBe(59);   // 60 - 3 + 2
+});</code></pre>
+
+<h2>6.2 <code>anularAccion</code></h2>
+<p>El issue #9 la pide junto con <code>registrarAccion</code>. Reglas:</p>
+<ul>
+<li>Solo sobre acciones <b>negativas</b>. Una positiva no se anula — no hay nada que reparar.</li>
+<li>Pasa a estado <code>ANULADA</code> y <b>vale 0 puntos</b> en el recálculo.</li>
+<li>Se <b>recalcula</b> el puntaje. Nunca se le suman de vuelta los puntos.</li>
+<li>Nada se borra. La acción sigue en la bitácora, marcada.</li>
+</ul>
+<pre><code>export const anularAccion = mutation({
+  args: {
+    accionRegistradaId: v.id("accionRegistrada"),
+    motivo: v.string(),
+  },
+  handler: (ctx, args) =&gt; conErroresPublicos(async () =&gt; {
+    const accion = await ctx.db.get(args.accionRegistradaId);
+    if (accion === null) throw new ErrorDominio("NO_ENCONTRADO", "Esa anotacion no existe.");
+
+    const matricula = await ctx.db.get(accion.matriculaId);
+    if (matricula === null) throw new ErrorDominio("NO_ENCONTRADO", "La matricula no existe.");
+
+    // El permiso se comprueba contra el estudiante dueno de la accion.
+    const { docente } = await exigirAccesoDocenteAEstudiante(ctx, matricula.estudianteId);
+
+    if (accion.signo !== "NEGATIVA") {
+      throw new ErrorDominio("VALIDACION", "Solo se pueden anular las anotaciones negativas.");
+    }
+    if (accion.estado !== "VIGENTE") {
+      throw new ErrorDominio("CONFLICTO", "Esa anotacion ya fue anulada o modificada.");
+    }
+
+    const ahora = Date.now();
+    await ctx.db.patch(accion._id, {
+      estado: "ANULADA",
+      resueltaPorDocenteId: docente._id,
+      resueltaEn: ahora,
+      motivoResolucion: args.motivo.trim(),
+      actualizadoEn: ahora,
+    });
+
+    await recalcularPuntaje(ctx, matricula._id, accion.periodoAcademicoId);
+    return accion._id;
+  }),
+});</code></pre>
+
+<h2>6.3 Saca el recálculo a su propia función</h2>
+<p>Ahora lo tienes dentro de <code>registrarAccion</code>. Sácalo: lo van a llamar <code>registrarAccion</code>, <code>anularAccion</code>, el cron nocturno <b>y Kenny desde <code>interaccion.ts</code></b> cuando un reclamo se resuelva como modificada.</p>
+<pre><code>/**
+ * ADR-005: el puntaje se recalcula desde las acciones VIGENTES, nunca se suma.
+ * Respeta `congelado`: si el parcial ya cerro, no se toca.
+ */
+export async function recalcularPuntaje(
+  ctx: MutationCtx,
+  matriculaId: Id&lt;"matricula"&gt;,
+  periodoAcademicoId: Id&lt;"periodoAcademico"&gt;,
+): Promise&lt;number | null&gt; {
+  const fila = await ctx.db.query("puntajePeriodo")
+    .withIndex("por_matricula_periodo", (q) =&gt;
+      q.eq("matriculaId", matriculaId).eq("periodoAcademicoId", periodoAcademicoId))
+    .unique();
+  if (fila === null || fila.congelado) return fila?.puntajeActual ?? null;
+
+  const vigentes = await ctx.db.query("accionRegistrada")
+    .withIndex("por_matricula_periodo", (q) =&gt;
+      q.eq("matriculaId", matriculaId)
+       .eq("periodoAcademicoId", periodoAcademicoId)
+       .eq("estado", "VIGENTE"))
+    .collect();
+
+  const puntos = vigentes.map((a) =&gt; a.puntosAplicados);
+  const puntajeActual = calcularPuntaje(
+    puntos, fila.puntajeBase, REGLAS.PUNTAJE_MINIMO, REGLAS.PUNTAJE_MAXIMO,
+  );
+
+  await ctx.db.patch(fila._id, {
+    puntosPositivos: puntos.filter((p) =&gt; p &gt; 0).reduce((a, b) =&gt; a + b, 0),
+    puntosNegativos: puntos.filter((p) =&gt; p &lt; 0).reduce((a, b) =&gt; a + b, 0),
+    puntajeActual,
+    franjaConductaId: await franjaDe(ctx, puntajeActual),
+    recalculadoEn: Date.now(),
+  });
+  return puntajeActual;
+}</code></pre>
+<p>Y la franja, que vas a necesitar también en los reportes:</p>
+<pre><code>/** La franja de conducta cuyo rango contiene el puntaje. */
+async function franjaDe(ctx: QueryCtx, puntaje: number) {
+  const franjas = await ctx.db.query("franjaConducta").collect();
+  return franjas.find((f) =&gt; puntaje &gt;= f.puntajeDesde &amp;&amp; puntaje &lt;= f.puntajeHasta)?._id;
+}</code></pre>
+
+<h2>6.4 La auditoría que Kenny está esperando</h2>
+<p>DP-006 fija cuatro eventos para la v1. Tres ya tienen quien los escriba. <b>El cuarto es tuyo</b>, y son dos llamadas:</p>
+<pre><code>// Al final de registrarAccion, despues de insertar y recalcular:
+await auditar(ctx, {
+  accion: "CREAR",
+  entidadTipo: "accionRegistrada",
+  entidadId: idAccion,
+  institucionId: institucion._id,
+  datosDespues: {
+    matriculaId: matricula._id,
+    tipoAccionId: tipo._id,
+    puntosAplicados: args.puntosAplicados,
+    fechaOcurrencia: fecha,
+  },
+});
+
+// En anularAccion:
+await auditar(ctx, {
+  accion: "ANULAR",
+  entidadTipo: "accionRegistrada",
+  entidadId: accion._id,
+  institucionId: institucion._id,
+  datosAntes: { estado: "VIGENTE", puntosAplicados: accion.puntosAplicados },
+  datosDespues: { estado: "ANULADA", motivo: args.motivo },
+});</code></pre>
+<p><code>institucionId</code> es opcional, pero ponlo: es lo que permite responderle a <b>un colegio concreto</b> qué pasó con sus estudiantes. Sale de <code>matricula → curso → anioLectivo → institucionId</code>, que ya recorres.</p>
+
+<h2>6.5 Cierra el día</h2>
+<pre><code>npm run typecheck &amp;&amp; npm test</code></pre>
+<p>Las dos en verde, y actualiza el PR #39:</p>
+<ul>
+<li>Marca las casillas de la plantilla que ahora sí se cumplen.</li>
+<li>Escribe <code>Cierra #9</code> en el cuerpo del PR.</li>
+<li>Comenta pidiendo revisión.</li>
+</ul>
+<div class="callout"><b>No toques <code>.env.schema</code>.</b> El arreglo del UUID que hiciste es idéntico al del PR #27 ya fusionado, así que no va a dar conflicto — pero tampoco hace falta que lo mantengas.</div>
+</div>
+
+<!-- ============================================================ -->
+<div class="part">
+<h1>Parte 7 — Día 2: asistencia</h1>
+<span class="dia">DÍA 2</span>
+
+<h2>7.1 Lo que hay que resolver</h2>
+<p>El docente toma asistencia del curso desde el celular. Estados en <code>ESTADO_ASISTENCIA</code>: <code>PRESENTE</code>, <code>AUSENTE</code>, <code>ATRASO</code>, <code>JUSTIFICADA</code>, <code>PERMISO</code>.</p>
+<div class="stop">
+<b>Una sola marca por estudiante por día.</b> Convex <b>no tiene índice único</b>. Esa unicidad la compruebas tú, con una lectura indexada <b>dentro de la misma mutation</b>, antes de insertar. Como la mutation es serializable, eso alcanza.
+</div>
+
+<h2>7.2 La mutation</h2>
+<p>Recibe el curso y la lista completa, no estudiante por estudiante: el docente marca a los 30 y guarda una vez.</p>
+<pre><code>export const tomarAsistencia = mutation({
+  args: {
+    cursoId: v.id("curso"),
+    fecha: v.optional(v.string()),
+    marcas: v.array(v.object({
+      estudianteId: v.id("estudiante"),
+      estado: v.union(...ESTADO_ASISTENCIA.map((e) =&gt; v.literal(e))),
+      observacion: v.optional(v.string()),
+    })),
+  },
+  handler: (ctx, args) =&gt; conErroresPublicos(async () =&gt; {
+    const docente = await exigirTitularDelCurso(ctx, args.cursoId);
+    const fecha = args.fecha ?? hoyEnGuayaquil();
+    if (fecha &gt; hoyEnGuayaquil()) {
+      throw new ErrorDominio("FECHAS_INVALIDAS", "No se puede tomar asistencia de un dia futuro.");
+    }
+
+    const periodo = await periodoEnCurso(ctx, args.cursoId);
+    const ahora = Date.now();
+    let creadas = 0;
+    let actualizadas = 0;
+
+    for (const marca of args.marcas) {
+      // El permiso se comprueba estudiante por estudiante: nadie cuela
+      // en la lista a un alumno de otro curso.
+      const { matricula } = await exigirAccesoDocenteAEstudiante(ctx, marca.estudianteId);
+      if (matricula.cursoId !== args.cursoId) {
+        throw new ErrorDominio("VALIDACION", "Ese estudiante no pertenece a este curso.");
+      }
+
+      const previa = await ctx.db.query("registroAsistencia")
+        .withIndex("por_matricula_fecha", (q) =&gt;
+          q.eq("matriculaId", matricula._id).eq("fecha", fecha))
+        .unique();
+
+      const datos = {
+        estado: marca.estado,
+        observacion: marca.observacion?.trim() || undefined,
+        registradoPorDocenteId: docente._id,
+        actualizadoEn: ahora,
+      };
+
+      if (previa === null) {
+        await ctx.db.insert("registroAsistencia", {
+          matriculaId: matricula._id,
+          periodoAcademicoId: periodo._id,
+          fecha, ...datos,
+        });
+        creadas++;
+      } else {
+        // Corregir una marca del mismo dia es normal: el docente se equivoca.
+        await ctx.db.patch(previa._id, datos);
+        actualizadas++;
+      }
+    }
+    return { creadas, actualizadas, fecha };
+  }),
+});</code></pre>
+
+<h2>7.3 La consulta para la pantalla</h2>
+<p>El docente abre la pantalla y tiene que ver a los 30 con lo que ya marcó hoy, si marcó:</p>
+<pre><code>export const asistenciaDelDia = query({
+  args: { cursoId: v.id("curso"), fecha: v.optional(v.string()) },
+  handler: (ctx, args) =&gt; conErroresPublicos(async () =&gt; {
+    await exigirTitularDelCurso(ctx, args.cursoId);
+    const fecha = args.fecha ?? hoyEnGuayaquil();
+
+    const matriculas = await ctx.db.query("matricula")
+      .withIndex("por_curso_estado", (q) =&gt;
+        q.eq("cursoId", args.cursoId).eq("estado", "CURSANDO"))
+      .collect();
+
+    const filas = [];
+    for (const matricula of matriculas) {
+      const estudiante = await ctx.db.get(matricula.estudianteId);
+      if (estudiante === null) continue;
+      const marca = await ctx.db.query("registroAsistencia")
+        .withIndex("por_matricula_fecha", (q) =&gt;
+          q.eq("matriculaId", matricula._id).eq("fecha", fecha))
+        .unique();
+      filas.push({
+        estudianteId: estudiante._id,
+        nombres: estudiante.nombres,
+        apellidos: estudiante.apellidos,
+        estado: marca?.estado ?? null,
+        observacion: marca?.observacion ?? null,
+      });
+    }
+    return { fecha, estudiantes: filas.sort((a, b) =&gt; a.apellidos.localeCompare(b.apellidos)) };
+  }),
+});</code></pre>
+
+<h2>7.4 Pruebas del día 2</h2>
+<ul class="check">
+<li>Tomar asistencia dos veces el mismo día <b>corrige</b>, no duplica: al final hay una sola fila por estudiante.</li>
+<li>Un docente que no es titular del curso recibe <code>ErrorPermiso</code>.</li>
+<li>Un estudiante de otro curso dentro de la lista hace fallar la mutation entera.</li>
+<li><code>asistenciaDelDia</code> devuelve a todos los <code>CURSANDO</code>, con <code>estado: null</code> los que no tienen marca.</li>
+</ul>
+</div>
+
+<!-- ============================================================ -->
+<div class="part">
+<h1>Parte 8 — Días 3 y 4: el reporte del día</h1>
+<span class="dia">DÍAS 3–4</span>
+<p>Es lo que el representante abre cada mañana. La razón por la que la app existe.</p>
+
+<h2>8.1 Los cuatro campos salen de la base, no del código</h2>
+<p>DP-004: cuatro campos, <b>ninguno obligatorio</b>. Vienen sembrados en <code>plantillaCampo</code>:</p>
+<table>
+<tr><th>Código</th><th>Etiqueta</th><th>Tipo</th><th>Orden</th></tr>
+<tr><td><code>ANUNCIOS</code></td><td>Anuncios</td><td>TEXTO_LARGO</td><td>1</td></tr>
+<tr><td><code>NOVEDADES</code></td><td>Novedades del día</td><td>TEXTO_LARGO</td><td>2</td></tr>
+<tr><td><code>TAREAS</code></td><td>Tareas enviadas</td><td>TEXTO_LARGO</td><td>3</td></tr>
+<tr><td><code>CONSEJO</code></td><td>Consejo del día</td><td>TEXTO_CORTO</td><td>4</td></tr>
+</table>
+<div class="stop"><b>Léelos de la base de datos.</b> Si los escribes fijos en el código, el día que una institución quiera un quinto campo hay que recompilar la app.</div>
+<pre><code>export const camposDelReporte = query({
+  args: {},
+  handler: (ctx) =&gt; conErroresPublicos(async () =&gt; {
+    await exigirDocente(ctx);
+    const plantilla = await ctx.db.query("plantillaReporte")
+      .withIndex("por_institucion", (q) =&gt; q.eq("institucionId", undefined).eq("activa", true))
+      .first();
+    if (plantilla === null) throw new ErrorDominio("NO_ENCONTRADO", "No hay plantilla de reporte.");
+
+    const campos = await ctx.db.query("plantillaCampo")
+      .withIndex("por_plantilla_codigo", (q) =&gt; q.eq("plantillaReporteId", plantilla._id))
+      .collect();
+    return {
+      plantillaReporteId: plantilla._id,
+      campos: campos.filter((c) =&gt; c.activo).sort((a, b) =&gt; a.orden - b.orden)
+        .map((c) =&gt; ({
+          id: c._id, codigo: c.codigo, etiqueta: c.etiqueta,
+          tipoDato: c.tipoDato, textoAyuda: c.textoAyuda ?? null,
+          longitudMaxima: c.longitudMaxima ?? null,
+        })),
+    };
+  }),
+});</code></pre>
+
+<h2>8.2 Guardar el borrador</h2>
+<p>El docente escribe durante el día y guarda varias veces. Mientras esté en <code>BORRADOR</code> se puede editar.</p>
+<pre><code>export const guardarReporteGeneral = mutation({
+  args: {
+    cursoId: v.id("curso"),
+    fecha: v.optional(v.string()),
+    valores: v.array(v.object({
+      plantillaCampoId: v.id("plantillaCampo"),
+      valorTexto: v.string(),
+    })),
+  },
+  handler: (ctx, args) =&gt; conErroresPublicos(async () =&gt; {
+    await exigirTitularDelCurso(ctx, args.cursoId);
+    const fecha = args.fecha ?? hoyEnGuayaquil();
+    const periodo = await periodoEnCurso(ctx, args.cursoId);
+
+    // ux_reporte_general: uno por curso y dia. Unicidad comprobada aqui.
+    let reporte = await ctx.db.query("reporteGeneral")
+      .withIndex("por_curso_fecha", (q) =&gt; q.eq("cursoId", args.cursoId).eq("fecha", fecha))
+      .unique();
+
+    if (reporte !== null &amp;&amp; reporte.estado !== "BORRADOR") {
+      throw new ErrorDominio("CONFLICTO", "El reporte de ese dia ya fue publicado.");
+    }
+
+    if (reporte === null) {
+      const plantilla = await plantillaActiva(ctx);
+      const id = await ctx.db.insert("reporteGeneral", {
+        cursoId: args.cursoId, periodoAcademicoId: periodo._id,
+        plantillaReporteId: plantilla._id, fecha,
+        estado: "BORRADOR", actualizadoEn: Date.now(),
+      });
+      reporte = (await ctx.db.get(id))!;
+    }
+
+    for (const valor of args.valores) {
+      const previo = await ctx.db.query("reporteGeneralValor")
+        .withIndex("por_reporte_campo", (q) =&gt;
+          q.eq("reporteGeneralId", reporte!._id).eq("plantillaCampoId", valor.plantillaCampoId))
+        .unique();
+      const texto = valor.valorTexto.trim() || undefined;
+      if (previo === null) {
+        await ctx.db.insert("reporteGeneralValor", {
+          reporteGeneralId: reporte._id,
+          plantillaCampoId: valor.plantillaCampoId,
+          valorTexto: texto,
+        });
+      } else {
+        await ctx.db.patch(previo._id, { valorTexto: texto });
+      }
+    }
+    return reporte._id;
+  }),
+});</code></pre>
+
+<h2>8.3 Publicar: la parte que importa</h2>
+<p>Al publicar se genera <b>un <code>reporteEstudiante</code> por cada estudiante con matrícula <code>CURSANDO</code></b>. Ese reporte es una <b>fotografía inmutable del día</b>: una vez publicado no cambia, aunque después se corrija una acción.</p>
+<div class="callout">
+<b>Si no hubo reporte general pero sí hubo acciones, igual se genera el del estudiante.</b> Un padre cuyo hijo tuvo una anotación no puede quedarse sin ver nada porque el docente no llenó los cuatro campos.
+</div>
+<pre><code>export const publicarReporteGeneral = mutation({
+  args: { cursoId: v.id("curso"), fecha: v.optional(v.string()) },
+  handler: (ctx, args) =&gt; conErroresPublicos(async () =&gt; {
+    const docente = await exigirTitularDelCurso(ctx, args.cursoId);
+    const fecha = args.fecha ?? hoyEnGuayaquil();
+    const periodo = await periodoEnCurso(ctx, args.cursoId);
+    const ahora = Date.now();
+
+    const reporte = await ctx.db.query("reporteGeneral")
+      .withIndex("por_curso_fecha", (q) =&gt; q.eq("cursoId", args.cursoId).eq("fecha", fecha))
+      .unique();
+    if (reporte !== null &amp;&amp; reporte.estado === "PUBLICADO") {
+      throw new ErrorDominio("CONFLICTO", "Ese reporte ya fue publicado.");
+    }
+    if (reporte !== null) {
+      await ctx.db.patch(reporte._id, {
+        estado: "PUBLICADO", publicadoEn: ahora,
+        publicadoPorDocenteId: docente._id, actualizadoEn: ahora,
+      });
+    }
+
+    const matriculas = await ctx.db.query("matricula")
+      .withIndex("por_curso_estado", (q) =&gt;
+        q.eq("cursoId", args.cursoId).eq("estado", "CURSANDO"))
+      .collect();
+
+    let generados = 0;
+    for (const matricula of matriculas) {
+      // Idempotente: republicar no duplica el reporte de nadie.
+      const previo = await ctx.db.query("reporteEstudiante")
+        .withIndex("por_matricula_fecha", (q) =&gt;
+          q.eq("matriculaId", matricula._id).eq("fecha", fecha))
+        .unique();
+      if (previo !== null) continue;
+
+      const acciones = await ctx.db.query("accionRegistrada")
+        .withIndex("por_matricula_fecha", (q) =&gt;
+          q.eq("matriculaId", matricula._id).eq("fechaOcurrencia", fecha))
+        .collect();
+      const vigentes = acciones.filter((a) =&gt; a.estado === "VIGENTE");
+
+      const asistencia = await ctx.db.query("registroAsistencia")
+        .withIndex("por_matricula_fecha", (q) =&gt;
+          q.eq("matriculaId", matricula._id).eq("fecha", fecha))
+        .unique();
+
+      const puntaje = await ctx.db.query("puntajePeriodo")
+        .withIndex("por_matricula_periodo", (q) =&gt;
+          q.eq("matriculaId", matricula._id).eq("periodoAcademicoId", periodo._id))
+        .unique();
+      const puntajeAlCierre = puntaje?.puntajeActual ?? REGLAS.PUNTAJE_BASE;
+
+      const reporteEstudianteId = await ctx.db.insert("reporteEstudiante", {
+        matriculaId: matricula._id,
+        periodoAcademicoId: periodo._id,
+        reporteGeneralId: reporte?._id,
+        fecha,
+        tieneNovedades: vigentes.length &gt; 0,
+        puntajeAlCierre,
+        franjaConductaId: await franjaDe(ctx, puntajeAlCierre),
+        estadoAsistencia: asistencia?.estado,
+        generadoEn: ahora,
+      });
+      generados++;
+
+      let orden = 0;
+      for (const accion of vigentes) {
+        await ctx.db.insert("reporteEstudianteItem", {
+          reporteEstudianteId, tipoItem: "ACCION",
+          accionRegistradaId: accion._id, orden: orden++,
+        });
+      }
+      if (asistencia !== null) {
+        await ctx.db.insert("reporteEstudianteItem", {
+          reporteEstudianteId, tipoItem: "ASISTENCIA",
+          registroAsistenciaId: asistencia._id, orden: orden++,
+        });
+      }
+
+      // Una entrega por cada representante vinculado.
+      const vinculo = await ctx.db.query("vinculoRepresentacion")
+        .withIndex("por_estudiante_estado", (q) =&gt;
+          q.eq("estudianteId", matricula.estudianteId).eq("estado", "ACTIVO"))
+        .unique();
+      if (vinculo !== null) {
+        await ctx.db.insert("entregaReporte", {
+          reporteEstudianteId, representanteId: vinculo.representanteId,
+          entregadoEn: ahora,
+        });
+      }
+    }
+    return { fecha, generados };
+  }),
+});</code></pre>
+
+<h2>8.4 Pruebas de los días 3 y 4</h2>
+<ul class="check">
+<li>Los campos salen de <code>plantillaCampo</code> y son los cuatro sembrados.</li>
+<li>Guardar dos veces el mismo día actualiza el borrador, no crea un segundo.</li>
+<li>Publicar genera un <code>reporteEstudiante</code> por cada matrícula <code>CURSANDO</code>, y ninguno para las que no lo están.</li>
+<li>Un reporte publicado ya no se puede editar: <code>guardarReporteGeneral</code> lanza <code>CONFLICTO</code>.</li>
+<li>Publicar dos veces no duplica reportes de estudiante.</li>
+<li>Un estudiante con una acción del día tiene <code>tieneNovedades: true</code> y su ítem <code>ACCION</code>.</li>
+<li>Sin reporte general, un estudiante con acciones <b>igual</b> recibe su reporte.</li>
+<li>Un docente que no es titular recibe <code>ErrorPermiso</code>.</li>
+</ul>
+</div>
+
+<!-- ============================================================ -->
+<div class="part">
+<h1>Parte 9 — Día 5: las tres consultas del representante</h1>
+<span class="dia">DÍA 5</span>
+<div class="callout"><b>Este es el día que más destraba al equipo.</b> Con estas tres consultas se pueden construir P4, P5 y P6 — y P4 es la pantalla más importante del producto. Si vas retrasada, haz este día antes que el 3 y el 4.</div>
+
+<div class="stop">
+En las tres: <code>exigirVinculo(ctx, estudianteId)</code> <b>antes</b> de leer nada. Un representante solo ve a sus propios hijos. Sin RLS debajo, olvidarlo no da error: entrega los datos de un menor ajeno.
+</div>
+
+<h2>9.1 El reporte de hoy (P4)</h2>
+<p>Tiene que poder distinguir <b>«no hay»</b> de <b>«error»</b>: la app muestra «aún no tienes reporte nuevo», que no es lo mismo que una pantalla rota.</p>
+<pre><code>export const reporteDeHoy = query({
+  args: { estudianteId: v.id("estudiante"), fecha: v.optional(v.string()) },
+  handler: (ctx, args) =&gt; conErroresPublicos(async () =&gt; {
+    await exigirVinculo(ctx, args.estudianteId);
+    const fecha = args.fecha ?? hoyEnGuayaquil();
+
+    const matricula = await ctx.db.query("matricula")
+      .withIndex("por_estudiante_estado", (q) =&gt;
+        q.eq("estudianteId", args.estudianteId).eq("estado", "CURSANDO"))
+      .unique();
+    if (matricula === null) return { fecha, hay: false as const, reporte: null };
+
+    const reporte = await ctx.db.query("reporteEstudiante")
+      .withIndex("por_matricula_fecha", (q) =&gt;
+        q.eq("matriculaId", matricula._id).eq("fecha", fecha))
+      .unique();
+    if (reporte === null) return { fecha, hay: false as const, reporte: null };
+
+    return { fecha, hay: true as const, reporte: await presentarReporte(ctx, reporte) };
+  }),
+});</code></pre>
+<p>Y el presentador, que vas a reutilizar en las tres:</p>
+<pre><code>async function presentarReporte(ctx: QueryCtx, reporte: Doc&lt;"reporteEstudiante"&gt;) {
+  const items = await ctx.db.query("reporteEstudianteItem")
+    .withIndex("por_reporte", (q) =&gt; q.eq("reporteEstudianteId", reporte._id))
+    .collect();
+
+  const acciones = [];
+  for (const item of items) {
+    if (item.tipoItem !== "ACCION" || item.accionRegistradaId === undefined) continue;
+    const accion = await ctx.db.get(item.accionRegistradaId);
+    if (accion === null) continue;
+    const categoria = await ctx.db.get(accion.categoriaAccionId);
+    acciones.push({
+      id: accion._id,
+      categoria: categoria?.nombre ?? "",
+      signo: accion.signo,
+      puntos: accion.puntosAplicados,
+      descripcion: accion.descripcion,
+      estado: accion.estado,
+    });
+  }
+
+  const franja = reporte.franjaConductaId
+    ? await ctx.db.get(reporte.franjaConductaId) : null;
+
+  // Los campos del reporte general del curso, si lo hubo.
+  const generales = [];
+  if (reporte.reporteGeneralId) {
+    const valores = await ctx.db.query("reporteGeneralValor")
+      .withIndex("por_reporte_campo", (q) =&gt;
+        q.eq("reporteGeneralId", reporte.reporteGeneralId!))
+      .collect();
+    for (const valor of valores) {
+      if (!valor.valorTexto) continue;
+      const campo = await ctx.db.get(valor.plantillaCampoId);
+      if (campo) generales.push({ etiqueta: campo.etiqueta, texto: valor.valorTexto, orden: campo.orden });
+    }
+    generales.sort((a, b) =&gt; a.orden - b.orden);
+  }
+
+  return {
+    id: reporte._id,
+    fecha: reporte.fecha,
+    tieneNovedades: reporte.tieneNovedades,
+    puntaje: reporte.puntajeAlCierre,
+    franja: franja ? { nombre: franja.nombre, frase: franja.fraseRepresentante, color: franja.colorHex ?? null } : null,
+    asistencia: reporte.estadoAsistencia ?? null,
+    acciones,
+    general: generales.map(({ etiqueta, texto }) =&gt; ({ etiqueta, texto })),
+  };
+}</code></pre>
+
+<h2>9.2 Reportes anteriores, limitados por plan (P5)</h2>
+<p>El plan gratuito ve menos que el premium. <b>Los dos números salen de <code>REGLAS</code></b>: <code>REPORTES_PREVIOS_FREE</code> (2) y <code>REPORTES_PREVIOS_PREMIUM</code> (7). No los escribas a mano.</p>
+<pre><code>import { tieneAccesoVigente } from "./lib/revenuecat";
+
+export const reportesAnteriores = query({
+  args: { estudianteId: v.id("estudiante") },
+  handler: (ctx, args) =&gt; conErroresPublicos(async () =&gt; {
+    const vinculo = await exigirVinculo(ctx, args.estudianteId);
+    const representante = await ctx.db.get(vinculo.representanteId);
+
+    const premium = representante !== null &amp;&amp;
+      (await tieneAccesoVigente(ctx, representante.perfilUsuarioId, ENTITLEMENTS.REPRESENTANTE));
+    const limite = premium ? REGLAS.REPORTES_PREVIOS_PREMIUM : REGLAS.REPORTES_PREVIOS_FREE;
+
+    const matricula = await ctx.db.query("matricula")
+      .withIndex("por_estudiante_estado", (q) =&gt;
+        q.eq("estudianteId", args.estudianteId).eq("estado", "CURSANDO"))
+      .unique();
+    if (matricula === null) return { limite, premium, reportes: [] };
+
+    // El indice esta ordenado por fecha: `order("desc")` da los mas recientes.
+    const reportes = await ctx.db.query("reporteEstudiante")
+      .withIndex("por_matricula_fecha", (q) =&gt; q.eq("matriculaId", matricula._id))
+      .order("desc")
+      .take(limite + 1);   // +1 = el de hoy, que no cuenta como "anterior"
+
+    const hoy = hoyEnGuayaquil();
+    const anteriores = reportes.filter((r) =&gt; r.fecha &lt; hoy).slice(0, limite);
+    return {
+      limite, premium,
+      reportes: await Promise.all(anteriores.map((r) =&gt; presentarReporte(ctx, r))),
+    };
+  }),
+});</code></pre>
+<div class="callout">
+Devuelve <code>limite</code> y <code>premium</code> en la respuesta. La pantalla los necesita para decir «con Premium verías los últimos 7» sin tener que adivinar el plan por su cuenta.
+</div>
+
+<h2>9.3 El acumulado del parcial (P6)</h2>
+<p>La bitácora de acciones del período, el puntaje y su franja.</p>
+<pre><code>export const reporteAcumulado = query({
+  args: { estudianteId: v.id("estudiante") },
+  handler: (ctx, args) =&gt; conErroresPublicos(async () =&gt; {
+    await exigirVinculo(ctx, args.estudianteId);
+
+    const matricula = await ctx.db.query("matricula")
+      .withIndex("por_estudiante_estado", (q) =&gt;
+        q.eq("estudianteId", args.estudianteId).eq("estado", "CURSANDO"))
+      .unique();
+    if (matricula === null) throw new ErrorDominio("NO_ENCONTRADO", "El estudiante no tiene matricula vigente.");
+
+    const curso = await ctx.db.get(matricula.cursoId);
+    const periodo = curso === null ? null : await periodoEnCursoDeCurso(ctx, curso);
+    if (periodo === null) throw new ErrorDominio("PERIODO_NO_VIGENTE", "No hay un parcial en curso.");
+
+    const puntaje = await ctx.db.query("puntajePeriodo")
+      .withIndex("por_matricula_periodo", (q) =&gt;
+        q.eq("matriculaId", matricula._id).eq("periodoAcademicoId", periodo._id))
+      .unique();
+
+    // Toda la bitacora, incluidas anuladas y modificadas: el representante
+    // tiene derecho a ver que una anotacion se corrigio, no que desaparecio.
+    const acciones = await ctx.db.query("accionRegistrada")
+      .withIndex("por_matricula_periodo", (q) =&gt;
+        q.eq("matriculaId", matricula._id).eq("periodoAcademicoId", periodo._id))
+      .collect();
+
+    const franja = puntaje?.franjaConductaId
+      ? await ctx.db.get(puntaje.franjaConductaId) : null;
+
+    return {
+      periodo: { nombre: periodo.nombre, fechaInicio: periodo.fechaInicio, fechaFin: periodo.fechaFin },
+      puntaje: puntaje?.puntajeActual ?? REGLAS.PUNTAJE_BASE,
+      puntosPositivos: puntaje?.puntosPositivos ?? 0,
+      puntosNegativos: puntaje?.puntosNegativos ?? 0,
+      congelado: puntaje?.congelado ?? false,
+      franja: franja ? { nombre: franja.nombre, frase: franja.fraseRepresentante, color: franja.colorHex ?? null } : null,
+      bitacora: acciones
+        .sort((a, b) =&gt; b.fechaOcurrencia.localeCompare(a.fechaOcurrencia))
+        .map((a) =&gt; ({
+          id: a._id, fecha: a.fechaOcurrencia, signo: a.signo,
+          puntos: a.estado === "VIGENTE" ? a.puntosAplicados : 0,
+          descripcion: a.descripcion, estado: a.estado,
+        })),
+    };
+  }),
+});</code></pre>
+
+<h2>9.4 Pruebas del día 5</h2>
+<ul class="check">
+<li>Un representante <b>sin vínculo</b> recibe <code>ErrorPermiso</code> en las tres consultas. <b>Es la prueba S-1 de la matriz de permisos</b> — «el Padre A no puede ver la bitácora del Hijo B».</li>
+<li>Sin reporte de hoy, <code>reporteDeHoy</code> devuelve <code>hay: false</code> y no lanza error.</li>
+<li>Un representante gratuito ve 2 reportes anteriores; uno premium ve 7.</li>
+<li>El de hoy no aparece dentro de «anteriores».</li>
+<li>La bitácora acumulada incluye las anuladas, y sus puntos salen en 0.</li>
+</ul>
+</div>
+
+<!-- ============================================================ -->
+<div class="part">
+<h1>Parte 10 — Día 6: comunicados y cron nocturno</h1>
+<span class="dia">DÍA 6</span>
+
+<h2>10.1 Comunicados del curso (DP-003)</h2>
+<p>Dos tipos, y <b>ninguno afecta el puntaje</b>:</p>
+<table>
+<tr><th>Tipo</th><th>Qué es</th><th>Visibilidad</th></tr>
+<tr><td><code>NOTA_PROFESOR</code></td><td>Mensaje libre, a un representante o a todo el curso</td><td>Entre 1 y 7 días, el docente elige</td></tr>
+<tr><td><code>EVENTO</code></td><td>Texto largo con fecha</td><td>Hasta la fecha del evento; desaparece solo ese día</td></tr>
+</table>
+<p>Guardas que ya existen — úsalas, no reescribas la validación:</p>
+<table>
+<tr><th>Guarda</th><th>Qué comprueba</th></tr>
+<tr><td><code>exigirVentanaComunicado(desde, hasta)</code></td><td>Que la ventana de visibilidad sea coherente</td></tr>
+<tr><td><code>exigirDuracionNota(dias)</code></td><td>Entre <code>NOTA_PROFESOR_DIAS_MIN</code> y <code>MAX</code> (1 y 7)</td></tr>
+<tr><td><code>exigirFechaEvento(tipo, fechaEvento)</code></td><td>Que un evento traiga fecha y una nota no</td></tr>
+<tr><td><code>exigirAlcanceCoherente(alcance, estudianteId)</code></td><td>Alcance <code>CURSO</code> no lleva estudiante; <code>ESTUDIANTE</code> sí</td></tr>
+<tr><td><code>exigirPublicacionCompleta(...)</code></td><td>Que publicar traiga fecha y autor</td></tr>
+</table>
+<p>Y <code>sumarDias(fecha, dias)</code> para calcular <code>visibleHasta</code> sin salir de la zona horaria del piloto.</p>
+
+<h2>10.2 El cron nocturno</h2>
+<p>Convex tiene cron propio. <b>El archivo ya existe</b>: <code>movil/convex/crons.ts</code>, con el cron de Kenny dentro. Convex exige que todas las tareas vivan en ese único archivo, así que es el segundo sitio del proyecto donde dos personas escriben en el mismo archivo.</p>
+<div class="callout">
+<b>La regla para no pisarse:</b> añade tu bloque <b>debajo</b> del último, nunca edites el de otro, y pon el módulo por delante del nombre. Te dejé el comentario en el sitio exacto.
+</div>
+<pre><code>// En movil/convex/crons.ts, debajo del cron de interaccion:
+
+/**
+ * Conducta (Persona B) — cierra el dia: publica los reportes que quedaron en
+ * borrador y deja el puntaje al dia. 22:00 en Guayaquil = 03:00 UTC.
+ */
+crons.daily(
+  "conducta: cierre nocturno",
+  { hourUTC: 3, minuteUTC: 0 },
+  internal.conducta.cierreNocturno,
+  {},
+);</code></pre>
+<p>Y en <code>conducta.ts</code>, una <code>internalMutation</code> — interna a propósito: la dispara el cron, nunca el cliente.</p>
+<pre><code>export const cierreNocturno = internalMutation({
+  args: { fecha: v.optional(v.string()) },
+  handler: async (ctx, args) =&gt; {
+    const fecha = args.fecha ?? hoyEnGuayaquil();
+    // 1. Cursos activos con reporte en BORRADOR de esa fecha -&gt; publicar
+    // 2. Estudiantes con acciones del dia y sin reporteEstudiante -&gt; generarlo
+    // 3. Devolver un resumen: { publicados, generados }
+    // Acota el lote (take) para no pasarte de los limites de una transaccion.
+  },
+});</code></pre>
+<p class="small">Fíjate en las horas: Guayaquil es UTC−5 todo el año, así que hora local + 5 = hora UTC. El cron de Kenny corre a las 08:00 UTC (03:00 local); el tuyo a las 03:00 UTC (22:00 local del día que cierra).</p>
+
+<h2>10.3 Pruebas del día 6</h2>
+<ul class="check">
+<li>Una nota de más de 7 días se rechaza.</li>
+<li>Un evento sin fecha se rechaza; una nota con fecha de evento también.</li>
+<li>Una nota de alcance <code>ESTUDIANTE</code> sin estudiante se rechaza.</li>
+<li>El cierre nocturno publica un borrador pendiente y no toca los ya publicados.</li>
+<li>Correr el cierre dos veces no duplica reportes.</li>
+</ul>
+</div>
+
+<!-- ============================================================ -->
+<div class="part">
+<h1>Parte 11 — Día 7: lo que los demás necesitan de ti</h1>
+<span class="dia">DÍA 7</span>
+
+<h2>11.1 El recálculo para Kenny</h2>
+<p>En <code>interaccion.ts</code> hay un comentario esperándote:</p>
+<pre><code>// RECALCULO_PENDIENTE (#9, Persona B): cuando `conducta.ts` exponga el
+// recalculo del periodo, se invoca aqui con accion.matriculaId y
+// accion.periodoAcademicoId.</code></pre>
+<p>Es el caso F4: cuando un docente resuelve un reclamo como <code>RESUELTA_MODIFICADA</code>, la acción pasa a <code>MODIFICADA</code>, vale 0 puntos y <b>hay que devolverle los puntos al estudiante</b>. Si tu <code>recalcularPuntaje</code> está exportada (§6.3), Kenny solo tiene que importarla y llamarla.</p>
+<p><b>Avísale en el grupo cuando esté disponible</b>, con el nombre exacto y sus argumentos. Es un cambio de dos líneas de su lado.</p>
+
+<h2>11.2 Avisa a la interfaz</h2>
+<p>Escribe un comentario en los issues <b>#31</b> y <b>#32</b> listando las funciones que expusiste, con sus argumentos y qué devuelven. Quien construya esas pantallas no debería tener que leer tu código para saber cómo llamarte.</p>
+<p>Mira <code>docs/04-guias/contrato-nucleo.md</code> como modelo: es exactamente eso para el módulo de Daniel.</p>
+
+<h2>11.3 Repaso final</h2>
+<ul class="check">
+<li><code>npm run typecheck</code> y <code>npm test</code> en verde.</li>
+<li>Ninguna función pública sin su llamada a <code>permisos.ts</code> en la primera línea.</li>
+<li>Ningún número suelto: todo sale de <code>REGLAS</code>, de <code>tipoAccion</code> o de <code>institucion</code>.</li>
+<li>Ningún <code>throw new Error(...)</code>: todos son <code>ErrorDominio</code>.</li>
+<li>Ningún <code>puntaje = puntaje ± n</code>: todo pasa por <code>recalcularPuntaje</code>.</li>
+<li>Los issues #8, #9 y #10 cerrados o con su PR marcando <code>Cierra #N</code>.</li>
+</ul>
+</div>
+
+<!-- ============================================================ -->
+<div class="part">
+<h1>Parte 12 — Cómo se entrega</h1>
+
+<h2>12.1 El ciclo completo</h2>
+<pre><code># 1. Rama nueva desde main al dia
+git checkout main &amp;&amp; git pull
+git checkout -b feat/conducta-asistencia
+
+# 2. Trabajas, y compruebas antes de cada commit
+npm run typecheck &amp;&amp; npm test
+
+# 3. Commit con mensaje que explique el porque, no el que
+git add -A
+git commit -m "feat(conducta): asistencia del curso con unicidad por dia"
+
+# 4. Subir y abrir el PR
+git push -u origin feat/conducta-asistencia
+gh pr create --base main    # o desde la web</code></pre>
+
+<h2>12.2 La plantilla del PR</h2>
+<p>Se rellena sola al abrirlo. <b>Marca las casillas de verdad</b>, no por costumbre. La sección «Si toca datos de estudiantes» aplica a casi todo lo tuyo: tus tablas son las cuatro más sensibles del sistema.</p>
+
+<h2>12.3 El CI</h2>
+<p>Cada PR corre <code>npm ci</code>, <code>npm run typecheck</code> y <code>npm test</code> en una máquina limpia con Node 24. Si pasa en tu máquina y falla ahí, casi siempre es un archivo que no subiste.</p>
+
+<h2>12.4 Un conflicto que te va a pasar</h2>
+<div class="callout">
+<code>movil/convex/_generated/api.d.ts</code> está versionado pero es <b>generado</b>. Dos ramas que añaden funciones chocan siempre ahí. <b>No lo resuelvas a mano:</b>
+<pre style="margin-top:6px;"><code>cd movil &amp;&amp; npx convex codegen &amp;&amp; git add convex/_generated/api.d.ts</code></pre>
+</div>
+
+<h2>12.5 Si te trabas</h2>
+<p>Escribe en el grupo con: qué intentabas, qué esperabas, qué pasó y el mensaje de error completo. Media hora atascada en silencio cuesta más que un mensaje.</p>
+<p>Y si <code>convex-test</code> se te resiste, dímelo: es la primera vez que escribes pruebas con esa herramienta y tiene su truco. Lo vemos juntos y no pasa nada.</p>
+</div>
+
+<!-- ============================================================ -->
+<div class="part">
+<h1>Apéndices</h1>
+
+<h2>Apéndice A — Tus tablas, campo por campo</h2>
+<h3>accionRegistrada</h3>
+<p class="small"><code>matriculaId</code> · <code>periodoAcademicoId</code> · <code>tipoAccionId</code> · <code>categoriaAccionId</code> · <code>signo</code> · <code>puntosAplicados</code> · <code>cuentaEnBitacora</code> · <code>descripcion</code> · <code>fechaOcurrencia</code> · <code>registradaPorDocenteId</code> · <code>estado</code> · <code>resueltaPorDocenteId?</code> · <code>resueltaEn?</code> · <code>motivoResolucion?</code> · <code>actualizadoEn</code><br>
+Índices: <code>por_matricula_periodo</code> [matriculaId, periodoAcademicoId, estado] · <code>por_matricula_fecha</code> [matriculaId, fechaOcurrencia]</p>
+
+<h3>puntajePeriodo</h3>
+<p class="small"><code>matriculaId</code> · <code>periodoAcademicoId</code> · <code>puntajeBase</code> · <code>puntosPositivos</code> · <code>puntosNegativos</code> · <code>puntajeActual</code> · <code>franjaConductaId?</code> · <code>congelado</code> · <code>recalculadoEn</code><br>
+Índice: <code>por_matricula_periodo</code> [matriculaId, periodoAcademicoId]</p>
+
+<h3>registroAsistencia</h3>
+<p class="small"><code>matriculaId</code> · <code>periodoAcademicoId</code> · <code>fecha</code> · <code>estado</code> · <code>observacion?</code> · <code>registradoPorDocenteId</code> · <code>justificadaEn?</code> · <code>actualizadoEn</code><br>
+Índice: <code>por_matricula_fecha</code> [matriculaId, fecha]</p>
+
+<h3>reporteGeneral · reporteGeneralValor</h3>
+<p class="small"><b>reporteGeneral:</b> <code>cursoId</code> · <code>periodoAcademicoId</code> · <code>plantillaReporteId</code> · <code>fecha</code> · <code>estado</code> · <code>publicadoEn?</code> · <code>publicadoPorDocenteId?</code> · <code>actualizadoEn</code> — índice <code>por_curso_fecha</code><br>
+<b>reporteGeneralValor:</b> <code>reporteGeneralId</code> · <code>plantillaCampoId</code> · <code>valorTexto?</code> — índice <code>por_reporte_campo</code></p>
+
+<h3>reporteEstudiante · reporteEstudianteItem · entregaReporte</h3>
+<p class="small"><b>reporteEstudiante:</b> <code>matriculaId</code> · <code>periodoAcademicoId</code> · <code>reporteGeneralId?</code> · <code>fecha</code> · <code>tieneNovedades</code> · <code>puntajeAlCierre</code> · <code>franjaConductaId?</code> · <code>estadoAsistencia?</code> · <code>generadoEn</code> — índice <code>por_matricula_fecha</code><br>
+<b>reporteEstudianteItem:</b> <code>reporteEstudianteId</code> · <code>tipoItem</code> · <code>accionRegistradaId?</code> · <code>registroAsistenciaId?</code> · <code>comunicadoCursoId?</code> · <code>textoLibre?</code> · <code>orden</code> — índice <code>por_reporte</code><br>
+<b>entregaReporte:</b> <code>reporteEstudianteId</code> · <code>representanteId</code> · <code>entregadoEn?</code> · <code>leidoEn?</code> — índice <code>por_reporte_representante</code></p>
+
+<h3>comunicadoCurso</h3>
+<p class="small"><code>cursoId</code> · <code>periodoAcademicoId?</code> · <code>tipo</code> · <code>alcance</code> · <code>estudianteId?</code> · <code>titulo</code> · <code>contenido</code> · <code>fechaEvento?</code> · <code>horaEvento?</code> · <code>visibleDesde</code> · <code>visibleHasta</code> · <code>creadoPorDocenteId</code> · <code>activo</code><br>
+Índices: <code>por_curso_ventana</code> [cursoId, activo, visibleHasta] · <code>por_estudiante</code> [estudianteId, activo]</p>
+
+<h3>franjaConducta · categoriaAccion · tipoAccion · plantillaReporte · plantillaCampo</h3>
+<p class="small">Las cinco vienen sembradas por <code>semillas:cargar</code>. Las <b>lees</b>; solo escribirías en ellas si una institución personalizara su catálogo, que no está en el alcance de la v1.</p>
+
+<h2 class="part" style="page-break-before:auto;">Apéndice B — Guardas disponibles</h2>
+<table>
+<tr><th>Función</th><th>Para qué</th></tr>
+<tr><td><code>calcularPuntaje(puntos[], base?, piso?, techo?)</code></td><td>El recálculo de ADR-005, con sus topes</td></tr>
+<tr><td><code>exigirTopeDiario(acumuladoHoy, puntosNuevos)</code></td><td>C4: +4 / −5 por día</td></tr>
+<tr><td><code>exigirSignoCoherente(signo, min, max)</code></td><td>Que una positiva no traiga rango negativo</td></tr>
+<tr><td><code>exigirRangoTipoAccion(min, defecto, max)</code></td><td>Que el defecto caiga dentro del rango</td></tr>
+<tr><td><code>exigirRangoFechas(inicio, fin, entidad)</code></td><td>Que un rango de fechas sea coherente</td></tr>
+<tr><td><code>exigirVentanaComunicado(desde, hasta)</code></td><td>Ventana de visibilidad de un comunicado</td></tr>
+<tr><td><code>exigirDuracionNota(dias)</code></td><td>Nota del profesor: entre 1 y 7 días</td></tr>
+<tr><td><code>exigirFechaEvento(tipo, fechaEvento?)</code></td><td>Un evento trae fecha; una nota no</td></tr>
+<tr><td><code>exigirAlcanceCoherente(alcance, estudianteId?)</code></td><td>CURSO sin estudiante, ESTUDIANTE con él</td></tr>
+<tr><td><code>exigirPublicacionCompleta(...)</code></td><td>Publicar trae fecha y autor</td></tr>
+<tr><td><code>hoyEnGuayaquil(ahora?)</code></td><td>La fecha de hoy en la zona del piloto</td></tr>
+<tr><td><code>sumarDias(fecha, dias)</code></td><td>Aritmética de fechas sin salir de la zona</td></tr>
+<tr><td><code>ErrorDominio(codigo, mensaje)</code></td><td>El error que la app sabe distinguir</td></tr>
+</table>
+<p class="small">Todas en <code>movil/convex/lib/guardas.ts</code>. <b>Léelo entero una vez</b> — son 260 líneas y te ahorra reescribir media docena de validaciones.</p>
+
+<h2>Apéndice C — REGLAS que te tocan</h2>
+<table>
+<tr><th>Constante</th><th>Valor</th><th>Qué es</th></tr>
+<tr><td><code>PUNTAJE_BASE</code></td><td>60</td><td>Con lo que arranca cada estudiante en cada parcial</td></tr>
+<tr><td><code>PUNTAJE_MINIMO</code> / <code>MAXIMO</code></td><td>0 / 100</td><td>Piso y techo del recálculo</td></tr>
+<tr><td><code>TOPE_DIARIO_POSITIVO</code></td><td>4</td><td>C4 — máximo que puede ganar en un día</td></tr>
+<tr><td><code>TOPE_DIARIO_NEGATIVO</code></td><td>5</td><td>C4 — máximo que puede perder en un día</td></tr>
+<tr><td><code>POSITIVA_MIN</code> / <code>MAX</code></td><td>1 / 2</td><td>C2 — rango de una acción positiva</td></tr>
+<tr><td><code>RESPONSABILIDAD_PUNTOS</code></td><td>−1</td><td>C2 — irresponsabilidad, fija</td></tr>
+<tr><td><code>DISCIPLINA_MIN</code> / <code>MAX</code></td><td>−3 / −1</td><td>C2 — indisciplina y deshonestidad</td></tr>
+<tr><td><code>REPORTES_PREVIOS_FREE</code></td><td>2</td><td>E4 — reportes anteriores, plan gratuito</td></tr>
+<tr><td><code>REPORTES_PREVIOS_PREMIUM</code></td><td>7</td><td>E4 — reportes anteriores, premium</td></tr>
+<tr><td><code>NOTA_PROFESOR_DIAS_MIN</code> / <code>MAX</code></td><td>1 / 7</td><td>Duración de una nota del profesor</td></tr>
+<tr><td><code>EVENTO_DIAS_ANTICIPACION_MAX</code></td><td>7</td><td>Con cuánta anticipación aparece un evento</td></tr>
+<tr><td><code>ZONA_HORARIA</code></td><td>America/Guayaquil</td><td>UTC−5 todo el año, sin cambio de hora</td></tr>
+</table>
+
+<h2>Apéndice D — Qué deja <code>semillas:cargar</code></h2>
+<h3>Las 6 franjas de conducta</h3>
+<table>
+<tr><th>Código</th><th>Nombre</th><th>Rango</th></tr>
+<tr><td>CRITICA</td><td>Situación crítica</td><td>0–15</td></tr>
+<tr><td>MUY_BAJO</td><td>Muy por debajo</td><td>16–30</td></tr>
+<tr><td>BAJO</td><td>Por debajo de lo esperado</td><td>31–50</td></tr>
+<tr><td>BASE</td><td>En el punto de partida</td><td>51–60</td></tr>
+<tr><td>BUENO</td><td>Buen desempeño</td><td>61–80</td></tr>
+<tr><td>EXCELENTE</td><td>Excelente</td><td>81–100</td></tr>
+</table>
+<h3>Las 6 categorías y los 7 tipos de acción</h3>
+<p class="small"><b>Categorías:</b> DESEMPENIO · CONVIVENCIA · RESPONSABILIDAD · PUNTUALIDAD · DISCIPLINA · DESHONESTIDAD<br>
+<b>Tipos positivos (+1 a +2):</b> POS_DESEMPENIO · POS_CONVIVENCIA · POS_RESPONSABILIDAD · POS_PUNTUALIDAD<br>
+<b>Tipos negativos:</b> NEG_INDISCIPLINA (−3 a −1) · NEG_DESHONESTIDAD (−3 a −1) · NEG_IRRESPONSABILIDAD (−1 fijo)</p>
+<h3>La plantilla del reporte</h3>
+<p class="small">Una plantilla «Reporte diario del curso» con cuatro campos: ANUNCIOS, NOVEDADES, TAREAS (texto largo) y CONSEJO (texto corto).</p>
+
+<h2>Apéndice E — Errores que vas a cometer</h2>
+<table>
+<tr><th>Síntoma</th><th>Causa</th></tr>
+<tr><td>«tu cuenta existe pero aún no completaste tu perfil» en una prueba</td><td>Sembraste <code>authSubject</code> sin el prefijo <code>https://convex.test|</code></td></tr>
+<tr><td><code>calcularPuntaje</code> devuelve cualquier cosa</td><td>Le pasaste la base como primer argumento. El primero es el <b>arreglo de puntos</b></td></tr>
+<tr><td><code>exigirVinculo</code> no compila</td><td>Le pasaste tres argumentos. Son dos: <code>(ctx, estudianteId)</code></td></tr>
+<tr><td>La pantalla dice «no pudimos completar la solicitud» y no el motivo real</td><td>Falta envolver el handler en <code>conErroresPublicos</code></td></tr>
+<tr><td><code>.unique()</code> lanza error</td><td>Hay más de una fila. Casi siempre es unicidad que no comprobaste antes de insertar</td></tr>
+<tr><td>El puntaje se desincroniza</td><td>Sumaste en vez de recalcular. Busca cualquier <code>puntaje ± n</code></td></tr>
+<tr><td>Un reporte cambia después de publicado</td><td>Estás leyendo las acciones al vuelo en vez de la fotografía guardada</td></tr>
+<tr><td>El CI falla y en tu máquina no</td><td>Un archivo sin subir, casi siempre <code>_generated/api.d.ts</code></td></tr>
+</table>
+
+<hr style="margin-top:26px;">
+<p class="small">Cresco · Manual de rol Persona B v2.0 · 9 de septiembre de 2026 · Dueño del documento: Persona C.<br>
+Si algo aquí no coincide con el código, <b>manda el código</b> — y avísame para corregir el manual.</p>
+</div>
+
+</body>
+</html>
