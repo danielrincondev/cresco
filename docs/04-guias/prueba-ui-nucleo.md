@@ -26,14 +26,33 @@ usando el mismo documento.
 
 ## Validación realizada
 
-- TypeScript del cliente y Convex sin errores; 97 pruebas automatizadas.
-- Bundle Android servido correctamente por Metro.
+- TypeScript del cliente y Convex sin errores; 125 pruebas automatizadas,
+  incluidas ocho de componentes para consentimiento, reintentos y auditoría.
+- Bundle Android generado mediante `expo export --platform android`.
 - Recorrido completo en navegador con viewport Pixel 7, autenticación real
   de Clerk de desarrollo y Convex de desarrollo: perfil con ambos roles,
   curso, dos parciales, invitación, registro sin documento, corrección del
   nombre, aprobación y actualización de la vista familiar.
 - La consulta del calendario tiene prueba de autorización: solo el titular
   puede verla; otro docente y una sesión anónima son rechazados.
+
+## Consentimiento y auditoría de sesión
+
+`versionConsentimiento`, en `src/content/consentimiento.ts`, identifica los textos
+incluidos en la app. Si el servidor exige otra versión, el formulario pide
+actualizar Cresco y no permite aceptar con un texto anterior. Al cambiar los
+documentos hay que actualizar su contenido y esta versión juntos. Una solicitud
+guardada conserva el identificador y la versión que se aceptó originalmente:
+reintentar una respuesta incierta no representa una nueva aceptación.
+
+El inicio autenticado llama a `auditoria.registrarInicioSesion`. Si aún falta
+el perfil, vuelve a llamarla al terminar el alta. Los errores se reintentan con
+esperas crecientes de hasta un minuto, mientras la sesión siga activa; el servidor
+agrupa eventos repetidos. Cerrar sesión o desmontar la pantalla cancela los
+reintentos pendientes. No se añaden tareas de servidor ni cron.
+
+Las pruebas de componentes simulan Clerk, Convex y el almacenamiento. La prueba
+física de estas correcciones sigue pendiente.
 
 ## Alcance de esta versión
 

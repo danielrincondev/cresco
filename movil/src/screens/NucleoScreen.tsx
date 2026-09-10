@@ -44,7 +44,9 @@ import {
 import {
   avisoPrivacidad,
   textoConsentimiento,
+  versionConsentimiento,
 } from "../content/consentimiento";
+import { useAuditoriaSesion } from "../lib/useAuditoriaSesion";
 import {
   borrarRegistro,
   guardarRegistro,
@@ -78,6 +80,7 @@ const documentosHijo = [
 
 export function NucleoScreen() {
   const perfil = useQuery(api.nucleo.obtenerPerfil);
+  useAuditoriaSesion(perfil === null ? null : perfil?.perfilUsuarioId);
   const { user } = useUser();
   const { signOut } = useClerk();
   const [ruta, setRuta] = useState<Ruta>({ tipo: "inicio" });
@@ -938,10 +941,20 @@ function RegistroForm({
   }, [perfil.perfilUsuarioId]);
   async function buscar() {
     const r = await op.ejecutar(() => consultar({ credencial: { codigo } }));
-    if (r.ok) setInvitacion(r.valor);
+    if (r.ok) {
+      if (r.valor.versionDocumento !== versionConsentimiento) {
+        setInvitacion(null);
+        setAcepta(false);
+        setDeclara(false);
+        op.setError("El consentimiento cambió. Actualiza Cresco para leer y aceptar la versión vigente.");
+        return;
+      }
+      setInvitacion(r.valor);
+    }
   }
   async function registrar() {
     if (!guardada && !invitacion) return;
+    if (!guardada && invitacion?.versionDocumento !== versionConsentimiento) return;
     const solicitud: SolicitudRegistro = guardada ?? {
       credencial: { codigo },
       solicitudId: randomUUID(),
@@ -955,7 +968,7 @@ function RegistroForm({
       parentesco,
       aceptaTratamiento: acepta,
       declaraRepresentanteLegal: declara,
-      versionDocumento: invitacion!.versionDocumento,
+      versionDocumento: versionConsentimiento,
     };
     const r = await op.ejecutar(async () => {
       await guardarRegistro(perfil.perfilUsuarioId, solicitud);
@@ -1100,7 +1113,7 @@ function RegistroForm({
           <Tarjeta>
             <Subtitulo>Antes de continuar</Subtitulo>
             <Cuerpo>
-              Versión {invitacion.versionDocumento} · Borrador pendiente de
+              Versión {versionConsentimiento} · Borrador pendiente de
               revisión jurídica.
             </Cuerpo>
             <Aviso>
