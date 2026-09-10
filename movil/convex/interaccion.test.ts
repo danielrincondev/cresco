@@ -517,3 +517,21 @@ describe("interaccion — dispositivos y notificaciones", () => {
     ).rejects.toThrow("no es tuya");
   });
 });
+
+describe("interaccion — enganche con el envio push", () => {
+  it("crear una notificacion programa su entrega al telefono", async () => {
+    const t = convexTest(schema, modules);
+    const e = await sembrarEscenario(t);
+    const accionId = await sembrarAccion(t, e);
+
+    await e.representante.mutation(api.interaccion.abrirInconformidad, {
+      accionRegistradaId: accionId, motivo: "NO_OCURRIO", mensaje: "No ocurrio",
+    });
+
+    const programadas = await t.run(async (ctx) =>
+      await ctx.db.system.query("_scheduled_functions").collect(),
+    );
+    expect(programadas).toHaveLength(1);
+    expect(programadas[0].name).toContain("push");
+  });
+});

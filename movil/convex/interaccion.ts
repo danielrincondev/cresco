@@ -12,6 +12,7 @@
 
 import { v } from "convex/values";
 
+import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import { mutation, query, type MutationCtx, type QueryCtx } from "./_generated/server";
 import {
@@ -62,7 +63,21 @@ function exigirFormatoHora(hora: string, campo: string): void {
   }
 }
 
-/** Crea una notificación en bandeja. El envío push real es un paso aparte. */
+/**
+ * Crea una notificación en bandeja y programa su entrega al teléfono.
+ *
+ * El push va con `scheduler.runAfter(0, ...)` y no con una llamada directa: si
+ * el envío fallara dentro de esta transacción, se revertiría **la notificación
+ * misma**. La bandeja tiene que sobrevivir aunque el push no salga; al revés
+ * no sirve de nada.
+ *
+ * Se programa una acción por destinatario. Una alerta de curso son treinta
+ * peticiones en vez de una, y se prefiere así: un teléfono con el token muerto
+ * no arrastra a los otros veintinueve.
+ *
+ * Lo que viaja a Expo es un aviso genérico, nunca este `titulo` ni este
+ * `cuerpo` — ver `push.ts`, que explica por qué.
+ */
 async function notificar(
   ctx: MutationCtx,
   perfilUsuarioId: Id<"perfilUsuario">,
@@ -72,7 +87,7 @@ async function notificar(
   entidadTipo?: string,
   entidadId?: string,
 ): Promise<Id<"notificacion">> {
-  return await ctx.db.insert("notificacion", {
+  const notificacionId = await ctx.db.insert("notificacion", {
     perfilUsuarioId,
     tipo,
     titulo,
@@ -80,6 +95,8 @@ async function notificar(
     entidadTipo,
     entidadId,
   });
+  await ctx.scheduler.runAfter(0, internal.push.enviar, { notificacionId });
+  return notificacionId;
 }
 
 /* ------------------------------------------------------------------ *
