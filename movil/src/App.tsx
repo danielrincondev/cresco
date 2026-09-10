@@ -19,11 +19,13 @@ import {
   Unauthenticated,
 } from "convex/react";
 import { ConvexProviderWithClerk } from "convex/react-clerk";
-import {
-  useFonts,
-  Inter_400Regular,
-  Inter_600SemiBold,
-} from "@expo-google-fonts/inter";
+// Se importa peso por peso, no desde `@expo-google-fonts/inter`. El paquete
+// barril arrastra sus 18 archivos .ttf al bundle -- 6 MB para usar dos de
+// ellos, mas que el codigo entero de la aplicacion. En un colegio fiscal
+// ecuatoriano la descarga la paga la familia con datos prepago.
+import { useFonts } from "expo-font";
+import { Inter_400Regular } from "@expo-google-fonts/inter/400Regular";
+import { Inter_600SemiBold } from "@expo-google-fonts/inter/600SemiBold";
 import { NucleoScreen } from "./screens/NucleoScreen";
 import { LimiteError } from "./components/NucleoUI";
 
