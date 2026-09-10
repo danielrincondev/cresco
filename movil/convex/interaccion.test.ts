@@ -835,7 +835,9 @@ describe("interaccion — la bandeja lee solo lo del docente que la abre (#48)",
     const reciente = await abrirReclamo(t, e, "El segundo");
 
     vi.setSystemTime(AHORA.getTime() + 31 * DIA);
-    await vencer(t);
+    // El vencimiento ahora se programa reclamo por reclamo, asi que se dispara
+    // el del que ya cumplio el plazo -- no un barrido de todos.
+    await vencer(t, viejo);
 
     const bandeja = await e.docente.query(api.interaccion.inconformidadesDelDocente);
     expect(bandeja.map((r) => r.id)).toEqual([viejo, reciente]);
