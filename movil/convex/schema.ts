@@ -769,9 +769,30 @@ export default defineSchema({
     cuerpo: v.string(),
     entidadTipo: v.optional(v.string()),
     entidadId: v.optional(v.string()),
+    /** Primera confirmación de FCM/APNs mediante un receipt de Expo; no acredita lectura. */
     enviadaEn: v.optional(v.number()),
     leidaEn: v.optional(v.number()),
   }).index("por_usuario", ["perfilUsuarioId"]),
+
+  /** Estado del push por notificación y dispositivo; la bandeja es independiente. */
+  entregaPush: defineTable({
+    notificacionId: v.id("notificacion"),
+    dispositivoId: v.id("dispositivo"),
+    tokenPush: v.string(),
+    dispositivoActualizadoEn: v.number(),
+    estado: v.union(
+      v.literal("PENDIENTE"), v.literal("ENVIANDO"), v.literal("ACEPTADA"),
+      v.literal("CONFIRMADA"), v.literal("FALLIDA"),
+    ),
+    intentos: v.number(),
+    consultasRecibo: v.number(),
+    proximoIntentoEn: v.optional(v.number()),
+    reservaHasta: v.optional(v.number()),
+    ticketId: v.optional(v.string()),
+    consultarReciboEn: v.optional(v.number()),
+    error: v.optional(v.string()),
+    ...actualizadoEn,
+  }).index("por_notificacion_dispositivo", ["notificacionId", "dispositivoId"]),
 
   /**
    * Registro de operaciones sobre datos de menores.
