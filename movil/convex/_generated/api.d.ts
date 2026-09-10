@@ -8,6 +8,7 @@
  * @module
  */
 
+import type * as auditoria from "../auditoria.js";
 import type * as crons from "../crons.js";
 import type * as http from "../http.js";
 import type * as interaccion from "../interaccion.js";
@@ -28,6 +29,7 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  auditoria: typeof auditoria;
   crons: typeof crons;
   http: typeof http;
   interaccion: typeof interaccion;
