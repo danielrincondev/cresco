@@ -498,7 +498,8 @@ async function contextoCurso(ctx: QueryCtx, cursoId: Id<"curso">) {
 }
 
 function exigirCursoActivo(contexto: Awaited<ReturnType<typeof contextoCurso>>) {
-  if (contexto.curso.estado !== "ACTIVO" || contexto.anio.estado === "CERRADO" || contexto.institucion.estado !== "ACTIVA") {
+  if (contexto.curso.estado !== "ACTIVO" || contexto.anio.estado === "CERRADO" ||
+    contexto.institucion.estado !== "ACTIVA" || contexto.anio.fechaFin < hoyEnGuayaquil()) {
     throw new ErrorDominio("CURSO_INACTIVO", "El curso no admite nuevos estudiantes.");
   }
 }
@@ -818,6 +819,9 @@ export const listarMisEstudiantes = query({
       if (!estudiante || estudiante.estado !== "ACTIVO") continue;
       const matricula = await ctx.db.query("matricula").withIndex("por_estudiante_estado", (q) =>
         q.eq("estudianteId", estudiante._id).eq("estado", "CURSANDO")).unique();
+      // Un pendiente aún no tiene matrícula. Un aprobado sin matrícula vigente
+      // ya no es legible por el representante, aunque conserve un vínculo activo.
+      if (!matricula && estudiante.estadoVerificacion !== "PENDIENTE") continue;
       const invitacion = vinculo.invitacionCursoId ? await ctx.db.get("invitacionCurso", vinculo.invitacionCursoId) : null;
       page.push({ ...presentarEstudiante(estudiante), matriculaId: matricula?._id ?? null,
         cursoId: matricula?.cursoId ?? invitacion?.cursoId ?? null });
