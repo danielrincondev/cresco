@@ -8,6 +8,7 @@
  * @module
  */
 
+import type * as auditoria from "../auditoria.js";
 import type * as http from "../http.js";
 import type * as interaccion from "../interaccion.js";
 import type * as lib_enums from "../lib/enums.js";
@@ -27,6 +28,7 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  auditoria: typeof auditoria;
   http: typeof http;
   interaccion: typeof interaccion;
   "lib/enums": typeof lib_enums;
