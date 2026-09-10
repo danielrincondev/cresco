@@ -10,7 +10,10 @@
  * cada función pública empieza llamando a `permisos.ts`, sin excepción.
  */
 
+import { paginationOptsValidator } from "convex/server";
 import { v } from "convex/values";
+
+import { internal } from "./_generated/api";
 
 import type { Doc, Id } from "./_generated/dataModel";
 import {
@@ -401,6 +404,7 @@ export const abrirInconformidad = mutation({
     }
 
     const ahora = Date.now();
+    const venceEn = ahora + REGLAS.INCONFORMIDAD_DIAS_PLAZO * DIA;
     const inconformidadId = await ctx.db.insert("inconformidad", {
       accionRegistradaId: args.accionRegistradaId,
       representanteId: representante._id,
@@ -413,9 +417,11 @@ export const abrirInconformidad = mutation({
       docenteId: accion.registradaPorDocenteId,
       // F3: el docente tiene 30 días. El plazo sale de REGLAS, no de un
       // número escrito aquí.
-      venceEn: ahora + REGLAS.INCONFORMIDAD_DIAS_PLAZO * DIA,
+      venceEn,
       actualizadoEn: ahora,
     });
+
+    await programarVencimiento(ctx, inconformidadId, venceEn);
 
     const docente = await ctx.db.get(accion.registradaPorDocenteId);
     if (docente !== null) {
@@ -444,7 +450,7 @@ export const abrirInconformidad = mutation({
  *
  * No calcula "vencida" aquí: `Date.now()` dentro de un `query` rompe la
  * reactividad de Convex, porque el resultado dejaría de depender solo de los
- * datos. Por eso el estado lo escribe el cron `vencerInconformidades`.
+ * datos. Por eso el estado lo escribe la tarea `vencerInconformidad`.
  *
  * `VENCIDA` sigue en la lista a propósito: el esquema dice que al vencer "sube
  * de prioridad", no que desaparezca. Como se ordena por `venceEn` ascendente y
@@ -585,74 +591,113 @@ export const resolverInconformidad = mutation({
   },
 });
 
+/** Programa el vencimiento y guarda su id en la misma transacción. */
+async function programarVencimiento(
+  ctx: MutationCtx,
+  inconformidadId: Id<"inconformidad">,
+  venceEn: number,
+): Promise<void> {
+  const vencimientoProgramadoId = await ctx.scheduler.runAt(
+    venceEn,
+    internal.interaccion.vencerInconformidad,
+    { inconformidadId },
+  );
+  await ctx.db.patch(inconformidadId, { vencimientoProgramadoId });
+}
+
 /**
- * F3: el reclamo que el docente dejo pasar 30 dias sin responder vence.
- *
- * Va en un cron y no en la consulta de la bandeja porque `Date.now()` dentro
- * de un `query` de Convex rompe la reactividad: el resultado dejaria de
- * depender solo de los datos. El estado tiene que quedar **escrito**.
- *
- * Interna a proposito: la dispara `crons.ts`, nunca el cliente. Un docente no
- * puede vencer su propio reclamo para quitarselo de encima.
- *
- * Idempotente: al pasar a `VENCIDA` el reclamo sale de los estados que este
- * lote recorre, asi que correrlo dos veces no vuelve a notificar.
+ * F3: tarea individual programada para `venceEn` al abrir el reclamo.
+ * Relee el estado: resolver antes del plazo deja esta tarea sin efecto.
+ * La transición y las notificaciones son atómicas e idempotentes.
  */
-export const vencerInconformidades = internalMutation({
-  args: { limite: v.optional(v.number()) },
-  handler: async (ctx, args) => {
+export const vencerInconformidad = internalMutation({
+  args: { inconformidadId: v.id("inconformidad") },
+  returns: v.boolean(),
+  handler: async (ctx, args): Promise<boolean> => {
+    const inconformidad = await ctx.db.get(args.inconformidadId);
     const ahora = Date.now();
-    // El lote se acota para no pasarse de los limites de una transaccion de
-    // Convex si un dia hay muchos atrasados. El cron del dia siguiente toma
-    // los que hayan quedado; un reclamo ya vencido no empeora por esperar 24h.
-    const limite = args.limite ?? 100;
-    if (limite < 1) throw new ErrorDominio("VALIDACION", "El limite debe ser al menos 1.");
-
-    let vencidas = 0;
-    for (const estado of ["ABIERTA", "EN_REVISION"] as const) {
-      if (vencidas >= limite) break;
-      const lote = await ctx.db
-        .query("inconformidad")
-        .withIndex("por_estado_vence", (q) => q.eq("estado", estado).lte("venceEn", ahora))
-        .take(limite - vencidas);
-
-      for (const inconformidad of lote) {
-        await ctx.db.patch(inconformidad._id, { estado: "VENCIDA", actualizadoEn: ahora });
-        vencidas++;
-
-        // Al representante se le avisa siempre: abrio un reclamo sobre su hijo
-        // y nadie le respondio. Enterarse por silencio es justo lo que las
-        // entrevistas del 1 de septiembre decian que rompe la confianza.
-        const representante = await ctx.db.get(inconformidad.representanteId);
-        if (representante !== null) {
-          await notificar(
-            ctx,
-            representante.perfilUsuarioId,
-            "RESPUESTA_INCONFORMIDAD",
-            "Tu reclamo venció sin respuesta",
-            "Pasaron 30 días sin que el docente respondiera. El reclamo sigue " +
-              "registrado y el docente todavía puede responderlo.",
-            "inconformidad",
-            inconformidad._id,
-          );
-        }
-
-        const accion = await ctx.db.get(inconformidad.accionRegistradaId);
-        const docente = accion === null ? null : await ctx.db.get(accion.registradaPorDocenteId);
-        if (docente !== null) {
-          await notificar(
-            ctx,
-            docente.perfilUsuarioId,
-            "RESPUESTA_INCONFORMIDAD",
-            "Un reclamo venció sin tu respuesta",
-            "Se cumplieron los 30 días. Sigue en tu bandeja y aún puedes responderlo.",
-            "inconformidad",
-            inconformidad._id,
-          );
-        }
-      }
+    if (inconformidad === null ||
+        (inconformidad.estado !== "ABIERTA" && inconformidad.estado !== "EN_REVISION") ||
+        inconformidad.venceEn > ahora) {
+      return false;
     }
-    return { vencidas, revisadoEn: ahora };
+
+    await ctx.db.patch(inconformidad._id, { estado: "VENCIDA", actualizadoEn: ahora });
+
+    const representante = await ctx.db.get(inconformidad.representanteId);
+    if (representante !== null) {
+      await notificar(
+        ctx,
+        representante.perfilUsuarioId,
+        "RESPUESTA_INCONFORMIDAD",
+        "Tu reclamo venció sin respuesta",
+        "Pasó el plazo para que el docente respondiera. El reclamo sigue " +
+          "registrado y el docente todavía puede responderlo.",
+        "inconformidad",
+        inconformidad._id,
+      );
+    }
+
+    const accion = await ctx.db.get(inconformidad.accionRegistradaId);
+    const docente = accion === null ? null : await ctx.db.get(accion.registradaPorDocenteId);
+    if (docente !== null) {
+      await notificar(
+        ctx,
+        docente.perfilUsuarioId,
+        "RESPUESTA_INCONFORMIDAD",
+        "Un reclamo venció sin tu respuesta",
+        "Se cumplió el plazo. Sigue en tu bandeja y aún puedes responderlo.",
+        "inconformidad",
+        inconformidad._id,
+      );
+    }
+    return true;
+  },
+});
+
+/**
+ * Migración inicial tras desplegar: programa los reclamos anteriores al cambio.
+ * Recorre ABIERTA y EN_REVISION en páginas, encadenadas sin esperar al otro día.
+ * El id guardado evita duplicar tareas al repetir o ejecutar en paralelo la migración.
+ * Si `venceEn` quedó en el pasado, runAt deja la tarea lista para ejecutarse.
+ */
+export const programarVencimientosExistentes = internalMutation({
+  args: {
+    estado: v.optional(v.union(v.literal("ABIERTA"), v.literal("EN_REVISION"))),
+    paginationOpts: v.optional(paginationOptsValidator),
+  },
+  returns: v.object({ programadas: v.number(), continuacion: v.boolean() }),
+  handler: async (ctx, args): Promise<{ programadas: number; continuacion: boolean }> => {
+    const estado = args.estado ?? "ABIERTA";
+    const paginationOpts = args.paginationOpts ?? { numItems: 100, cursor: null };
+    if (!Number.isInteger(paginationOpts.numItems) ||
+        paginationOpts.numItems < 1 || paginationOpts.numItems > 100) {
+      throw new ErrorDominio("VALIDACION", "El lote debe tener entre 1 y 100 reclamos.");
+    }
+    const lote = await ctx.db
+      .query("inconformidad")
+      .withIndex("por_estado_vence", (q) => q.eq("estado", estado))
+      .paginate(paginationOpts);
+
+    let programadas = 0;
+    for (const inconformidad of lote.page) {
+      if (inconformidad.vencimientoProgramadoId !== undefined) continue;
+      await programarVencimiento(ctx, inconformidad._id, inconformidad.venceEn);
+      programadas++;
+    }
+
+    if (!lote.isDone) {
+      await ctx.scheduler.runAfter(0, internal.interaccion.programarVencimientosExistentes, {
+        estado,
+        paginationOpts: { ...paginationOpts, cursor: lote.continueCursor },
+      });
+    } else if (estado === "ABIERTA") {
+      await ctx.scheduler.runAfter(0, internal.interaccion.programarVencimientosExistentes, {
+        estado: "EN_REVISION",
+        paginationOpts: { numItems: paginationOpts.numItems, cursor: null },
+      });
+    }
+    return { programadas, continuacion: !lote.isDone || estado === "ABIERTA" };
   },
 });
 

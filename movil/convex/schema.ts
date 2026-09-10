@@ -625,7 +625,7 @@ export default defineSchema({
     .index("por_bloque_estado", ["disponibilidadDocenteId", "estado"]),
 
   /**
-   * F3: el docente tiene 30 días; vencido pasa a VENCIDA por cron y sube de
+   * F3: el docente tiene 30 días; una tarea programada lo pasa a VENCIDA y sube de
    * prioridad. F4: RESUELTA_MODIFICADA lleva la acción a 0 y devuelve puntos.
    * ck_inconformidad_resolucion → guardas.ts
    */
@@ -652,6 +652,8 @@ export default defineSchema({
     resueltaPorDocenteId: v.optional(v.id("docente")),
     resueltaEn: v.optional(v.number()),
     venceEn: v.number(),
+    /** Ausente en reclamos previos: la migración inicial programa su vencimiento. */
+    vencimientoProgramadoId: v.optional(v.id("_scheduled_functions")),
     citaId: v.optional(v.id("cita")),
     ...actualizadoEn,
   })
