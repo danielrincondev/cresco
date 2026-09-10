@@ -1,9 +1,10 @@
 import { ConvexError, v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
 import { mutation, query, type MutationCtx, type QueryCtx } from "./_generated/server";
-import { ESTADO_ASISTENCIA } from "./lib/enums";
+import { ENTITLEMENTS, ESTADO_ASISTENCIA, REGLAS } from "./lib/enums";
 import { ErrorDominio, exigirTopeDiario, calcularPuntaje, hoyEnGuayaquil } from "./lib/guardas";
 import { ErrorPermiso, auditar, exigirAccesoDocenteAEstudiante, exigirDocente, exigirTitularDelCurso, exigirVinculo } from "./lib/permisos";
+import { tieneAccesoVigente } from "./lib/revenuecat";
 
 const estadoAsistencia = v.union(...ESTADO_ASISTENCIA.map((estado) => v.literal(estado)));
 
@@ -338,6 +339,28 @@ export const reporteAcumulado = query({
     const acciones = await ctx.db.query("accionRegistrada").withIndex("por_matricula_periodo", (q) => q.eq("matriculaId", matricula._id).eq("periodoAcademicoId", periodo._id)).collect();
     const franja = puntaje?.franjaConductaId === undefined ? null : await ctx.db.get(puntaje.franjaConductaId);
     return { periodo: { nombre: periodo.nombre, fechaInicio: periodo.fechaInicio, fechaFin: periodo.fechaFin }, puntaje: puntaje?.puntajeActual ?? 60, puntosPositivos: puntaje?.puntosPositivos ?? 0, puntosNegativos: puntaje?.puntosNegativos ?? 0, congelado: puntaje?.congelado ?? false, franja: franja === null ? null : { nombre: franja.nombre, frase: franja.fraseRepresentante, color: franja.colorHex ?? null }, bitacora: acciones.sort((a, b) => b.fechaOcurrencia.localeCompare(a.fechaOcurrencia)).map((a) => ({ id: a._id, fecha: a.fechaOcurrencia, signo: a.signo, puntos: a.estado === "VIGENTE" ? a.puntosAplicados : 0, descripcion: a.descripcion, estado: a.estado })) };
+  }),
+});
+
+export const reportesAnteriores = query({
+  args: { estudianteId: v.id("estudiante") },
+  handler: (ctx, args) => conErroresPublicos(async () => {
+    const vinculo = await exigirVinculo(ctx, args.estudianteId);
+    const representante = await ctx.db.get(vinculo.representanteId);
+    const suscripciones = representante === null ? [] : await ctx.db.query("suscripcion")
+      .withIndex("por_usuario", (q) => q.eq("perfilUsuarioId", representante.perfilUsuarioId))
+      .collect();
+    let premium = false;
+    for (const suscripcion of suscripciones) {
+      if (!tieneAccesoVigente({ estado: suscripcion.estado, expiraEn: suscripcion.expiraEn })) continue;
+      const plan = await ctx.db.get(suscripcion.planId);
+      if (plan?.entitlementRevenuecat === ENTITLEMENTS.REPRESENTANTE) premium = true;
+    }
+    const limite = premium ? REGLAS.REPORTES_PREVIOS_PREMIUM : REGLAS.REPORTES_PREVIOS_FREE;
+    const matricula = await ctx.db.query("matricula").withIndex("por_estudiante_estado", (q) => q.eq("estudianteId", args.estudianteId).eq("estado", "CURSANDO")).unique();
+    if (matricula === null) return { limite, premium, reportes: [] };
+    const reportes = await ctx.db.query("reporteEstudiante").withIndex("por_matricula_fecha", (q) => q.eq("matriculaId", matricula._id)).order("desc").take(limite + 1);
+    return { limite, premium, reportes: await Promise.all(reportes.filter((r) => r.fecha < hoyEnGuayaquil()).slice(0, limite).map((r) => presentarReporte(ctx, r))) };
   }),
 });
 
