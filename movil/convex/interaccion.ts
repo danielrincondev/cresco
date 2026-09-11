@@ -13,7 +13,9 @@
 import { ConvexError, v } from "convex/values";
 
 import type { Doc, Id } from "./_generated/dataModel";
-import { mutation, query, type MutationCtx, type QueryCtx } from "./_generated/server";
+import { action, internalMutation, mutation, query, type MutationCtx, type QueryCtx } from "./_generated/server";
+import { internal } from "./_generated/api";
+import { verificarReautenticacion } from "./lib/reautenticacion";
 import {
   ALCANCE_ALERTA,
   MODALIDAD,
@@ -133,6 +135,17 @@ export const publicarDisponibilidad = mutation({
     exigirFormatoHora(args.horaFin, "La hora de fin");
     exigirRangoHoras(args.horaInicio, args.horaFin);
 
+    const fecha = new Date(`${args.fecha}T00:00:00Z`);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(args.fecha) || !Number.isFinite(fecha.getTime()) ||
+        fecha.toISOString().slice(0, 10) !== args.fecha) {
+      throw new ErrorDominio("FECHAS_INVALIDAS", "Ingresa una fecha válida.");
+    }
+    const minutos = (hora: string) => Number(hora.slice(0, 2)) * 60 + Number(hora.slice(3));
+    const inicio = minutos(args.horaInicio);
+    const fin = minutos(args.horaFin);
+    if ((fin - inicio) % REGLAS.CITA_MINUTOS !== 0) {
+      throw new ErrorDominio("VALIDACION", `La franja debe contener bloques completos de ${REGLAS.CITA_MINUTOS} minutos.`);
+    }
     if (args.fecha < hoyEnGuayaquil()) {
       throw new ErrorDominio("FECHAS_INVALIDAS", "No se puede publicar un horario en el pasado.");
     }
@@ -154,17 +167,22 @@ export const publicarDisponibilidad = mutation({
       throw new ErrorDominio("CONFLICTO", "Ya tienes un bloque publicado que se cruza con este.");
     }
 
-    return await ctx.db.insert("disponibilidadDocente", {
-      docenteId: docente._id,
-      cursoId: args.cursoId,
-      fecha: args.fecha,
-      horaInicio: args.horaInicio,
-      horaFin: args.horaFin,
-      modalidad: args.modalidad ?? "PRESENCIAL",
-      lugarOEnlace: args.lugarOEnlace?.trim() || undefined,
-      estado: "DISPONIBLE",
-      actualizadoEn: Date.now(),
-    });
+    const hora = (m: number) => `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
+    let primero: Id<"disponibilidadDocente"> | undefined;
+    // Toda la franja se publica en la misma transacción: un solapamiento no
+    // puede dejar medio horario publicado ni dos reservas para un mismo tramo.
+    for (let m = inicio; m < fin; m += REGLAS.CITA_MINUTOS) {
+      const id = await ctx.db.insert("disponibilidadDocente", {
+        docenteId: docente._id, cursoId: args.cursoId, fecha: args.fecha,
+        horaInicio: hora(m), horaFin: hora(m + REGLAS.CITA_MINUTOS),
+        modalidad: args.modalidad ?? "PRESENCIAL",
+        lugarOEnlace: args.lugarOEnlace?.trim() || undefined,
+        estado: "DISPONIBLE", actualizadoEn: Date.now(),
+      });
+      primero ??= id;
+    }
+    // Conserva el contrato existente; el resto se obtiene con bloquesDisponibles.
+    return primero!;
   }),
 });
 
@@ -599,24 +617,36 @@ export const resolverInconformidad = mutation({
  * El docente activa una alerta.
  *
  * G1: exige **reautenticación reciente**. El cliente reautentica con Clerk y
- * pasa el momento en que ocurrió; aquí se comprueba que sea reciente y se
- * guarda como constancia. Sin esto la alerta se dispara por accidente.
+ * envía una prueba firmada de su sesión. La action comprueba su firma y
+ * vigencia; solo la mutation interna recibe la fecha verificada.
  *
  * La app debe declarar **visiblemente que no sustituye al ECU 911**. Eso es
  * responsabilidad de la pantalla (D17), pero se repite aquí porque es una
  * regla del producto, no una decisión de interfaz.
  */
-export const activarAlerta = mutation({
-  args: {
-    cursoId: v.id("curso"),
-    alcance: alcanceAlerta,
-    estudianteId: v.optional(v.id("estudiante")),
-    tipo: tipoAlerta,
-    titulo: v.string(),
-    mensaje: v.string(),
-    esSimulacro: v.boolean(),
-    reautenticadoEn: v.number(),
-  },
+const datosAlerta = {
+  cursoId: v.id("curso"),
+  alcance: alcanceAlerta,
+  estudianteId: v.optional(v.id("estudiante")),
+  tipo: tipoAlerta,
+  titulo: v.string(),
+  mensaje: v.string(),
+  esSimulacro: v.boolean(),
+};
+
+/** La prueba firmada solo se comprueba en el servidor; no se guarda el token. */
+export const activarAlerta = action({
+  args: { ...datosAlerta, tokenReautenticacion: v.string() },
+  handler: (ctx, { tokenReautenticacion, ...datos }): Promise<{ id: Id<"alertaEmergencia">; entregas: number }> =>
+    conErroresPublicos(async () => {
+      const reautenticadoEn = await verificarReautenticacion(tokenReautenticacion, await ctx.auth.getUserIdentity());
+      return await ctx.runMutation(internal.interaccion.activarAlertaVerificada, { ...datos, reautenticadoEn });
+    }),
+});
+
+/** Privada: la titularidad y todas las escrituras se comprueban atómicamente. */
+export const activarAlertaVerificada = internalMutation({
+  args: { ...datosAlerta, reautenticadoEn: v.number() },
   handler: (ctx, args) => conErroresPublicos(async () => {
     const docente = await exigirTitularDelCurso(ctx, args.cursoId);
     exigirAlcanceCoherente(args.alcance, args.estudianteId);
@@ -624,7 +654,7 @@ export const activarAlerta = mutation({
     const ahora = Date.now();
     // Una reautenticación de hace media hora no sirve: la gracia es que la
     // persona demuestre que es ella *en el momento* de activar la alerta.
-    if (args.reautenticadoEn > ahora || ahora - args.reautenticadoEn > 5 * MINUTO) {
+    if (!Number.isFinite(args.reautenticadoEn) || args.reautenticadoEn > ahora || ahora - args.reautenticadoEn > 5 * MINUTO) {
       throw new ErrorDominio(
         "REAUTENTICACION_REQUERIDA",
         "Vuelve a confirmar tu identidad para activar una alerta.",

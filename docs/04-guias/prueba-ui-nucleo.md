@@ -26,8 +26,9 @@ usando el mismo documento.
 
 ## Validación realizada
 
-- TypeScript del cliente y Convex sin errores; 125 pruebas automatizadas,
-  incluidas ocho de componentes para consentimiento, reintentos y auditoría.
+- TypeScript del cliente y Convex sin errores; 161 pruebas automatizadas,
+  incluidas ocho de componentes para consentimiento, reintentos y auditoría,
+  y ocho sobre el contenido del aviso y la exclusión de notas internas.
 - Bundle Android generado mediante `expo export --platform android`.
 - Recorrido completo en navegador con viewport Pixel 7, autenticación real
   de Clerk de desarrollo y Convex de desarrollo: perfil con ambos roles,
@@ -66,3 +67,6 @@ El texto de consentimiento y el aviso se copian de los borradores en
 pantalla lo indica antes de aceptar. Esta entrega tampoco incorpora pagos,
 notificaciones ni seguimiento de conducta. No cierra por sí sola los issues
 que incluyan esas capacidades.
+
+El aviso mostrado excluye la sección «Notas internas». Una prueba lo compara
+con la parte pública del documento para detectar desincronizaciones.

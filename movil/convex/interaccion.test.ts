@@ -3,11 +3,12 @@
 
 import { convexTest } from "convex-test";
 import { ConvexError } from "convex/values";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { api } from "./_generated/api";
+import { api, internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import schema from "./schema";
+import { exportJWK, generateKeyPair, SignJWT } from "jose";
 
 const modules = import.meta.glob(["./interaccion.ts", "./_generated/*.js"]);
 
@@ -81,7 +82,7 @@ async function sembrarEscenario(t: ReturnType<typeof convexTest>) {
 
   return {
     ...ids,
-    docente: t.withIdentity({ subject: "docente_1" }),
+    docente: t.withIdentity({ subject: "docente_1", sid: "sesion_docente" }),
     representante: t.withIdentity({ subject: "rep_1" }),
   };
 }
@@ -224,7 +225,7 @@ describe("interaccion — citas", () => {
     const suyos = await e.representante.query(api.interaccion.bloquesDisponibles, {
       estudianteId: e.estudianteId, desde: "2026-09-01",
     });
-    expect(suyos).toHaveLength(1);
+    expect(suyos).toHaveLength(2);
     expect(suyos[0].duracionMinutos).toBe(15);
   });
 
@@ -399,7 +400,7 @@ describe("interaccion — alertas de emergencia", () => {
     const e = await sembrarEscenario(t);
 
     await expect(
-      e.docente.mutation(api.interaccion.activarAlerta, {
+      e.docente.mutation(internal.interaccion.activarAlertaVerificada, {
         cursoId: e.cursoId, alcance: "CURSO", tipo: "EVACUACION",
         titulo: "Evacuación", mensaje: "Vengan por sus hijos",
         esSimulacro: false,
@@ -413,7 +414,7 @@ describe("interaccion — alertas de emergencia", () => {
     const e = await sembrarEscenario(t);
 
     await expect(
-      e.docente.mutation(api.interaccion.activarAlerta, {
+      e.docente.mutation(internal.interaccion.activarAlertaVerificada, {
         cursoId: e.cursoId, alcance: "CURSO", tipo: "SIMULACRO",
         titulo: "Simulacro", mensaje: "Es una práctica",
         esSimulacro: false, reautenticadoEn: AHORA.getTime(),
@@ -426,7 +427,7 @@ describe("interaccion — alertas de emergencia", () => {
     const e = await sembrarEscenario(t);
 
     await expect(
-      e.docente.mutation(api.interaccion.activarAlerta, {
+      e.docente.mutation(internal.interaccion.activarAlertaVerificada, {
         cursoId: e.cursoId, alcance: "CURSO", estudianteId: e.estudianteId,
         tipo: "ACCIDENTE", titulo: "Accidente", mensaje: "Vengan",
         esSimulacro: false, reautenticadoEn: AHORA.getTime(),
@@ -438,7 +439,7 @@ describe("interaccion — alertas de emergencia", () => {
     const t = convexTest(schema, modules);
     const e = await sembrarEscenario(t);
 
-    const r = await e.docente.mutation(api.interaccion.activarAlerta, {
+    const r = await e.docente.mutation(internal.interaccion.activarAlertaVerificada, {
       cursoId: e.cursoId, alcance: "CURSO", tipo: "SUSPENSION_CLASES",
       titulo: "Se suspenden las clases", mensaje: "No hay agua en el plantel",
       esSimulacro: false, reautenticadoEn: AHORA.getTime(),
@@ -458,7 +459,7 @@ describe("interaccion — alertas de emergencia", () => {
   it("el representante confirma la lectura y no puede confirmar la de otro", async () => {
     const t = convexTest(schema, modules);
     const e = await sembrarEscenario(t);
-    await e.docente.mutation(api.interaccion.activarAlerta, {
+    await e.docente.mutation(internal.interaccion.activarAlertaVerificada, {
       cursoId: e.cursoId, alcance: "CURSO", tipo: "RETIRO_ANTICIPADO",
       titulo: "Salida anticipada", mensaje: "Hoy salen a las 11:00",
       esSimulacro: false, reautenticadoEn: AHORA.getTime(),
@@ -578,5 +579,102 @@ describe("interaccion — los errores llegan utiles a la pantalla", () => {
     expect((error as ConvexError<{ codigo: string }>).data).toMatchObject({
       codigo: "NO_AUTENTICADO",
     });
+  });
+});
+
+
+describe("interaccion — franjas de quince minutos", () => {
+  it("reserva dos citas consecutivas y rechazar una solo libera su tramo", async () => {
+    const t = convexTest(schema, modules);
+    const e = await sembrarEscenario(t);
+    const primerId = await e.docente.mutation(api.interaccion.publicarDisponibilidad, {
+      cursoId: e.cursoId, fecha: "2026-09-10", horaInicio: "12:30", horaFin: "13:00",
+      modalidad: "VIRTUAL", lugarOEnlace: "https://example.com/reunion",
+    });
+    const consultar = () => e.representante.query(api.interaccion.bloquesDisponibles, {
+      estudianteId: e.estudianteId, desde: "2026-09-10",
+    });
+    const bloques = await consultar();
+    expect(bloques.map(b => [b.horaInicio, b.horaFin])).toEqual([["12:30", "12:45"], ["12:45", "13:00"]]);
+    expect(bloques[0].id).toBe(primerId);
+    for (const b of bloques) expect(b).toMatchObject({ modalidad: "VIRTUAL", lugarOEnlace: "https://example.com/reunion" });
+    const primera = await e.representante.mutation(api.interaccion.solicitarCita, {
+      estudianteId: e.estudianteId, disponibilidadDocenteId: bloques[0].id,
+    });
+    expect((await consultar()).map(b => b.id)).toEqual([bloques[1].id]);
+    await e.representante.mutation(api.interaccion.solicitarCita, {
+      estudianteId: e.estudianteId, disponibilidadDocenteId: bloques[1].id,
+    });
+    expect(await consultar()).toEqual([]);
+    const citas = await e.docente.query(api.interaccion.misCitasDocente, {});
+    expect(citas.map(c => c.fechaHoraFin - c.fechaHoraInicio)).toEqual([900000, 900000]);
+    await e.docente.mutation(api.interaccion.responderCita, { citaId: primera, aceptar: false });
+    expect((await consultar()).map(b => b.id)).toEqual([bloques[0].id]);
+  });
+
+  it("no deja bloques parciales cuando una franja se solapa", async () => {
+    const t = convexTest(schema, modules);
+    const e = await sembrarEscenario(t);
+    await e.docente.mutation(api.interaccion.publicarDisponibilidad, { fecha: "2026-09-10", horaInicio: "12:45", horaFin: "13:00" });
+    await expect(e.docente.mutation(api.interaccion.publicarDisponibilidad, {
+      fecha: "2026-09-10", horaInicio: "12:30", horaFin: "13:15",
+    })).rejects.toThrow("se cruza");
+    expect(await t.run(ctx => ctx.db.query("disponibilidadDocente").collect())).toHaveLength(1);
+  });
+
+  it.each([
+    { fecha: "2026-09-10", horaInicio: "12:30", horaFin: "12:40" },
+    { fecha: "2026-09-10", horaInicio: "12:30", horaFin: "12:50" },
+    { fecha: "2026-09-31", horaInicio: "12:30", horaFin: "13:00" },
+  ])("rechaza la franja inválida $fecha $horaInicio–$horaFin sin escribir", async args => {
+    const t = convexTest(schema, modules);
+    const e = await sembrarEscenario(t);
+    await expect(e.docente.mutation(api.interaccion.publicarDisponibilidad, args)).rejects.toThrow();
+    expect(await t.run(ctx => ctx.db.query("disponibilidadDocente").collect())).toEqual([]);
+  });
+});
+
+describe("interaccion — frontera pública de alertas", () => {
+  let claves: Awaited<ReturnType<typeof generateKeyPair>>;
+  beforeAll(async () => { claves = await generateKeyPair("RS256"); });
+  beforeEach(async () => {
+    vi.stubEnv("CLERK_JWT_ISSUER_DOMAIN", "https://convex.test");
+    const jwk = { ...await exportJWK(claves.publicKey), kid: "alertas", alg: "RS256", use: "sig" };
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ keys: [jwk] }), { status: 200 })));
+  });
+  afterEach(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs(); });
+  async function prueba(edad = 0, sub = "docente_1", sid = "sesion_docente") {
+    return await new SignJWT({ sid, fva: [edad, -1] }).setProtectedHeader({ alg: "RS256", kid: "alertas" })
+      .setIssuer("https://convex.test").setSubject(sub).setIssuedAt(AHORA.getTime() / 1000)
+      .setExpirationTime(AHORA.getTime() / 1000 + 60).sign(claves.privateKey);
+  }
+  const datos = { alcance: "CURSO" as const, tipo: "EVACUACION" as const, titulo: "Evacuación", mensaje: "Estamos en el patio", esSimulacro: false };
+
+  it("persiste solo la fecha calculada desde la prueba firmada", async () => {
+    const t = convexTest(schema, modules);
+    const e = await sembrarEscenario(t);
+    const r = await e.docente.action(api.interaccion.activarAlerta, { ...datos, cursoId: e.cursoId, tokenReautenticacion: await prueba() });
+    expect(r.entregas).toBe(1);
+    const alerta = await t.run(ctx => ctx.db.get(r.id));
+    expect(alerta?.reautenticadoEn).toBe(AHORA.getTime() - 60_000);
+    expect(alerta).not.toHaveProperty("tokenReautenticacion");
+  });
+
+  it("rechaza la prueba vieja sin crear alertas, entregas ni notificaciones", async () => {
+    const t = convexTest(schema, modules);
+    const e = await sembrarEscenario(t);
+    await expect(e.docente.action(api.interaccion.activarAlerta, { ...datos, cursoId: e.cursoId, tokenReautenticacion: await prueba(30) }))
+      .rejects.toThrow("Vuelve a confirmar");
+    expect(await t.run(async ctx => [await ctx.db.query("alertaEmergencia").collect(), await ctx.db.query("entregaAlerta").collect(), await ctx.db.query("notificacion").collect()]))
+      .toEqual([[], [], []]);
+  });
+
+  it("la reautenticación no concede titularidad del curso", async () => {
+    const t = convexTest(schema, modules);
+    const e = await sembrarEscenario(t);
+    const rep = t.withIdentity({ subject: "rep_1", sid: "sesion_rep" });
+    await expect(rep.action(api.interaccion.activarAlerta, { ...datos, cursoId: e.cursoId, tokenReautenticacion: await prueba(0, "rep_1", "sesion_rep") }))
+      .rejects.toThrow();
+    expect(await t.run(ctx => ctx.db.query("alertaEmergencia").collect())).toEqual([]);
   });
 });
