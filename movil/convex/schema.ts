@@ -123,7 +123,7 @@ export default defineSchema({
    * ux_perfil_documento → índice `por_documento`, unicidad en la mutation
    */
   perfilUsuario: defineTable({
-    /** El `subject` del JWT de Clerk. Ver `viewer.ts`. */
+    /** tokenIdentifier (emisor + subject); admite subject legado del emisor configurado. */
     authSubject: v.string(),
     tipoDocumento: enumDe(TIPO_DOCUMENTO),
     numeroDocumento: v.string(),
@@ -302,6 +302,9 @@ export default defineSchema({
     estudianteId: v.id("estudiante"),
     parentesco: enumDe(PARENTESCO),
     invitacionCursoId: v.optional(v.id("invitacionCurso")),
+    /** Clave del formulario y huella normalizada para reintentos de registro. */
+    solicitudId: v.optional(v.string()),
+    huellaSolicitud: v.optional(v.string()),
     estado: enumDe(ESTADO_VINCULO),
     vigenteDesde: v.string(),
     vigenteHasta: v.optional(v.string()),
@@ -309,6 +312,7 @@ export default defineSchema({
     ...actualizadoEn,
   })
     .index("por_representante_estudiante", ["representanteId", "estudianteId"]) // ux_vinculo
+    .index("por_representante_solicitud", ["representanteId", "solicitudId"])
     // ux_vinculo_estudiante_unico: uno solo ACTIVO por estudiante
     .index("por_estudiante_estado", ["estudianteId", "estado"])
     .index("por_representante_estado", ["representanteId", "estado"]),

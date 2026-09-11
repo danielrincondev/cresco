@@ -27,7 +27,7 @@ const periodosValidos = [
 async function sembrarDocente(t: ReturnType<typeof convexTest>, subject = "docente_1") {
   const ids = await t.run(async (ctx) => {
     const perfilUsuarioId = await ctx.db.insert("perfilUsuario", {
-      authSubject: subject,
+      authSubject: `https://convex.test|${subject}`,
       tipoDocumento: "CEDULA",
       numeroDocumento: `090000000${subject.at(-1) ?? "1"}`,
       actualizadoEn: Date.now(),

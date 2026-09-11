@@ -7,7 +7,19 @@ import { ErrorPermiso } from "./lib/permisos";
 import schema from "./schema";
 
 const modules = import.meta.glob(["./conducta.ts", "./nucleo.ts", "./semillas.ts", "./_generated/*.js"]);
-beforeEach(() => vi.useFakeTimers().setSystemTime(new Date("2026-09-10T02:00:00Z")));
+/**
+ * convex-test firma las identidades con el emisor `https://convex.test`, y
+ * desde el PR #42 `perfilActual` las resuelve por `tokenIdentifier` -- emisor
+ * + subject --, con respaldo al subject a secas solo para el emisor que
+ * declare `CLERK_JWT_ISSUER_DOMAIN`. Declararlo aqui hace que sembrar por
+ * `authSubject` siga funcionando, sin que la prueba fije el formato interno de
+ * la identidad, que no es asunto suyo.
+ */
+beforeEach(() => {
+  vi.useFakeTimers().setSystemTime(new Date("2026-09-10T02:00:00Z"));
+  vi.stubEnv("CLERK_JWT_ISSUER_DOMAIN", "https://convex.test");
+});
+afterEach(() => vi.unstubAllEnvs());
 afterEach(() => vi.useRealTimers());
 async function fixture() {
   const t = convexTest(schema, modules);
