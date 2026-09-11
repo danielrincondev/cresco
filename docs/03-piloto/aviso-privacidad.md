@@ -79,9 +79,9 @@ acción sensible sobre la información de un estudiante y cuándo.
 
 ## 4. Qué NO recogemos
 
-- **No almacenamos archivos ni fotografías**, de ninguna clase. Si el docente
-  carga una lista de estudiantes desde un archivo, ese archivo **se procesa y
-  se descarta**; nunca se guarda.
+- **No almacenamos archivos ni fotografías**, de ninguna clase. La aplicación
+  no permite subir archivos: los estudiantes se registran escribiendo sus
+  datos, no cargando listas.
 - **No recogemos calificaciones académicas.** El puntaje de conducta de Cresco
   no forma parte del expediente académico ni modifica ninguna nota.
 - No recogemos ubicación, contactos, ni contenido de otras aplicaciones.
