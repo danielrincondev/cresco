@@ -2,7 +2,11 @@
 
 import { describe, expect, it } from "vitest";
 
-import { avisoPrivacidad, textoConsentimiento } from "./consentimiento";
+import {
+  avisoPrivacidad,
+  textoConsentimiento,
+  versionConsentimiento,
+} from "./consentimiento";
 
 // Los documentos entran como texto en tiempo de compilación (`?raw`) y no con
 // `node:fs`: el tsconfig de la app no trae los tipos de Node, y añadírselos
@@ -76,15 +80,29 @@ describe("aviso de privacidad — lo que ve el representante", () => {
    * del aviso promete que no pasa.
    */
   it("coincide palabra por palabra con docs/03-piloto/aviso-privacidad.md", () => {
-    const publico = soloLF(avisoDoc)
+    const doc = soloLF(avisoDoc);
+    const titulo = doc.split("\n")[0].trim();
+    // Del título salta directo a la sección 1: lo de en medio es la cabecera
+    // del equipo. Y corta antes de las notas internas del final.
+    const cuerpo = doc
+      .slice(doc.indexOf("\n## 1. "))
       .split("\n## Notas internas")[0]
       .replace(/\n-{3,}\s*$/, "")
       .trim();
-    expect(soloLF(avisoPrivacidad).trim()).toBe(publico);
+    // La línea en blanco entre el título y la sección 1 se conserva: es lo que
+    // hace que `parrafosLegibles` los pinte como dos párrafos y no como uno.
+    expect(soloLF(avisoPrivacidad).trim()).toBe(`${titulo}\n\n${cuerpo}`);
   });
 
+  /**
+   * La versión ya no viaja dentro del texto del aviso: vivía en la cabecera
+   * del equipo, que es justo lo que se quitó. Ahora la fuente es
+   * `versionConsentimiento`, y la pantalla de consentimiento se la muestra a
+   * la persona por separado. Lo que esta prueba cuida es que esa constante y
+   * los dos documentos no se separen.
+   */
   it("declara la misma versión que los documentos", () => {
-    expect(avisoPrivacidad).toContain(VERSION);
+    expect(versionConsentimiento).toBe(VERSION);
     expect(avisoDoc).toContain(VERSION);
     expect(consentimientoDoc).toContain(VERSION);
   });

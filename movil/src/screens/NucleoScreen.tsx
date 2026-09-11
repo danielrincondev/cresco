@@ -42,6 +42,16 @@ import {
   useOperacion,
 } from "../components/NucleoUI";
 import {
+  AgendaDocente,
+  Ajustes,
+  AlertaDocente,
+  AlertasFamilia,
+  CitasFamilia,
+  Notificaciones,
+  ReclamosDocente,
+} from "./InteraccionScreen";
+import { parrafosLegibles } from "../lib/texto";
+import {
   avisoPrivacidad,
   textoConsentimiento,
   versionConsentimiento,
@@ -64,8 +74,11 @@ type Alumno = FunctionReturnType<
 type Perfil = NonNullable<FunctionReturnType<typeof api.nucleo.obtenerPerfil>>;
 type Invitacion = FunctionReturnType<typeof api.nucleo.crearInvitacion>;
 type Ruta =
-  | { tipo: "inicio" | "perfil" | "crearCurso" | "registro" }
-  | { tipo: "curso" | "periodos"; curso: Curso }
+  | { tipo: "inicio" | "perfil" | "registro" | "crearCurso" }
+  // Interaccion (#33). Las de familia no llevan curso: el permiso sale del
+  // vinculo del representante, no de un curso que la pantalla elija.
+  | { tipo: "notificaciones" | "citas" | "alertas" | "ajustes" }
+  | { tipo: "curso" | "periodos" | "reclamos" | "agenda" | "alerta"; curso: Curso }
   | { tipo: "invitacion"; invitacion: Invitacion; curso: Curso }
   | { tipo: "aprobar"; curso: Curso; alumno: Alumno };
 
@@ -132,14 +145,32 @@ export function NucleoScreen() {
           </Text>
         </View>
         {perfil && ruta.tipo === "inicio" && (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Mi perfil y roles"
-            onPress={() => setRuta({ tipo: "perfil" })}
-            style={styles.iconButton}
-          >
-            <Icono nombre="account" decorativo />
-          </Pressable>
+          <>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Novedades"
+              onPress={() => setRuta({ tipo: "notificaciones" })}
+              style={styles.iconButton}
+            >
+              <Icono nombre="bell" decorativo />
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Mi perfil y roles"
+              onPress={() => setRuta({ tipo: "perfil" })}
+              style={styles.iconButton}
+            >
+              <Icono nombre="account" decorativo />
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Ajustes"
+              onPress={() => setRuta({ tipo: "ajustes" })}
+              style={styles.iconButton}
+            >
+              <Icono nombre="cog" decorativo />
+            </Pressable>
+          </>
         )}
         <Pressable
           accessibilityRole="button"
@@ -178,6 +209,20 @@ export function NucleoScreen() {
           />
         ) : ruta.tipo === "registro" ? (
           <RegistroForm perfil={perfil} onGuardar={volver} />
+        ) : ruta.tipo === "notificaciones" ? (
+          <Notificaciones />
+        ) : ruta.tipo === "ajustes" ? (
+          <Ajustes />
+        ) : ruta.tipo === "reclamos" ? (
+          <ReclamosDocente />
+        ) : ruta.tipo === "agenda" ? (
+          <AgendaDocente curso={ruta.curso} />
+        ) : ruta.tipo === "alerta" ? (
+          <AlertaDocente curso={ruta.curso} />
+        ) : ruta.tipo === "citas" ? (
+          <CitasFamilia />
+        ) : ruta.tipo === "alertas" ? (
+          <AlertasFamilia />
         ) : (
           <>
             {perfil.docenteId && perfil.representanteId && (
@@ -198,6 +243,7 @@ export function NucleoScreen() {
               <MisHijos
                 nombre={user?.firstName ?? ""}
                 registrar={() => setRuta({ tipo: "registro" })}
+                navegar={setRuta}
               />
             )}
           </>
@@ -357,8 +403,15 @@ function Cursos({
           </Boton>
         ) : (
           <Aviso>
-            Has alcanzado los {datos.limitePlan} cursos de tu plan. La opción
-            para ampliar el plan estará disponible próximamente.
+            {/*
+              El plan gratuito permite 1 curso, y "los 1 cursos de tu plan" es
+              justo lo que se lee en un telefono real. El singular se trata
+              aparte en vez de dejar una plantilla que solo funciona en plural.
+            */}
+            {datos.limitePlan === 1
+              ? "Tu plan incluye un curso y ya lo estás usando."
+              : `Has alcanzado los ${datos.limitePlan} cursos de tu plan.`}{" "}
+            La opción para ampliar el plan estará disponible próximamente.
           </Aviso>
         ))}
     </Pagina>
@@ -485,6 +538,15 @@ function DetalleCurso({
         Invitar representantes
       </Boton>
       <ErrorMensaje mensaje={op.error} />
+      <Boton secundario onPress={() => navegar({ tipo: "reclamos", curso })}>
+        Reclamos de las familias
+      </Boton>
+      <Boton secundario onPress={() => navegar({ tipo: "agenda", curso })}>
+        Atención a familias
+      </Boton>
+      <Boton secundario onPress={() => navegar({ tipo: "alerta", curso })}>
+        Alerta de emergencia
+      </Boton>
       <Opciones
         valor={pestana}
         opciones={[
@@ -833,9 +895,11 @@ function AprobarForm({
 function MisHijos({
   nombre,
   registrar,
+  navegar,
 }: {
   nombre: string;
   registrar: () => void;
+  navegar: (ruta: Ruta) => void;
 }) {
   const { results, status, loadMore } = usePaginatedQuery(
     api.nucleo.listarMisEstudiantes,
@@ -888,6 +952,12 @@ function MisHijos({
       )}
       <Mas status={status} cargar={() => loadMore(20)} />
       <Boton onPress={registrar}>Registrar a mi hijo</Boton>
+      <Boton secundario onPress={() => navegar({ tipo: "citas" })}>
+        Pedir una cita
+      </Boton>
+      <Boton secundario onPress={() => navegar({ tipo: "alertas" })}>
+        Alertas del curso
+      </Boton>
     </Pagina>
   );
 }
@@ -1190,16 +1260,15 @@ function RegistroForm({
 function TextoDocumento({ texto }: { texto: string }) {
   return (
     <>
-      {texto.split(/\n\s*\n/).map((p, i) => (
-        <Cuerpo key={i}>
-          {p
-            .replace(/^#+\s*/gm, "")
-            .replace(/^>\s?/gm, "")
-            .replaceAll("**", "")
-            .replaceAll("`", "")
-            .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
-            .replace(/\n/g, " ")}
-        </Cuerpo>
+      {/*
+        La limpieza vive en `lib/texto.ts`, con pruebas sobre el documento
+        real. Lo que había aquí quitaba negritas y títulos pero dejaba las
+        tuberías de las tablas: las secciones 5, 6 y 7 del aviso —quién ve los
+        datos, qué proveedores participan, qué derechos hay— son justamente
+        tablas, y son las que más se consultan.
+      */}
+      {parrafosLegibles(texto).map((p, i) => (
+        <Cuerpo key={i}>{p}</Cuerpo>
       ))}
     </>
   );
