@@ -72,6 +72,8 @@ import { Boton, Campo, Casilla, Opciones } from "../components/NucleoUI";
 
 const perfil = {
   perfilUsuarioId: "perfil" as NonNullable<Perfil>["perfilUsuarioId"],
+  nombres: "Kenny",
+  apellidos: "Chung",
   docenteId: null,
   representanteId: "representante" as NonNullable<Perfil>["representanteId"],
 };

@@ -194,6 +194,60 @@ export const publicarDisponibilidad = mutation({
  * vínculo real. Si recibiera `docenteId`, cualquier usuario autenticado
  * podría listar el horario de cualquier docente del sistema.
  */
+/**
+ * P9: quien es el docente a cargo del hijo, con nombre y datos de contacto.
+ *
+ * Recorre el mismo camino que `bloquesDisponibles` -- estudiante, matricula
+ * CURSANDO, asignacion TITULAR vigente -- y por la misma razon empieza por
+ * `exigirVinculo`: sin eso, cualquier representante podria consultar los datos
+ * de contacto de cualquier docente del sistema pasando un `estudianteId` ajeno.
+ *
+ * Devuelve `null` cuando no hay titular asignado, que es un estado normal al
+ * principio del año lectivo y no un error que valga la pena mostrarle a nadie.
+ */
+export const docenteACargo = query({
+  args: { estudianteId: v.id("estudiante") },
+  handler: (ctx, args) => conErroresPublicos(async () => {
+    await exigirVinculo(ctx, args.estudianteId);
+
+    const matricula = await ctx.db
+      .query("matricula")
+      .withIndex("por_estudiante_estado", (q) =>
+        q.eq("estudianteId", args.estudianteId).eq("estado", "CURSANDO"),
+      )
+      .unique();
+    if (matricula === null) return null;
+
+    const titulares = await ctx.db
+      .query("asignacionDocente")
+      .withIndex("por_curso_rol", (q) => q.eq("cursoId", matricula.cursoId).eq("rol", "TITULAR"))
+      .collect();
+    const titular = titulares.find((t) => t.vigenteHasta === undefined);
+    if (titular === undefined) return null;
+
+    const docente = await ctx.db.get(titular.docenteId);
+    if (docente === null) return null;
+    const perfil = await ctx.db.get(docente.perfilUsuarioId);
+    const curso = await ctx.db.get(matricula.cursoId);
+
+    return {
+      docenteId: docente._id,
+      // Se entrega el nombre ya compuesto: la pantalla no tiene por que saber
+      // en que orden se escriben los apellidos aqui, y un perfil anterior a
+      // #52 todavia puede no tener ninguno de los dos.
+      nombre:
+        perfil && (perfil.nombres || perfil.apellidos)
+          ? `${perfil.nombres ?? ""} ${perfil.apellidos ?? ""}`.trim()
+          : null,
+      curso: curso?.nombre ?? null,
+      tituloProfesional: docente.tituloProfesional ?? null,
+      correoContacto: docente.correoContacto ?? null,
+      telefonoContacto: docente.telefonoContacto ?? null,
+      horarioAtencion: docente.horarioAtencion ?? null,
+    };
+  }),
+});
+
 export const bloquesDisponibles = query({
   args: { estudianteId: v.id("estudiante"), desde: v.string() },
   handler: (ctx, args) => conErroresPublicos(async () => {
