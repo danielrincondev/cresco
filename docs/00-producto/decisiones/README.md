@@ -24,6 +24,7 @@ a `docs/99-archivo/`.
 | 010 | Cresco es el canal de comunicación, no un mecanismo de control sobre la familia | Aceptada |
 | 011 | Iconografía: MaterialCommunityIcons con pares de contorno | Aceptada |
 | 012 | El rol de interfaz se disuelve: D pasa a producto y entrega | Aceptada |
+| 013 | Importar la lista del curso por CSV (D9) se difiere a la v2 | Propuesta |
 
 Cuándo escribir una DP nueva en vez de editar el código o un ADR: cuando la
 decisión es de **producto o negocio** (qué construye la app, para quién, con
