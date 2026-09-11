@@ -10,6 +10,8 @@
  */
 
 import { internalMutation } from "./_generated/server";
+import { internal } from "./_generated/api";
+import { v } from "convex/values";
 
 /**
  * Copia `docenteId` a los reclamos que se crearon antes de que ese campo
@@ -20,16 +22,21 @@ import { internalMutation } from "./_generated/server";
  * sin el campo no esta en ese indice. Por eso esto se corre inmediatamente
  * despues de desplegar el esquema, no "cuando haya tiempo".
  *
- * Devuelve el conteo para poder comprobar que quedo en cero al repetirla.
+ * Procesa lotes de 100 y programa el siguiente dentro de la misma transacción.
+ * Devuelve y registra los conteos de cada lote; la última ejecución informa
+ * `continuacionProgramada: false`. Se inicia sin argumentos de cursor.
  */
 export const rellenarDocenteEnInconformidades = internalMutation({
-  args: {},
-  handler: async (ctx) => {
-    const todas = await ctx.db.query("inconformidad").collect();
+  args: { cursor: v.optional(v.string()) },
+  handler: async (ctx, args): Promise<{
+    revisadas: number; rellenadas: number; huerfanas: number; continuacionProgramada: boolean;
+  }> => {
+    const lote = await ctx.db.query("inconformidad")
+      .paginate({ cursor: args.cursor ?? null, numItems: 100 });
 
     let rellenadas = 0;
     let huerfanas = 0;
-    for (const inconformidad of todas) {
+    for (const inconformidad of lote.page) {
       if (inconformidad.docenteId !== undefined) continue;
 
       const accion = await ctx.db.get(inconformidad.accionRegistradaId);
@@ -45,6 +52,15 @@ export const rellenarDocenteEnInconformidades = internalMutation({
       rellenadas += 1;
     }
 
-    return { revisadas: todas.length, rellenadas, huerfanas };
+    if (!lote.isDone) {
+      await ctx.scheduler.runAfter(0, internal.migraciones.rellenarDocenteEnInconformidades, {
+        cursor: lote.continueCursor,
+      });
+    }
+    const resultado = {
+      revisadas: lote.page.length, rellenadas, huerfanas, continuacionProgramada: !lote.isDone,
+    };
+    console.info("[migracion docente en inconformidades]", resultado);
+    return resultado;
   },
 });

@@ -502,7 +502,7 @@ export const inconformidadesDelDocente = query({
     const mias = [];
     for (const i of enCurso) {
       const accion = await ctx.db.get(i.accionRegistradaId);
-      if (accion === null) continue;
+      if (accion === null || accion.registradaPorDocenteId !== docente._id) continue;
       mias.push({
         id: i._id,
         motivo: i.motivo,

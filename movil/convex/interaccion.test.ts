@@ -680,6 +680,53 @@ describe("interaccion — frontera pública de alertas", () => {
 });
 
 describe("interaccion — la bandeja del docente se lee por indice (#48)", () => {
+  it("migra varios lotes, tolera huérfanos y puede repetirse", async () => {
+    const t = convexTest(schema, modules);
+    const e = await sembrarEscenario(t);
+    const accionRegistradaId = await sembrarAccion(t, e);
+    const accionHuerfana = await sembrarAccion(t, e);
+    await t.run(async (ctx) => {
+      for (let i = 0; i < 205; i++) {
+        await ctx.db.insert("inconformidad", {
+          accionRegistradaId: i === 110 ? accionHuerfana : accionRegistradaId,
+          representanteId: e.representanteId, motivo: "NO_OCURRIO", mensaje: `Reclamo ${i}`,
+          estado: "ABIERTA", venceEn: Date.now() + 86_400_000, actualizadoEn: Date.now(),
+        });
+      }
+      await ctx.db.delete(accionHuerfana);
+    });
+    expect(await t.mutation(internal.migraciones.rellenarDocenteEnInconformidades, {}))
+      .toMatchObject({ revisadas: 100, continuacionProgramada: true });
+    await t.finishAllScheduledFunctions(vi.runAllTimers);
+    const antes = await t.run(ctx => ctx.db.query("inconformidad").collect());
+    expect(antes.filter(i => i.docenteId === e.docenteId)).toHaveLength(204);
+    expect(antes.filter(i => i.docenteId === undefined)).toHaveLength(1);
+    expect(await t.mutation(internal.migraciones.rellenarDocenteEnInconformidades, {}))
+      .toMatchObject({ rellenadas: 0 });
+    await t.finishAllScheduledFunctions(vi.runAllTimers);
+    expect(await t.run(ctx => ctx.db.query("inconformidad").collect())).toEqual(antes);
+  });
+
+  it("no expone una acción ajena aunque el docenteId copiado sea incorrecto", async () => {
+    const t = convexTest(schema, modules);
+    const e = await sembrarEscenario(t);
+    const accionRegistradaId = await sembrarAccion(t, e);
+    await t.run(async (ctx) => {
+      const perfilUsuarioId = await ctx.db.insert("perfilUsuario", {
+        authSubject: "https://convex.test|otro", tipoDocumento: "CEDULA",
+        numeroDocumento: "0900000009", actualizadoEn: Date.now(),
+      });
+      const docenteId = await ctx.db.insert("docente", { perfilUsuarioId, actualizadoEn: Date.now() });
+      await ctx.db.patch(accionRegistradaId, { registradaPorDocenteId: docenteId });
+      await ctx.db.insert("inconformidad", {
+        accionRegistradaId, docenteId: e.docenteId, representanteId: e.representanteId,
+        motivo: "NO_OCURRIO", mensaje: "Detalle ajeno", estado: "ABIERTA",
+        venceEn: Date.now() + 86_400_000, actualizadoEn: Date.now(),
+      });
+    });
+    expect(await e.docente.query(api.interaccion.inconformidadesDelDocente)).toEqual([]);
+  });
+
   /**
    * La consulta paso de recorrer todos los reclamos abiertos del sistema a
    * leer solo los suyos por `por_docente_estado`. El precio de esa mejora es
