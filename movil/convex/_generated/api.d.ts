@@ -15,6 +15,7 @@ import type * as lib_enums from "../lib/enums.js";
 import type * as lib_flags from "../lib/flags.js";
 import type * as lib_guardas from "../lib/guardas.js";
 import type * as lib_permisos from "../lib/permisos.js";
+import type * as lib_reautenticacion from "../lib/reautenticacion.js";
 import type * as lib_revenuecat from "../lib/revenuecat.js";
 import type * as nucleo from "../nucleo.js";
 import type * as semillas from "../semillas.js";
@@ -35,6 +36,7 @@ declare const fullApi: ApiFromModules<{
   "lib/flags": typeof lib_flags;
   "lib/guardas": typeof lib_guardas;
   "lib/permisos": typeof lib_permisos;
+  "lib/reautenticacion": typeof lib_reautenticacion;
   "lib/revenuecat": typeof lib_revenuecat;
   nucleo: typeof nucleo;
   semillas: typeof semillas;

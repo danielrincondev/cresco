@@ -15,15 +15,15 @@
  *
  * Los textos de estado y los formatos de fecha no están aquí sino en
  * `lib/estados.ts` y `lib/fechas.ts`, que sí tienen pruebas. Lo que queda en
- * este archivo es JSX y llamadas — lo que un `tsc` limpio ya cubre razonablemente
- * bien y lo que, sin biblioteca de pruebas de componentes en el proyecto, no
- * tendría cómo verificarse de otra forma.
+ * este archivo se verifica con pruebas de componentes, incluyendo errores
+ * de reautenticación, cambios durante el envío y páginas vacías.
  */
 
 import { useState } from "react";
 import { Linking, Modal, Pressable, StyleSheet, Text, View } from "react-native";
-import { useAuth, useClerk } from "@clerk/expo";
-import { useMutation, usePaginatedQuery, useQuery } from "convex/react";
+import { useClerk, useSession, useUser } from "@clerk/expo";
+import { ConvexError } from "convex/values";
+import { useAction, useMutation, usePaginatedQuery, useQuery } from "convex/react";
 import type { FunctionReturnType } from "convex/server";
 
 import { api } from "../../convex/_generated/api";
@@ -360,54 +360,55 @@ export function AgendaDocente({ curso }: { curso: Curso }) {
  * sección 10 del aviso de privacidad. Por eso el aviso está arriba del
  * formulario y no debajo del botón.
  *
- * G1 pide reautenticación antes de activar, y el servidor rechaza un
- * `reautenticadoEn` de hace más de cinco minutos. Lo que se hace aquí son dos
- * cosas: pedir un token fresco a Clerk sin caché —que prueba que la sesión
- * sigue viva en este instante, no que se revocó hace rato— y exigir que el
- * docente escriba la palabra de confirmación, que es lo que evita el disparo
- * accidental con el teléfono en el bolsillo.
- *
- * **Lo que todavía no hace: volver a pedir la contraseña.** `@clerk/expo`
- * exporta `useReverification`, pero está pensado para envolver llamadas a la
- * API de Clerk y no pude comprobar su comportamiento contra una instancia real
- * ni un teléfono. Cablearlo a ciegas para una función de emergencia sería peor
- * que dejarlo escrito: queda anotado en el PR y en el issue.
+ * G1: cada envío exige reingresar la contraseña mediante Clerk. El servidor
+ * verifica la firma, la sesión y la edad del factor del token resultante.
  */
 export function AlertaDocente({ curso }: { curso: Curso }) {
-  const { getToken } = useAuth();
-  const activar = useMutation(api.interaccion.activarAlerta);
+  const { session } = useSession();
+  const { user } = useUser();
+  const activar = useAction(api.interaccion.activarAlerta);
   const [tipo, setTipo] = useState<(typeof TIPO_ALERTA)[number]>("EVACUACION");
   const [titulo, setTitulo] = useState("");
   const [mensaje, setMensaje] = useState("");
   const [confirmacion, setConfirmacion] = useState("");
   const [entendido, setEntendido] = useState(false);
-  const [enviada, setEnviada] = useState<number>();
+  const [password, setPassword] = useState("");
+  const [enviada, setEnviada] = useState<{ entregas: number; esSimulacro: boolean }>();
   const op = useOperacion();
 
   const esSimulacro = tipo === "SIMULACRO";
   const palabra = esSimulacro ? "SIMULACRO" : "ENVIAR";
   const listo =
+    !!session && user?.passwordEnabled === true && password.length > 0 &&
     entendido &&
     confirmacion.trim().toUpperCase() === palabra &&
     titulo.trim().length > 0 &&
     mensaje.trim().length > 0;
 
   async function enviar() {
+    if (!listo || op.pendiente || !session) return;
+    const datos = { cursoId: curso.id, alcance: "CURSO" as const, tipo, titulo, mensaje, esSimulacro };
+    const clave = password;
+    setPassword("");
     const r = await op.ejecutar(async () => {
-      // Sin caché: si la sesión se revocó, esto falla antes de mandar nada.
-      await getToken({ skipCache: true });
-      return await activar({
-        cursoId: curso.id,
-        alcance: "CURSO",
-        tipo,
-        titulo,
-        mensaje,
-        esSimulacro,
-        reautenticadoEn: Date.now(),
-      });
+      const fallo = (mensaje: string) => new ConvexError({ codigo: "REAUTENTICACION_REQUERIDA", mensaje });
+      try {
+        const inicio = await session.startVerification({ level: "first_factor" });
+        if (!inicio.supportedFirstFactors?.some(f => f.strategy === "password")) {
+          throw fallo("Tu cuenta necesita una contraseña para activar alertas.");
+        }
+        const verificacion = await session.attemptFirstFactorVerification({ strategy: "password", password: clave });
+        if (verificacion.status !== "complete") throw fallo("No se completó la verificación de tu identidad.");
+      } catch (error) {
+        if (error instanceof ConvexError) throw error;
+        throw fallo("No pudimos verificar tu contraseña. Revísala y vuelve a intentarlo.");
+      }
+      const tokenReautenticacion = await session.getToken({ skipCache: true });
+      if (!tokenReautenticacion) throw fallo("Tu sesión ya no está disponible. Vuelve a iniciar sesión.");
+      return await activar({ ...datos, tokenReautenticacion });
     });
     if (r.ok) {
-      setEnviada(r.valor.entregas);
+      setEnviada({ entregas: r.valor.entregas, esSimulacro: datos.esSimulacro });
       setConfirmacion("");
       setEntendido(false);
     }
@@ -415,11 +416,13 @@ export function AlertaDocente({ curso }: { curso: Curso }) {
 
   if (enviada !== undefined) {
     return (
-      <Pagina titulo="Alerta enviada">
-        <EstadoVacio icono="bell-ring" titulo={`Llegó a ${enviada} familias`}>
-          {esSimulacro
-            ? "Se envió marcada como simulacro, para que nadie la confunda con una emergencia real."
-            : "Las familias del curso ya la recibieron y pueden confirmar que la leyeron."}
+      <Pagina titulo="Alerta publicada">
+        <EstadoVacio icono="bell-ring" titulo={enviada.entregas === 0 ? "Alerta publicada sin destinatarios" : "Disponible para las familias"}>
+          {enviada.entregas === 0
+            ? "Este curso no tiene familias vinculadas que puedan recibir este aviso."
+            : enviada.esSimulacro
+            ? "Se publicó marcada como simulacro. Esto no confirma que las familias la hayan recibido o leído."
+            : "La alerta está disponible en Cresco. Esto no confirma que las familias la hayan recibido o leído."}
         </EstadoVacio>
         <Boton secundario onPress={() => setEnviada(undefined)}>
           Volver
@@ -452,22 +455,25 @@ export function AlertaDocente({ curso }: { curso: Curso }) {
           valor: t,
           texto: t === "SIMULACRO" ? "Simulacro" : etiquetaAlerta(t, false).texto,
         }))}
+        disabled={op.pendiente}
         onChange={setTipo}
       />
       {esSimulacro && (
         <Aviso>
-          Va a llegar marcada como simulacro. Es a propósito: si una práctica se
+          Se publicará marcada como simulacro. Es a propósito: si una práctica se
           ve igual que una emergencia, las familias aprenden a ignorarlas.
         </Aviso>
       )}
 
       <Campo
+        editable={!op.pendiente}
         etiqueta="Título"
         value={titulo}
         onChangeText={setTitulo}
         placeholder="Evacuación por sismo"
       />
       <Campo
+        editable={!op.pendiente}
         etiqueta="Mensaje para las familias"
         multiline
         numberOfLines={4}
@@ -477,11 +483,13 @@ export function AlertaDocente({ curso }: { curso: Curso }) {
       />
 
       <Casilla
-        texto={`Confirmo que esto va a llegar a todas las familias del curso ${curso.nombre}.`}
+        disabled={op.pendiente}
+        texto={`Confirmo que quiero publicar este aviso para las familias del curso ${curso.nombre}.`}
         marcada={entendido}
         onChange={() => setEntendido(!entendido)}
       />
       <Campo
+        editable={!op.pendiente}
         etiqueta={`Escribe ${palabra} para confirmar`}
         ayuda="Es el paso que evita que se dispare sin querer."
         value={confirmacion}
@@ -489,6 +497,21 @@ export function AlertaDocente({ curso }: { curso: Curso }) {
         autoCapitalize="characters"
         autoCorrect={false}
       />
+      {user?.passwordEnabled ? (
+        <Campo
+          etiqueta="Confirma tu contraseña"
+          ayuda="Verificamos tu identidad antes de publicar cada alerta."
+          value={password}
+          onChangeText={setPassword}
+          secureTextEntry
+          autoCapitalize="none"
+          autoCorrect={false}
+          autoComplete="current-password"
+          editable={!op.pendiente}
+        />
+      ) : (
+        <Aviso>Tu cuenta necesita una contraseña para activar alertas. Si ingresaste con Google, configura primero una contraseña en tu cuenta.</Aviso>
+      )}
       <ErrorMensaje mensaje={op.error} />
       <Boton pendiente={op.pendiente} disabled={!listo} onPress={() => void enviar()}>
         {esSimulacro ? "Enviar simulacro" : "Enviar alerta al curso"}
@@ -502,7 +525,7 @@ export function AlertaDocente({ curso }: { curso: Curso }) {
  * ======================================================================= */
 
 export function CitasFamilia() {
-  const { results: hijos, status } = usePaginatedQuery(
+  const { results: hijos, status, loadMore } = usePaginatedQuery(
     api.nucleo.listarMisEstudiantes,
     {},
     { initialNumItems: 20 },
@@ -529,7 +552,7 @@ export function CitasFamilia() {
       <Subtitulo>Pedir una cita</Subtitulo>
       {status === "LoadingFirstPage" ? (
         <Cargando />
-      ) : hijos.length === 0 ? (
+      ) : hijos.length === 0 && status === "Exhausted" ? (
         <EstadoVacio icono="account-group" titulo="Todavía no tienes hijos registrados">
           Registra a tu hijo con el código del curso para poder pedir una cita.
         </EstadoVacio>
@@ -544,6 +567,12 @@ export function CitasFamilia() {
             </Boton>
           </Tarjeta>
         ))
+      )}
+
+      {(status === "CanLoadMore" || status === "LoadingMore") && (
+        <Boton secundario pendiente={status === "LoadingMore"} onPress={() => loadMore(20)}>
+          Ver más hijos
+        </Boton>
       )}
 
       <Subtitulo>Tus citas</Subtitulo>
