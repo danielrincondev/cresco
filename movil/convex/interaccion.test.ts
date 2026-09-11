@@ -709,14 +709,14 @@ async function sembrarSegundoDocente(
   const ids = await t.run(async (ctx) => {
     const ahora = Date.now();
     const perfilDocente = await ctx.db.insert("perfilUsuario", {
-      authSubject: "docente_2", tipoDocumento: "CEDULA", numeroDocumento: "0900000007",
+      authSubject: "https://convex.test|docente_2", tipoDocumento: "CEDULA", numeroDocumento: "0900000007",
       actualizadoEn: ahora,
     });
     const docenteId = await ctx.db.insert("docente", {
       perfilUsuarioId: perfilDocente, actualizadoEn: ahora,
     });
     const perfilRep = await ctx.db.insert("perfilUsuario", {
-      authSubject: "rep_2", tipoDocumento: "CEDULA", numeroDocumento: "0900000008",
+      authSubject: "https://convex.test|rep_2", tipoDocumento: "CEDULA", numeroDocumento: "0900000008",
       actualizadoEn: ahora,
     });
     const representanteId = await ctx.db.insert("representante", {
