@@ -23,13 +23,13 @@ y backend de Convex:
 | Webhook de RevenueCat (`convex/http.ts`) | Implementado, con pruebas (`npm test`) |
 | Sistema de diseño (`movil/src/theme/Theme.ts`) | Implementado: color, tipografía, espaciado, iconografía |
 | Integración continua (`.github/workflows/ci.yml`) | Implementado: tipos y 252 pruebas en cada PR |
-| Propiedad por módulo (`.github/CODEOWNERS`) | Implementado — falta activar branch protection en GitHub |
+| Propiedad por módulo (`.github/CODEOWNERS`) | Implementado: protección de `main` activa; exige CI y revisión |
 | Banderas de activación (`convex/lib/flags.ts`) | Implementado |
 | Bitwarden Secrets Manager | Estructura lista en `.env.schema`, **sin vault compartido configurado todavía** — ver más abajo |
 | `convex/nucleo.ts` | Implementado: perfiles, cursos, períodos, invitaciones, vinculación y aprobación |
-| `convex/interaccion.ts` | Implementado: citas, reclamos, alertas de emergencia, dispositivos y notificaciones |
+| `convex/interaccion.ts` | Implementado: citas, reclamos, alertas, dispositivos y bandeja. Push y recálculo tras resolver reclamos pendientes de integración |
 | `convex/conducta.ts` | Parcial: registrar acción con recálculo derivado. Asistencia, reportes y cierre nocturno en curso |
-| `convex/auditoria.ts` | Implementado: `LOGIN` y `LEER_SENSIBLE` (DP-006) |
+| `convex/auditoria.ts` | Productores implementados: `LOGIN` conectado; conexión de `LEER_SENSIBLE` a las pantallas en PR #62 |
 | Reautenticación antes de una alerta (`convex/lib/reautenticacion.ts`) | Implementado: verifica la firma de Clerk contra el JWKS y exige verificación reciente |
 | **Las 31 pantallas del producto** | **En construcción.** Hechas: alta de perfil, cursos y parciales, invitación y vinculación, consentimiento, aprobación de estudiantes, reclamos, agenda de citas, alerta de emergencia, notificaciones y ajustes |
 
@@ -42,7 +42,7 @@ Clerk + Convex.
 - `movil/src/App.tsx`: arranque de Expo, fuentes y estado de autenticación.
 - `movil/src/screens/`: las pantallas, agrupadas por módulo de backend.
 - `movil/src/components/`, `movil/src/theme/`: los componentes base y el sistema
-  de diseño. Ningún color suelto vive fuera de `Theme.ts`.
+  de diseño. Los colores deben salir de `Theme.ts`.
 - `movil/convex/auth.config.ts`: valida en Convex los JWT emitidos por Clerk.
 - `movil/convex/lib/`: reglas de dominio, guardas de integridad y permisos. Todo
   acceso a datos de un estudiante pasa por aquí, nunca por la pantalla.
@@ -50,10 +50,11 @@ Clerk + Convex.
 
 ### Dos cosas que conviene saber antes de leer el código
 
-**El puntaje de conducta nunca se incrementa** (ADR-005). Se deriva de las
-acciones vigentes del período con `calcularPuntaje(...)`. Por eso anular una
-anotación no "resta puntos": la acción deja de estar vigente y el total se
-vuelve a calcular. No hay ningún contador que pueda quedar desincronizado.
+**El puntaje de conducta se deriva de las acciones vigentes** (ADR-005). Al
+registrar una acción se recalcula y se guarda el resultado en `puntajePeriodo`.
+La resolución de un reclamo ya cambia el estado y los puntos de la acción,
+pero **todavía falta conectar el recálculo del período en ese flujo** (#9): el
+total guardado puede quedar desactualizado hasta que se recalcule.
 
 **El estudiante nunca es usuario.** No tiene cuenta ni puede iniciar sesión. Sus
 datos los aporta su representante legal o su docente, y quién puede leerlos se
