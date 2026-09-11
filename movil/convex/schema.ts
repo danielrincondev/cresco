@@ -636,6 +636,18 @@ export default defineSchema({
   inconformidad: defineTable({
     accionRegistradaId: v.id("accionRegistrada"),
     representanteId: v.id("representante"),
+    /**
+     * A quien le toca responder. Se puede deducir siguiendo
+     * `accionRegistradaId` hasta `accion.registradaPorDocenteId`, pero
+     * entonces la bandeja del docente no se puede indexar: habria que leer
+     * **todos** los reclamos abiertos del sistema y filtrarlos en memoria
+     * (issue #48). Se denormaliza para que `por_docente_estado` exista.
+     *
+     * Opcional solo por los reclamos creados antes de este campo; los nuevos
+     * siempre lo llevan. `migraciones.rellenarDocenteEnInconformidades` lo
+     * completa, y despues de correrla no deberia quedar ninguno sin el.
+     */
+    docenteId: v.optional(v.id("docente")),
     motivo: enumDe(MOTIVO_INCONFORMIDAD),
     mensaje: v.string(),
     estado: enumDe(ESTADO_INCONFORMIDAD),
@@ -647,7 +659,8 @@ export default defineSchema({
     ...actualizadoEn,
   })
     .index("por_accion_representante", ["accionRegistradaId", "representanteId"])
-    .index("por_estado_vence", ["estado", "venceEn"]),
+    .index("por_estado_vence", ["estado", "venceEn"])
+    .index("por_docente_estado", ["docenteId", "estado"]),
 
   /**
    * G1: exige reautenticación; `reautenticadoEn` deja constancia.
