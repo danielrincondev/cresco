@@ -60,6 +60,33 @@ describe("texto — sobre los documentos reales del piloto", () => {
     expect(texto).toContain("El propio estudiante · Nada");
   });
 
+  /**
+   * Se vio en el telefono: "...sobre su hijo o representado Su nombre,
+   * documento de identidad y curso". El subtitulo en negrita se pegaba al
+   * parrafo de abajo porque el documento no deja linea en blanco entre ellos.
+   * Es el texto que una madre lee antes de autorizar los datos de su hijo.
+   */
+  it("separa los subtitulos en negrita del parrafo que les sigue", () => {
+    const parrafos = parrafosLegibles(textoConsentimiento);
+    for (const subtitulo of [
+      "Qué información se va a guardar sobre su hijo o representado",
+      "Quién la puede ver",
+      "Lo que no hacemos",
+      "Lo que todavía no podemos hacer",
+      "Puede cambiar de opinión",
+    ]) {
+      // Cada uno es un parrafo por si mismo, no el arranque de otro mas largo.
+      expect(parrafos).toContain(subtitulo);
+    }
+  });
+
+  it("no deja frases pegadas al subtitulo anterior", () => {
+    const texto = unido(textoConsentimiento);
+    expect(texto).not.toContain("representado Su nombre");
+    expect(texto).not.toContain("Quién la puede ver Solo usted");
+    expect(texto).not.toContain("Lo que no hacemos No guardamos");
+  });
+
   it("el texto de consentimiento también, marcadores incluidos", () => {
     const texto = unido(textoConsentimiento);
     expect(texto).not.toContain("**");

@@ -51,6 +51,21 @@ const esFilaDeTabla = (linea: string) => linea.startsWith("|") && linea.endsWith
 const esSeparadorHorizontal = (linea: string) => /^-{3,}$/.test(linea);
 const MARCA_DE_LISTA = /^(?:[-*+]\s+|\d+\.\s+)/;
 
+/**
+ * Una línea **entera** en negrita es un subtítulo, no parte del párrafo.
+ *
+ * El texto de consentimiento los escribe así, sin línea en blanco debajo:
+ *
+ *     **Qué información se va a guardar sobre su hijo o representado**
+ *     Su nombre, documento de identidad y curso. Y, durante el año lectivo...
+ *
+ * Sin esta distinción quedaban pegados, y en el teléfono se leía «...sobre su
+ * hijo o representado Su nombre, documento de identidad y curso». Se vio así
+ * en la pantalla de consentimiento: justo el texto que una madre lee antes de
+ * autorizar el tratamiento de los datos de su hijo.
+ */
+const esSubtitulo = (linea: string) => /^\*\*[^*].*[^*]\*\*$/.test(linea);
+
 /** Deja la línea sin su decoración de estructura; el contenido no se toca. */
 function limpiarLinea(linea: string): string {
   const sinCita = linea.startsWith(">") ? linea.slice(1).trim() : linea;
@@ -92,6 +107,15 @@ export function parrafosLegibles(markdown: string): string[] {
       // al quitarle las almohadillas, y eso es indistinguible de un elemento
       // de lista numerada. Es un título; la numeración es parte del nombre.
       const eraTitulo = /^>?\s*#{1,6}\s/.test(linea);
+
+      // Un subtitulo en negrita cierra el parrafo anterior y va solo.
+      if (!eraTitulo && esSubtitulo(limpia)) {
+        cerrar();
+        const subtitulo = normalizar(limpia);
+        if (subtitulo.length > 0) parrafos.push(subtitulo);
+        continue;
+      }
+
       if (!eraTitulo && MARCA_DE_LISTA.test(limpia)) {
         cerrar();
         const item = normalizar(limpia.replace(MARCA_DE_LISTA, ""));
