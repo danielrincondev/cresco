@@ -173,7 +173,7 @@ it("cancela los reintentos de auditoría al cerrar sesión", async () => {
 });
 
 it("bloquea una versión desconocida en lugar de aceptar con el texto antiguo", async () => {
-  estado.version = "2026-09-v2";
+  estado.version = `${versionConsentimiento}-desconocida`;
   await montar();
   await buscarCurso();
   expect(vista!.root.findAllByType(Casilla)).toHaveLength(0);
@@ -200,7 +200,7 @@ it("exige consultar nuevamente si el consentimiento cambia mientras se completa 
   await pulsar("Acepto y registro a mi hijo");
   expect(estado.guardada).toBeNull();
   expect(vista!.root.findAllByType(Casilla)).toHaveLength(0);
-  estado.version = "2026-09-v2";
+  estado.version = `${versionConsentimiento}-desconocida`;
   await pulsar("Buscar curso");
   expect(JSON.stringify(vista!.toJSON())).toContain("Actualiza Cresco");
   expect(llamadas("nucleo:canjearInvitacion")).toHaveLength(1);
@@ -216,7 +216,7 @@ it("conserva solicitud y versión aceptada al reabrir tras un fallo de red", asy
   await act(async () => vista!.unmount());
   // El servidor puede haber cambiado desde el intento original: se recupera
   // esa solicitud exacta, nunca se inventa otra aceptación ni identificador.
-  estado.version = "2026-09-v2";
+  estado.version = `${versionConsentimiento}-desconocida`;
   await montar();
   await pulsar("Registrar a mi hijo");
   await pulsar("Reintentar registro");

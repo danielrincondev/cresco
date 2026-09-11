@@ -22,7 +22,7 @@ import consentimientoDoc from "../../../docs/03-piloto/texto-consentimiento.md?r
  */
 const soloLF = (texto: string) => texto.split("\r\n").join("\n");
 
-const VERSION = "2026-09-v1";
+const VERSION = "2026-09-v2";
 
 describe("aviso de privacidad — lo que ve el representante", () => {
   /**
@@ -38,6 +38,7 @@ describe("aviso de privacidad — lo que ve el representante", () => {
       "Pendientes antes de usar este documento",
       "Decisiones del proyecto que este texto refleja",
       "DP-007",
+      "DP-009",
       "ADR-006",
       "Regla I3",
       "issue #16",
@@ -84,18 +85,19 @@ describe("aviso de privacidad — lo que ve el representante", () => {
   });
 
   /**
-   * DP-006: la bitácora de la v1 cubre inicio de sesión, lectura de una ficha,
-   * crear o anular una acción y aprobar un estudiante — no cada consulta de
-   * pantalla. Decir "cada acceso" era prometer una garantía que el piloto no
+   * La bitácora cubre las operaciones implementadas; el registro de lecturas
+   * se incorpora progresivamente y no cubre cada consulta de pantalla. Decir "cada acceso" era prometer una garantía que el piloto no
    * puede sostener si la institución la audita.
    */
   it("describe el alcance real de la bitácora, sin decir 'cada acceso'", () => {
     expect(avisoPrivacidad).not.toContain("Cada acceso a información");
-    expect(avisoPrivacidad).toContain("la bitácora cubre esas acciones, no toda");
+    expect(avisoPrivacidad).not.toContain("registrar o anular");
+    expect(avisoPrivacidad).toContain("no acredita todas las lecturas");
+    expect(avisoPrivacidad).toContain("la bitácora cubre esas\nacciones, no toda");
   });
 
   /**
-   * El guardia contra la deriva. La versión `2026-09-v1` vive en tres sitios
+   * El guardia contra la deriva. La versión `2026-09-v2` vive en tres sitios
    * —el documento, `VERSION_CONSENTIMIENTO` de `convex/nucleo.ts` y este
    * archivo— y `consentimiento.versionDocumento` guarda la que la persona leyó.
    * Si el documento cambia y esta copia no, acabamos guardando una versión que
