@@ -1,11 +1,5 @@
-import {
-  ClerkProvider,
-  useAuth,
-  useClerk,
-  useSignIn,
-  useSignUp,
-  useUser,
-} from "@clerk/expo";
+import { ClerkProvider, useAuth, useSignIn, useSignUp } from "@clerk/expo";
+import { useSSO } from "@clerk/expo/experimental";
 import { tokenCache } from "@clerk/expo/token-cache";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import {
@@ -21,13 +15,19 @@ import { useState } from "react";
 import {
   Authenticated,
   AuthLoading,
-  AuthRefreshing,
   ConvexReactClient,
   Unauthenticated,
-  useQuery,
 } from "convex/react";
 import { ConvexProviderWithClerk } from "convex/react-clerk";
-import { api } from "../convex/_generated/api";
+// Se importa peso por peso, no desde `@expo-google-fonts/inter`. El paquete
+// barril arrastra sus 18 archivos .ttf al bundle -- 6 MB para usar dos de
+// ellos, mas que el codigo entero de la aplicacion. En un colegio fiscal
+// ecuatoriano la descarga la paga la familia con datos prepago.
+import { useFonts } from "expo-font";
+import { Inter_400Regular } from "@expo-google-fonts/inter/400Regular";
+import { Inter_600SemiBold } from "@expo-google-fonts/inter/600SemiBold";
+import { NucleoScreen } from "./screens/NucleoScreen";
+import { LimiteError } from "./components/NucleoUI";
 
 const clerkPublishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY;
 const convexUrl = process.env.EXPO_PUBLIC_CONVEX_URL;
@@ -49,9 +49,22 @@ const convex = new ConvexReactClient(convexUrl, {
 });
 
 export function App() {
+  const [fontsLoaded, fontError] = useFonts({
+    Inter: Inter_400Regular,
+    "Inter-Semibold": Inter_600SemiBold,
+  });
+  if (!fontsLoaded && !fontError)
+    return (
+      <SafeAreaProvider>
+        <LoadingScreen message="Preparando Cresco..." />
+      </SafeAreaProvider>
+    );
   return (
     <SafeAreaProvider>
-      <ClerkProvider publishableKey={clerkPublishableKey} tokenCache={tokenCache}>
+      <ClerkProvider
+        publishableKey={clerkPublishableKey}
+        tokenCache={tokenCache}
+      >
         <ConvexProviderWithClerk client={convex} useAuth={useAuth}>
           <StatusBar barStyle="dark-content" />
           <AuthLoading>
@@ -81,7 +94,10 @@ function getAuthErrorMessage(error: unknown) {
   ) {
     const firstError = error.errors[0];
     if (firstError && typeof firstError === "object") {
-      if ("longMessage" in firstError && typeof firstError.longMessage === "string") {
+      if (
+        "longMessage" in firstError &&
+        typeof firstError.longMessage === "string"
+      ) {
         return firstError.longMessage;
       }
       if ("message" in firstError && typeof firstError.message === "string") {
@@ -98,12 +114,14 @@ function getAuthErrorMessage(error: unknown) {
 function WelcomeScreen() {
   const { signIn } = useSignIn();
   const { signUp } = useSignUp();
+  const { startSSOFlow } = useSSO();
   const [mode, setMode] = useState<AuthMode | null>(null);
   const [step, setStep] = useState<AuthStep>("credentials");
   const [emailAddress, setEmailAddress] = useState("");
   const [password, setPassword] = useState("");
   const [code, setCode] = useState("");
   const [isPending, setIsPending] = useState(false);
+  const [isGooglePending, setIsGooglePending] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   async function selectMode(nextMode: AuthMode | null) {
@@ -117,6 +135,21 @@ function WelcomeScreen() {
     }
 
     setMode(nextMode);
+  }
+
+  async function continueWithGoogle() {
+    setErrorMessage(null);
+    setIsGooglePending(true);
+
+    try {
+      await signIn.reset();
+      await signUp.reset();
+      await startSSOFlow({ strategy: "oauth_google" });
+    } catch (error) {
+      setErrorMessage(getAuthErrorMessage(error));
+    } finally {
+      setIsGooglePending(false);
+    }
   }
 
   async function submitCredentials() {
@@ -150,7 +183,9 @@ function WelcomeScreen() {
           return;
         }
 
-        throw new Error("Clerk requiere un paso de inicio de sesión no compatible.");
+        throw new Error(
+          "Clerk requiere un paso de inicio de sesión no compatible.",
+        );
       }
 
       if (mode === "sign-up") {
@@ -235,12 +270,41 @@ function WelcomeScreen() {
         {mode === null ? (
           <>
             <Pressable
+              accessibilityLabel="Continuar con Google"
               accessibilityRole="button"
+              disabled={isGooglePending}
+              onPress={() => void continueWithGoogle()}
+              style={({ pressed }) => [
+                styles.button,
+                styles.googleButton,
+                pressed && styles.buttonPressed,
+                isGooglePending && styles.buttonDisabled,
+              ]}
+            >
+              {isGooglePending ? (
+                <ActivityIndicator color="#173f35" />
+              ) : (
+                <Text style={styles.googleButtonText}>
+                  Continuar con Google
+                </Text>
+              )}
+            </Pressable>
+
+            <View style={styles.dividerRow}>
+              <View style={styles.dividerLine} />
+              <Text style={styles.dividerText}>o continúa con correo</Text>
+              <View style={styles.dividerLine} />
+            </View>
+
+            <Pressable
+              accessibilityRole="button"
+              disabled={isGooglePending}
               onPress={() => void selectMode("sign-in")}
               style={({ pressed }) => [
                 styles.button,
                 styles.primaryButton,
                 pressed && styles.buttonPressed,
+                isGooglePending && styles.buttonDisabled,
               ]}
             >
               <Text style={styles.primaryButtonText}>Iniciar sesión</Text>
@@ -248,11 +312,13 @@ function WelcomeScreen() {
 
             <Pressable
               accessibilityRole="button"
+              disabled={isGooglePending}
               onPress={() => void selectMode("sign-up")}
               style={({ pressed }) => [
                 styles.button,
                 styles.secondaryButton,
                 pressed && styles.buttonPressed,
+                isGooglePending && styles.buttonDisabled,
               ]}
             >
               <Text style={styles.secondaryButtonText}>Crear cuenta</Text>
@@ -288,7 +354,9 @@ function WelcomeScreen() {
                   <Text style={styles.fieldLabel}>Contraseña</Text>
                   <TextInput
                     autoCapitalize="none"
-                    autoComplete={mode === "sign-in" ? "current-password" : "new-password"}
+                    autoComplete={
+                      mode === "sign-in" ? "current-password" : "new-password"
+                    }
                     editable={!isPending}
                     onChangeText={setPassword}
                     onSubmitEditing={() => void submitCredentials()}
@@ -365,75 +433,11 @@ function WelcomeScreen() {
 }
 
 function HomeScreen() {
-  const { signOut } = useClerk();
-  const { user } = useUser();
-  const viewer = useQuery(api.viewer.current);
-  const [isSigningOut, setIsSigningOut] = useState(false);
-
-  async function handleSignOut() {
-    setIsSigningOut(true);
-    try {
-      await signOut();
-    } finally {
-      setIsSigningOut(false);
-    }
-  }
-
-  const displayName =
-    viewer?.name ??
-    user?.fullName ??
-    user?.primaryEmailAddress?.emailAddress ??
-    "Usuario";
-
+  const { userId } = useAuth();
   return (
-    <SafeAreaView style={styles.screen}>
-      <AuthRefreshing>
-        <View style={styles.refreshingBanner}>
-          <ActivityIndicator color="#2f7d68" size="small" />
-          <Text style={styles.refreshingText}>Renovando tu sesión...</Text>
-        </View>
-      </AuthRefreshing>
-      <View style={styles.hero}>
-        <Text style={styles.eyebrow}>CRESCO</Text>
-        <Text style={styles.title}>Hola, {displayName}</Text>
-        <Text style={styles.subtitle}>
-          Clerk autenticó tu sesión y Convex validó el token.
-        </Text>
-      </View>
-
-      <View style={styles.card}>
-        <View style={styles.connectionRow}>
-          <View style={styles.connectionDot} />
-          <View style={styles.connectionCopy}>
-            <Text style={styles.connectionTitle}>
-              {viewer ? "Convex conectado" : "Conectando con Convex..."}
-            </Text>
-            <Text style={styles.connectionDetail}>
-              {viewer?.email ?? user?.primaryEmailAddress?.emailAddress ?? ""}
-            </Text>
-          </View>
-          {!viewer ? <ActivityIndicator color="#2f7d68" /> : null}
-        </View>
-
-        <Pressable
-          accessibilityRole="button"
-          disabled={isSigningOut}
-          onPress={() => void handleSignOut()}
-          style={({ pressed }) => [
-            styles.button,
-            styles.secondaryButton,
-            pressed && styles.buttonPressed,
-            isSigningOut && styles.buttonDisabled,
-          ]}
-        >
-          {isSigningOut ? (
-            <ActivityIndicator color="#173f35" />
-          ) : (
-            <Text style={styles.secondaryButtonText}>Cerrar sesión</Text>
-          )}
-        </Pressable>
-      </View>
-    </SafeAreaView>
+    <LimiteError key={userId}>
+      <NucleoScreen />
+    </LimiteError>
   );
 }
 
@@ -493,6 +497,21 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "700",
   },
+  dividerLine: {
+    backgroundColor: "#dce7e2",
+    flex: 1,
+    height: 1,
+  },
+  dividerRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 10,
+    marginVertical: 4,
+  },
+  dividerText: {
+    color: "#597069",
+    fontSize: 13,
+  },
   error: {
     backgroundColor: "#fff0ee",
     borderRadius: 12,
@@ -523,6 +542,16 @@ const styles = StyleSheet.create({
     color: "#597069",
     fontSize: 14,
     lineHeight: 20,
+  },
+  googleButton: {
+    backgroundColor: "#ffffff",
+    borderColor: "#bfd8ce",
+    borderWidth: 1,
+  },
+  googleButtonText: {
+    color: "#173f35",
+    fontSize: 16,
+    fontWeight: "700",
   },
   hero: {
     gap: 12,

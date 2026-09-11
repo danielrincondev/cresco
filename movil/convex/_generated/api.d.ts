@@ -9,12 +9,14 @@
  */
 
 import type * as auditoria from "../auditoria.js";
+import type * as conducta from "../conducta.js";
 import type * as http from "../http.js";
 import type * as interaccion from "../interaccion.js";
 import type * as lib_enums from "../lib/enums.js";
 import type * as lib_flags from "../lib/flags.js";
 import type * as lib_guardas from "../lib/guardas.js";
 import type * as lib_permisos from "../lib/permisos.js";
+import type * as lib_reautenticacion from "../lib/reautenticacion.js";
 import type * as lib_revenuecat from "../lib/revenuecat.js";
 import type * as nucleo from "../nucleo.js";
 import type * as push from "../push.js";
@@ -30,12 +32,14 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   auditoria: typeof auditoria;
+  conducta: typeof conducta;
   http: typeof http;
   interaccion: typeof interaccion;
   "lib/enums": typeof lib_enums;
   "lib/flags": typeof lib_flags;
   "lib/guardas": typeof lib_guardas;
   "lib/permisos": typeof lib_permisos;
+  "lib/reautenticacion": typeof lib_reautenticacion;
   "lib/revenuecat": typeof lib_revenuecat;
   nucleo: typeof nucleo;
   push: typeof push;

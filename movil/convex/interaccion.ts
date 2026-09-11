@@ -10,11 +10,12 @@
  * cada función pública empieza llamando a `permisos.ts`, sin excepción.
  */
 
-import { v } from "convex/values";
+import { ConvexError, v } from "convex/values";
 
 import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
-import { mutation, query, type MutationCtx, type QueryCtx } from "./_generated/server";
+import { action, internalMutation, mutation, query, type MutationCtx, type QueryCtx } from "./_generated/server";
+import { verificarReautenticacion } from "./lib/reautenticacion";
 import {
   ALCANCE_ALERTA,
   MODALIDAD,
@@ -31,6 +32,7 @@ import {
   hoyEnGuayaquil,
 } from "./lib/guardas";
 import {
+  ErrorPermiso,
   auditar,
   exigirDocente,
   exigirPerfil,
@@ -38,6 +40,29 @@ import {
   exigirTitularDelCurso,
   exigirVinculo,
 } from "./lib/permisos";
+
+/**
+ * Los errores esperados conservan codigo y mensaje al llegar al cliente.
+ *
+ * Sin esto, un `ErrorDominio` cruza la frontera de Convex como un fallo
+ * generico y la pantalla solo puede decir "no pudimos completar la solicitud":
+ * el representante que reserva un horario que acaban de tomar merece leer
+ * *"ese horario ya no esta disponible"*, no una disculpa sin informacion.
+ *
+ * Es gemela de la de `nucleo.ts`. Se duplica a proposito: moverla a `lib/`
+ * convertiria diez lineas de traduccion de errores en superficie compartida,
+ * que pide el acuerdo de los tres para cambiarse.
+ */
+async function conErroresPublicos<T>(operacion: () => Promise<T>): Promise<T> {
+  try {
+    return await operacion();
+  } catch (error) {
+    if (error instanceof ErrorDominio || error instanceof ErrorPermiso) {
+      throw new ConvexError({ codigo: error.codigo, mensaje: error.message });
+    }
+    throw error;
+  }
+}
 
 const modalidad = v.union(...MODALIDAD.map((x) => v.literal(x)));
 const motivoInconformidad = v.union(...MOTIVO_INCONFORMIDAD.map((x) => v.literal(x)));
@@ -120,12 +145,23 @@ export const publicarDisponibilidad = mutation({
     cursoId: v.optional(v.id("curso")),
     lugarOEnlace: v.optional(v.string()),
   },
-  handler: async (ctx, args) => {
+  handler: (ctx, args) => conErroresPublicos(async () => {
     const docente = await exigirDocente(ctx);
     exigirFormatoHora(args.horaInicio, "La hora de inicio");
     exigirFormatoHora(args.horaFin, "La hora de fin");
     exigirRangoHoras(args.horaInicio, args.horaFin);
 
+    const fecha = new Date(`${args.fecha}T00:00:00Z`);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(args.fecha) || !Number.isFinite(fecha.getTime()) ||
+        fecha.toISOString().slice(0, 10) !== args.fecha) {
+      throw new ErrorDominio("FECHAS_INVALIDAS", "Ingresa una fecha válida.");
+    }
+    const minutos = (hora: string) => Number(hora.slice(0, 2)) * 60 + Number(hora.slice(3));
+    const inicio = minutos(args.horaInicio);
+    const fin = minutos(args.horaFin);
+    if ((fin - inicio) % REGLAS.CITA_MINUTOS !== 0) {
+      throw new ErrorDominio("VALIDACION", `La franja debe contener bloques completos de ${REGLAS.CITA_MINUTOS} minutos.`);
+    }
     if (args.fecha < hoyEnGuayaquil()) {
       throw new ErrorDominio("FECHAS_INVALIDAS", "No se puede publicar un horario en el pasado.");
     }
@@ -147,18 +183,23 @@ export const publicarDisponibilidad = mutation({
       throw new ErrorDominio("CONFLICTO", "Ya tienes un bloque publicado que se cruza con este.");
     }
 
-    return await ctx.db.insert("disponibilidadDocente", {
-      docenteId: docente._id,
-      cursoId: args.cursoId,
-      fecha: args.fecha,
-      horaInicio: args.horaInicio,
-      horaFin: args.horaFin,
-      modalidad: args.modalidad ?? "PRESENCIAL",
-      lugarOEnlace: args.lugarOEnlace?.trim() || undefined,
-      estado: "DISPONIBLE",
-      actualizadoEn: Date.now(),
-    });
-  },
+    const hora = (m: number) => `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
+    let primero: Id<"disponibilidadDocente"> | undefined;
+    // Toda la franja se publica en la misma transacción: un solapamiento no
+    // puede dejar medio horario publicado ni dos reservas para un mismo tramo.
+    for (let m = inicio; m < fin; m += REGLAS.CITA_MINUTOS) {
+      const id = await ctx.db.insert("disponibilidadDocente", {
+        docenteId: docente._id, cursoId: args.cursoId, fecha: args.fecha,
+        horaInicio: hora(m), horaFin: hora(m + REGLAS.CITA_MINUTOS),
+        modalidad: args.modalidad ?? "PRESENCIAL",
+        lugarOEnlace: args.lugarOEnlace?.trim() || undefined,
+        estado: "DISPONIBLE", actualizadoEn: Date.now(),
+      });
+      primero ??= id;
+    }
+    // Conserva el contrato existente; el resto se obtiene con bloquesDisponibles.
+    return primero!;
+  }),
 });
 
 /**
@@ -171,7 +212,7 @@ export const publicarDisponibilidad = mutation({
  */
 export const bloquesDisponibles = query({
   args: { estudianteId: v.id("estudiante"), desde: v.string() },
-  handler: async (ctx, args) => {
+  handler: (ctx, args) => conErroresPublicos(async () => {
     await exigirVinculo(ctx, args.estudianteId);
 
     const matricula = await ctx.db
@@ -208,7 +249,7 @@ export const bloquesDisponibles = query({
         lugarOEnlace: b.lugarOEnlace,
         duracionMinutos: REGLAS.CITA_MINUTOS,
       }));
-  },
+  }),
 });
 
 /**
@@ -221,7 +262,7 @@ export const solicitarCita = mutation({
     estudianteId: v.id("estudiante"),
     motivo: v.optional(v.string()),
   },
-  handler: async (ctx, args) => {
+  handler: (ctx, args) => conErroresPublicos(async () => {
     const representante = await exigirRepresentante(ctx);
     await exigirVinculo(ctx, args.estudianteId);
 
@@ -277,7 +318,7 @@ export const solicitarCita = mutation({
       );
     }
     return citaId;
-  },
+  }),
 });
 
 /** El docente confirma o rechaza. Rechazar libera el bloque. */
@@ -287,7 +328,7 @@ export const responderCita = mutation({
     aceptar: v.boolean(),
     notasDocente: v.optional(v.string()),
   },
-  handler: async (ctx, args) => {
+  handler: (ctx, args) => conErroresPublicos(async () => {
     const docente = await exigirDocente(ctx);
     const cita = await ctx.db.get(args.citaId);
     if (cita === null) throw new ErrorDominio("NO_ENCONTRADO", "La cita no existe.");
@@ -325,33 +366,33 @@ export const responderCita = mutation({
       );
     }
     return cita._id;
-  },
+  }),
 });
 
 /** Citas del representante autenticado (P8). */
 export const misCitasRepresentante = query({
   args: {},
-  handler: async (ctx) => {
+  handler: (ctx) => conErroresPublicos(async () => {
     const representante = await exigirRepresentante(ctx);
     const citas = await ctx.db
       .query("cita")
       .withIndex("por_representante", (q) => q.eq("representanteId", representante._id))
       .collect();
     return citas.sort((a, b) => b.fechaHoraInicio - a.fechaHoraInicio);
-  },
+  }),
 });
 
 /** Citas del docente autenticado (D16). */
 export const misCitasDocente = query({
   args: {},
-  handler: async (ctx) => {
+  handler: (ctx) => conErroresPublicos(async () => {
     const docente = await exigirDocente(ctx);
     const citas = await ctx.db
       .query("cita")
       .withIndex("por_docente", (q) => q.eq("docenteId", docente._id))
       .collect();
     return citas.sort((a, b) => a.fechaHoraInicio - b.fechaHoraInicio);
-  },
+  }),
 });
 
 /* ------------------------------------------------------------------ *
@@ -381,7 +422,7 @@ export const abrirInconformidad = mutation({
     motivo: motivoInconformidad,
     mensaje: v.string(),
   },
-  handler: async (ctx, args) => {
+  handler: (ctx, args) => conErroresPublicos(async () => {
     const representante = await exigirRepresentante(ctx);
 
     const accion = await ctx.db.get(args.accionRegistradaId);
@@ -437,7 +478,7 @@ export const abrirInconformidad = mutation({
       );
     }
     return inconformidadId;
-  },
+  }),
 });
 
 /**
@@ -453,7 +494,7 @@ export const abrirInconformidad = mutation({
  */
 export const inconformidadesDelDocente = query({
   args: {},
-  handler: async (ctx) => {
+  handler: (ctx) => conErroresPublicos(async () => {
     const docente = await exigirDocente(ctx);
 
     const enCurso: Doc<"inconformidad">[] = [];
@@ -485,7 +526,7 @@ export const inconformidadesDelDocente = query({
       });
     }
     return mias.sort((a, b) => a.venceEn - b.venceEn);
-  },
+  }),
 });
 
 /**
@@ -513,7 +554,7 @@ export const resolverInconformidad = mutation({
     ),
     respuestaDocente: v.string(),
   },
-  handler: async (ctx, args) => {
+  handler: (ctx, args) => conErroresPublicos(async () => {
     const docente = await exigirDocente(ctx);
 
     const inconformidad = await ctx.db.get(args.inconformidadId);
@@ -581,7 +622,7 @@ export const resolverInconformidad = mutation({
       );
     }
     return inconformidad._id;
-  },
+  }),
 });
 
 /* ------------------------------------------------------------------ *
@@ -592,32 +633,44 @@ export const resolverInconformidad = mutation({
  * El docente activa una alerta.
  *
  * G1: exige **reautenticación reciente**. El cliente reautentica con Clerk y
- * pasa el momento en que ocurrió; aquí se comprueba que sea reciente y se
- * guarda como constancia. Sin esto la alerta se dispara por accidente.
+ * envía una prueba firmada de su sesión. La action comprueba su firma y
+ * vigencia; solo la mutation interna recibe la fecha verificada.
  *
  * La app debe declarar **visiblemente que no sustituye al ECU 911**. Eso es
  * responsabilidad de la pantalla (D17), pero se repite aquí porque es una
  * regla del producto, no una decisión de interfaz.
  */
-export const activarAlerta = mutation({
-  args: {
-    cursoId: v.id("curso"),
-    alcance: alcanceAlerta,
-    estudianteId: v.optional(v.id("estudiante")),
-    tipo: tipoAlerta,
-    titulo: v.string(),
-    mensaje: v.string(),
-    esSimulacro: v.boolean(),
-    reautenticadoEn: v.number(),
-  },
-  handler: async (ctx, args) => {
+const datosAlerta = {
+  cursoId: v.id("curso"),
+  alcance: alcanceAlerta,
+  estudianteId: v.optional(v.id("estudiante")),
+  tipo: tipoAlerta,
+  titulo: v.string(),
+  mensaje: v.string(),
+  esSimulacro: v.boolean(),
+};
+
+/** La prueba firmada solo se comprueba en el servidor; no se guarda el token. */
+export const activarAlerta = action({
+  args: { ...datosAlerta, tokenReautenticacion: v.string() },
+  handler: (ctx, { tokenReautenticacion, ...datos }): Promise<{ id: Id<"alertaEmergencia">; entregas: number }> =>
+    conErroresPublicos(async () => {
+      const reautenticadoEn = await verificarReautenticacion(tokenReautenticacion, await ctx.auth.getUserIdentity());
+      return await ctx.runMutation(internal.interaccion.activarAlertaVerificada, { ...datos, reautenticadoEn });
+    }),
+});
+
+/** Privada: la titularidad y todas las escrituras se comprueban atómicamente. */
+export const activarAlertaVerificada = internalMutation({
+  args: { ...datosAlerta, reautenticadoEn: v.number() },
+  handler: (ctx, args) => conErroresPublicos(async () => {
     const docente = await exigirTitularDelCurso(ctx, args.cursoId);
     exigirAlcanceCoherente(args.alcance, args.estudianteId);
 
     const ahora = Date.now();
     // Una reautenticación de hace media hora no sirve: la gracia es que la
     // persona demuestre que es ella *en el momento* de activar la alerta.
-    if (args.reautenticadoEn > ahora || ahora - args.reautenticadoEn > 5 * MINUTO) {
+    if (!Number.isFinite(args.reautenticadoEn) || args.reautenticadoEn > ahora || ahora - args.reautenticadoEn > 5 * MINUTO) {
       throw new ErrorDominio(
         "REAUTENTICACION_REQUERIDA",
         "Vuelve a confirmar tu identidad para activar una alerta.",
@@ -702,7 +755,7 @@ export const activarAlerta = mutation({
     });
 
     return { id: alertaId, entregas };
-  },
+  }),
 });
 
 /**
@@ -715,7 +768,7 @@ export const activarAlerta = mutation({
  */
 export const misAlertas = query({
   args: {},
-  handler: async (ctx) => {
+  handler: (ctx) => conErroresPublicos(async () => {
     const representante = await exigirRepresentante(ctx);
 
     const vinculos = await ctx.db
@@ -765,13 +818,13 @@ export const misAlertas = query({
       }
     }
     return mias.sort((a, b) => b.activadaEn - a.activadaEn);
-  },
+  }),
 });
 
 /** G3: el representante confirma que la leyó. */
 export const confirmarAlerta = mutation({
   args: { entregaAlertaId: v.id("entregaAlerta") },
-  handler: async (ctx, args) => {
+  handler: (ctx, args) => conErroresPublicos(async () => {
     const representante = await exigirRepresentante(ctx);
     const entrega = await ctx.db.get(args.entregaAlertaId);
     if (entrega === null) throw new ErrorDominio("NO_ENCONTRADO", "Esa alerta no existe.");
@@ -783,7 +836,7 @@ export const confirmarAlerta = mutation({
     const ahora = Date.now();
     await ctx.db.patch(entrega._id, { leidoEn: entrega.leidoEn ?? ahora, confirmadoEn: ahora });
     return entrega._id;
-  },
+  }),
 });
 
 /* ------------------------------------------------------------------ *
@@ -797,7 +850,7 @@ export const registrarDispositivo = mutation({
     plataforma: v.optional(plataforma),
     versionApp: v.optional(v.string()),
   },
-  handler: async (ctx, args) => {
+  handler: (ctx, args) => conErroresPublicos(async () => {
     const perfil = await exigirPerfil(ctx);
     const token = exigirTexto(args.tokenPush, "El token del dispositivo");
     const ahora = Date.now();
@@ -827,26 +880,26 @@ export const registrarDispositivo = mutation({
       activo: true,
       actualizadoEn: ahora,
     });
-  },
+  }),
 });
 
 /** Bandeja de notificaciones del usuario autenticado. */
 export const misNotificaciones = query({
   args: {},
-  handler: async (ctx) => {
+  handler: (ctx) => conErroresPublicos(async () => {
     const perfil = await exigirPerfil(ctx);
     const notificaciones = await ctx.db
       .query("notificacion")
       .withIndex("por_usuario", (q) => q.eq("perfilUsuarioId", perfil._id))
       .collect();
     return notificaciones.sort((a, b) => b._creationTime - a._creationTime);
-  },
+  }),
 });
 
 /** Marca una notificación como leída. Solo el dueño puede. */
 export const marcarNotificacionLeida = mutation({
   args: { notificacionId: v.id("notificacion") },
-  handler: async (ctx, args) => {
+  handler: (ctx, args) => conErroresPublicos(async () => {
     const perfil = await exigirPerfil(ctx);
     const notificacion = await ctx.db.get(args.notificacionId);
     if (notificacion === null) {
@@ -859,5 +912,5 @@ export const marcarNotificacionLeida = mutation({
       await ctx.db.patch(notificacion._id, { leidaEn: Date.now() });
     }
     return notificacion._id;
-  },
+  }),
 });
