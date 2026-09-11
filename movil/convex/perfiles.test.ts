@@ -36,6 +36,22 @@ describe("núcleo — perfiles", () => {
     expect((await cliente.query(api.nucleo.listarCursos)).cursos[0].id).toBe(curso.id);
   });
 
+  it("acepta nombres de una letra y permite corregirlos sin cambiar la identidad", async () => {
+    const t = convexTest(schema, modules);
+    const cliente = t.withIdentity({ subject: "a" });
+    const perfil = await cliente.mutation(api.nucleo.completarPerfil, {
+      ...datos, nombres: "  A  ", apellidos: "  O  ",
+    });
+    expect(perfil).toMatchObject({ nombres: "A", apellidos: "O" });
+    const corregido = await cliente.mutation(api.nucleo.completarPerfil, {
+      ...datos, nombres: "Ana", apellidos: "O'Connor",
+    });
+    expect(corregido).toMatchObject({
+      perfilUsuarioId: perfil.perfilUsuarioId, docenteId: perfil.docenteId,
+      nombres: "Ana", apellidos: "O'Connor",
+    });
+  });
+
   it("repetir el alta concurrentemente conserva un solo perfil y rol", async () => {
     const t = convexTest(schema, modules);
     const cliente = t.withIdentity({ subject: "a" });
@@ -101,7 +117,7 @@ describe("núcleo — perfiles", () => {
     { ...datos, numeroDocumento: "incorrecto" },
     { ...datos, telefono: "" },
     { ...datos, nombres: " " },
-    { ...datos, apellidos: "R" },
+    { ...datos, apellidos: " " },
   ])("rechaza datos inválidos sin crear registros (%j)", async (args) => {
     const t = convexTest(schema, modules);
     await expect(t.withIdentity({ subject: "a" }).mutation(api.nucleo.completarPerfil, args)).rejects.toThrow("VALIDACION");

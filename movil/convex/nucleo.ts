@@ -139,7 +139,7 @@ export const completarPerfil = mutation({
     // apostrofes y de una sola letra. Lo unico que se exige es que diga algo.
     const nombres = args.nombres.trim();
     const apellidos = args.apellidos.trim();
-    if (nombres.length < 2 || apellidos.length < 2) {
+    if (nombres.length === 0 || apellidos.length === 0) {
       throw new ErrorDominio("VALIDACION", "Escribe tu nombre y tu apellido.");
     }
     const numeroDocumento = normalizarDocumento(args.tipoDocumento, args.numeroDocumento);
@@ -180,6 +180,7 @@ export const completarPerfil = mutation({
         ...(telefono === undefined ? {} : { telefono }),
         actualizadoEn,
       });
+      perfil = (await ctx.db.get("perfilUsuario", perfil._id))!;
     }
     for (const rol of args.roles) {
       const tabla = rol === "DOCENTE" ? "docente" : "representante";
