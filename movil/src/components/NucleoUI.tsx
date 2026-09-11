@@ -232,10 +232,11 @@ export function Campo({
 }: TextInputProps & { etiqueta: string; ayuda?: string; error?: string }) {
   const largo = typeof props.value === "string" ? props.value.length : 0;
   const tope = props.maxLength;
-  // Se enseña en el ultimo 20% del tope, o en los ultimos 20 caracteres si el
-  // campo es corto -- lo que ocurra mas tarde.
+  // Se enseña en el ultimo 20% del tope o en los ultimos 20 caracteres,
+  // lo que ocurra mas tarde. Un campo vacío nunca muestra el contador.
   const muestraContador =
-    tope !== undefined && largo >= tope - Math.max(20, Math.round(tope * 0.2));
+    tope !== undefined && tope > 0 &&
+    largo >= tope - Math.min(20, Math.floor(tope * 0.2));
 
   return (
     <View style={s.campo}>
@@ -255,7 +256,7 @@ export function Campo({
         {error !== undefined ? (
           <Text style={s.textoError}>{error}</Text>
         ) : ayuda ? (
-          <Cuerpo>{ayuda}</Cuerpo>
+          <Text style={[s.texto, s.ayudaCampo]}>{ayuda}</Text>
         ) : (
           <View />
         )}
@@ -439,6 +440,7 @@ export const s = StyleSheet.create({
     justifyContent: "space-between",
     gap: Espacio.sm,
   },
+  ayudaCampo: { flexShrink: 1 },
   textoError: {
     flexShrink: 1,
     color: Semantico.error,

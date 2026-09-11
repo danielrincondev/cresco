@@ -35,6 +35,33 @@ it("el contador de caracteres solo aparece cerca del tope", () => {
   expect(textos(largo)).toContain("485");
 });
 
+it.each([
+  { tope: 1, desde: 1 },
+  { tope: 10, desde: 8 },
+  { tope: 25, desde: 20 },
+  { tope: 100, desde: 80 },
+  { tope: 500, desde: 480 },
+])("el contador con límite $tope aparece desde $desde caracteres", ({ tope, desde }) => {
+  const vista = pintar(<Campo etiqueta="Documento" value="" maxLength={tope} />);
+  for (const largo of [0, desde - 1, desde, tope]) {
+    act(() => {
+      vista.update(<Campo etiqueta="Documento" value={"x".repeat(largo)} maxLength={tope} />);
+    });
+    expect(vista.root.findAllByProps({
+      accessibilityLabel: `${largo} de ${tope} caracteres`,
+    })).toHaveLength(largo >= desde ? 1 : 0);
+  }
+  act(() => { vista.unmount(); });
+});
+
+it("no muestra contador sin límite o con límite cero", () => {
+  for (const tope of [undefined, 0]) {
+    const vista = pintar(<Campo etiqueta="Documento" value="" maxLength={tope} />);
+    expect(textos(vista)).not.toContain("caracteres");
+    act(() => { vista.unmount(); });
+  }
+});
+
 /**
  * Dos lineas bajo un campo, una de las cuales ya no aplica, es como se ignoran
  * las dos. El error sustituye a la ayuda en vez de acumularse.
