@@ -3,6 +3,14 @@
 // coincidir. Son el texto con el que se pide consentimiento sobre datos de un
 // menor: la version que la persona lee tiene que ser exactamente la que queda
 // guardada en `consentimiento.versionDocumento`.
+
+/**
+ * La version del texto que va **dentro de esta app**, no la que anuncie el
+ * servidor. Tenerla como constante con nombre es la mitad del arreglo al
+ * problema de las tres copias de `2026-09-v1`; la otra mitad es la prueba que
+ * compara este archivo con el documento.
+ */
+export const versionConsentimiento = "2026-09-v1";
 export const textoConsentimiento =
   "Usted está por registrar a **{nombre del estudiante}** en el curso\n**{nombre del curso}**, a cargo de **{nombre del docente}**.\n\n**Qué información se va a guardar sobre su hijo o representado**\nSu nombre, documento de identidad y curso. Y, durante el año lectivo, los\nregistros de conducta y responsabilidad que escriba su docente: qué ocurrió,\ncuándo, y los puntos correspondientes.\n\n**Quién la puede ver**\nSolo usted y el docente de su curso. Ningún otro representante, ningún otro\ndocente. **Su hijo no usa esta aplicación** y no tiene acceso a ella.\n\n**Lo que no hacemos**\nNo guardamos fotos ni archivos. No vendemos ni cedemos su información. Este\npuntaje **no es una calificación** y no afecta las notas de las materias.\n\n**Lo que todavía no podemos hacer**\nEn esta primera versión **no podemos borrar los datos si usted lo solicita**.\nPodemos dejar de mostrarlos, pero el registro permanece. Estamos trabajando\nen poder anonimizarlos, y se lo decimos de frente antes de que acepte.\n\n**Puede cambiar de opinión**\nPuede retirar este consentimiento cuando quiera desde Ajustes. Si lo hace,\ndejará de recibir los reportes de su hijo por esta aplicación.";
 /**

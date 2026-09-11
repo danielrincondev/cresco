@@ -61,6 +61,11 @@ La invitación dura `REGLAS.INVITACION_DIAS_VIGENCIA` (30 días), permite varios
 canjes y `crearInvitacion` reutiliza la última mientras sea válida. No se exige
 que siga vigente al aprobar un registro que ya fue aceptado.
 
+La emisión, consulta, canje y aprobación también comprueban que no haya pasado
+la fecha final del año lectivo, aunque su estado aún no sea `CERRADO`. El último
+día es inclusivo en `America/Guayaquil`; se permite preparar inscripciones antes
+del inicio del año. Esta comprobación se hace al operar, sin tarea programada.
+
 `consultarInvitacion` es una mutation sin escrituras para validar la caducidad
 con el reloj del servidor al enviar P2. El canje vuelve a comprobarla: la
 previsualización no reserva plaza ni congela su vigencia.
@@ -132,6 +137,12 @@ Un pendiente se vincula al curso a través de la invitación del vínculo, porqu
 institución/verificación y filtra por el curso exacto; una página puede quedar
 vacía sin ser la última. Seguir el cursor hasta `isDone`. Esto conserva el
 esquema actual sin inventar una matrícula provisional.
+
+`listarMisEstudiantes` conserva los pendientes sin matrícula y los estudiantes
+con matrícula `CURSANDO`. Un aprobado sin matrícula vigente queda fuera de la
+respuesta aunque su vínculo siga activo, por ejemplo tras finalizar, retirar o
+trasladar su matrícula. Este filtro también puede dejar páginas vacías: continuar
+con el cursor mientras `isDone` sea falso.
 
 Códigos adicionales: `PERFIL_NO_ENCONTRADO`, `SIN_PERMISO`, `SIN_VINCULO`,
 `INVITACION_INVALIDA`, `CURSO_INACTIVO`, `CONSENTIMIENTO_REQUERIDO`,

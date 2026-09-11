@@ -345,3 +345,82 @@ describe("núcleo — aprobación y listas", () => {
   });
 
 });
+
+describe("núcleo — límites de acceso y calendario", () => {
+  it("admite el último día en Guayaquil y rechaza al llegar la medianoche local", async () => {
+    const s = await escenario();
+    vi.setSystemTime(new Date("2027-03-01T04:59:59Z"));
+    const invitacion = await s.docente.mutation(api.nucleo.crearInvitacion, { cursoId: s.cursoId });
+    const solicitud = { ...s.solicitud, credencial: { codigo: invitacion.codigo } };
+    const { estudianteId } = await s.representante.mutation(api.nucleo.canjearInvitacion, solicitud);
+    await aprobar(s, estudianteId);
+    vi.setSystemTime(new Date("2027-03-01T05:00:00Z"));
+    await expect(s.representante.mutation(api.nucleo.canjearInvitacion, {
+      ...solicitud, solicitudId: "solicitud-prueba-0002",
+      estudiante: { ...hijo, numeroDocumento: "0900000011" },
+    })).rejects.toThrow("CURSO_INACTIVO");
+    expect((await registros(s.t)).estudiantes).toHaveLength(1);
+  });
+
+  it("permite preparar inscripciones antes del inicio del año", async () => {
+    const s = await escenario();
+    vi.setSystemTime(new Date("2026-04-20T15:00:00Z"));
+    const invitacion = await s.docente.mutation(api.nucleo.crearInvitacion, { cursoId: s.cursoId });
+    const { estudianteId } = await s.representante.mutation(api.nucleo.canjearInvitacion, {
+      ...s.solicitud, credencial: { codigo: invitacion.codigo },
+    });
+    await aprobar(s, estudianteId);
+    expect((await registros(s.t)).puntajes).toHaveLength(3);
+  });
+
+  it("conserva pendientes y matriculados al paginar entre matrículas terminadas", async () => {
+    const s = await escenario();
+    const primero = await canjear(s);
+    const { matriculaId } = await aprobar(s, primero.estudianteId);
+    await s.t.run((ctx) => ctx.db.patch("matricula", matriculaId, { estado: "FINALIZADA" }));
+    const segundo = await s.representante.mutation(api.nucleo.canjearInvitacion, {
+      ...s.solicitud, solicitudId: "solicitud-prueba-0002",
+      estudiante: { ...hijo, numeroDocumento: "0900000011" },
+    });
+    const listar = (cursor: string | null) => s.representante.query(api.nucleo.listarMisEstudiantes, {
+      paginationOpts: { numItems: 1, cursor },
+    });
+    const primeraPagina = await listar(null);
+    expect(primeraPagina.page).toHaveLength(0);
+    expect(primeraPagina.isDone).toBe(false);
+    expect((await listar(primeraPagina.continueCursor)).page[0]).toMatchObject({
+      estudianteId: segundo.estudianteId, estadoVerificacion: "PENDIENTE", matriculaId: null,
+    });
+    const aprobado = await aprobar(s, segundo.estudianteId);
+    expect((await listar(primeraPagina.continueCursor)).page[0]).toMatchObject({
+      estudianteId: segundo.estudianteId, estadoVerificacion: "APROBADO", matriculaId: aprobado.matriculaId,
+    });
+  });
+
+  it.each(["FINALIZADA", "RETIRADA", "TRASLADADA"] as const)("no expone datos después de matrícula %s", async (estado) => {
+    const s = await escenario();
+    const { estudianteId } = await canjear(s);
+    const { matriculaId } = await aprobar(s, estudianteId);
+    await s.t.run((ctx) => ctx.db.patch("matricula", matriculaId, { estado }));
+    const respuesta = await s.representante.query(api.nucleo.listarMisEstudiantes, { paginationOpts: pagina });
+    expect(respuesta.page).toHaveLength(0);
+  });
+
+  it("rechaza canjes después del fin del año aunque el código siga vigente", async () => {
+    const s = await escenario();
+    vi.setSystemTime(new Date("2027-02-20T15:00:00Z"));
+    const invitacion = await s.docente.mutation(api.nucleo.crearInvitacion, { cursoId: s.cursoId });
+    vi.setSystemTime(new Date("2027-03-01T15:00:00Z"));
+    await expect(s.representante.mutation(api.nucleo.canjearInvitacion, {
+      ...s.solicitud, credencial: { codigo: invitacion.codigo },
+    })).rejects.toThrow("CURSO_INACTIVO");
+    await expect(s.representante.mutation(api.nucleo.consultarInvitacion, {
+      credencial: { codigo: invitacion.codigo },
+    })).rejects.toThrow("CURSO_INACTIVO");
+    await expect(s.docente.mutation(api.nucleo.crearInvitacion, {
+      cursoId: s.cursoId,
+    })).rejects.toThrow("CURSO_INACTIVO");
+    expect((await registros(s.t)).estudiantes).toHaveLength(0);
+    expect((await s.t.run((ctx) => ctx.db.get("invitacionCurso", invitacion.invitacionId)))?.usosRealizados).toBe(0);
+  });
+});
