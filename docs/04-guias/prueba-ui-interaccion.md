@@ -46,4 +46,21 @@ sin crear decenas de estudiantes en el entorno de desarrollo.
 - 238 pruebas automatizadas, incluidos los casos de reautenticación, tipo de
   alerta, destinatarios vacíos, reservas independientes y paginación.
 - Tipos de la app y del backend correctos; exportación Android correcta.
-- Recorrido interactivo de esta revisión: pendiente de ejecutar y documentar.
+- Recorrido manual en navegador completado por Daniel el 10 de septiembre de
+  2026, con capturas durante la sesión y confirmación final del resultado:
+  - Los turnos 12:30–12:45 y 12:45–13:00 aparecieron separados.
+  - Reservar el primero dejó disponible el segundo. Después de reservar ambos,
+    rechazar el de 12:30 liberó solo ese turno; el de 12:45 siguió pendiente.
+  - Un intento de reverificación fue rechazado. Con otra cuenta de prueba con
+    contraseña, la verificación permitió publicar el simulacro.
+  - La confirmación indicó publicación sin asegurar recepción o lectura.
+  - La vista familiar mostró «Simulacro — no es una emergencia». Daniel
+    confirmó que la lectura y su conservación al volver a entrar funcionaron.
+- Para este recorrido se sincronizó #50 con el backend personal de desarrollo.
+  No se desplegó a producción. La prueba se realizó manualmente; la herramienta
+  de control no tenía un navegador conectado.
+
+La causa del intento fallido en la cuenta usada con Google no quedó determinada;
+no se considera evidencia del caso «cuenta sin contraseña». Ese caso, el bloqueo
+de campos durante el envío y las pruebas de firma se cubren automáticamente.
+La validación en un teléfono físico sigue pendiente.
