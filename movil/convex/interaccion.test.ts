@@ -697,3 +697,152 @@ describe("interaccion — vencimiento programado de reclamos (F3)", () => {
     expect(await t.run(async ctx => (await ctx.db.query("notificacion").collect()).length)).toBe(206);
   });
 });
+
+/**
+ * Un segundo docente completo -- su curso, su estudiante y el representante de
+ * ese estudiante -- para poder comprobar que las bandejas no se mezclan.
+ */
+async function sembrarSegundoDocente(
+  t: ReturnType<typeof convexTest>,
+  e: Awaited<ReturnType<typeof sembrarEscenario>>,
+) {
+  const ids = await t.run(async (ctx) => {
+    const ahora = Date.now();
+    const perfilDocente = await ctx.db.insert("perfilUsuario", {
+      authSubject: "docente_2", tipoDocumento: "CEDULA", numeroDocumento: "0900000007",
+      actualizadoEn: ahora,
+    });
+    const docenteId = await ctx.db.insert("docente", {
+      perfilUsuarioId: perfilDocente, actualizadoEn: ahora,
+    });
+    const perfilRep = await ctx.db.insert("perfilUsuario", {
+      authSubject: "rep_2", tipoDocumento: "CEDULA", numeroDocumento: "0900000008",
+      actualizadoEn: ahora,
+    });
+    const representanteId = await ctx.db.insert("representante", {
+      perfilUsuarioId: perfilRep, actualizadoEn: ahora,
+    });
+
+    const curso = await ctx.db.get(e.cursoId);
+    const cursoId = await ctx.db.insert("curso", {
+      anioLectivoId: curso!.anioLectivoId, nombre: "Sexto B", nivel: "6to", paralelo: "B",
+      jornada: "MATUTINA", estado: "ACTIVO", actualizadoEn: ahora,
+    });
+    await ctx.db.insert("asignacionDocente", {
+      cursoId, docenteId, rol: "TITULAR", vigenteDesde: "2026-05-04", actualizadoEn: ahora,
+    });
+    const estudianteId = await ctx.db.insert("estudiante", {
+      institucionId: e.institucionId, nombres: "Luis", apellidos: "Mora",
+      tipoDocumento: "CEDULA", numeroDocumento: "0922222222",
+      origenRegistro: "REPRESENTANTE", estadoVerificacion: "APROBADO", estado: "ACTIVO",
+      actualizadoEn: ahora,
+    });
+    const matriculaId = await ctx.db.insert("matricula", {
+      estudianteId, cursoId, fechaIngreso: "2026-05-04", estado: "CURSANDO",
+      actualizadoEn: ahora,
+    });
+    await ctx.db.insert("vinculoRepresentacion", {
+      representanteId, estudianteId, parentesco: "PADRE",
+      estado: "ACTIVO", vigenteDesde: "2026-05-04", actualizadoEn: ahora,
+    });
+
+    // Una accion negativa suya, para que su representante pueda reclamarla.
+    const categoriaAccionId = await ctx.db.insert("categoriaAccion", {
+      institucionId: e.institucionId, codigo: "DISCIPLINA", nombre: "Indisciplina",
+      aplicaA: "ESTUDIANTE", orden: 1, activa: true, actualizadoEn: ahora,
+    });
+    const tipoAccionId = await ctx.db.insert("tipoAccion", {
+      institucionId: e.institucionId, categoriaAccionId, codigo: "NEG_ATRASO",
+      nombre: "Atrasos", signo: "NEGATIVA",
+      puntosDefecto: -1, puntosMin: -3, puntosMax: -1,
+      requiereDescripcion: true, admiteInconformidad: true,
+      cuentaEnBitacora: true, activa: true, actualizadoEn: ahora,
+    });
+    const accionId = await ctx.db.insert("accionRegistrada", {
+      matriculaId, periodoAcademicoId: e.periodoAcademicoId,
+      tipoAccionId, categoriaAccionId,
+      signo: "NEGATIVA", puntosAplicados: -2, cuentaEnBitacora: true,
+      descripcion: "Llego tarde tres veces", fechaOcurrencia: "2026-09-07",
+      registradaPorDocenteId: docenteId, estado: "VIGENTE", actualizadoEn: ahora,
+    });
+    return { docenteId, estudianteId, accionId };
+  });
+  return {
+    ...ids,
+    docente: t.withIdentity({ subject: "docente_2" }),
+    representante: t.withIdentity({ subject: "rep_2" }),
+  };
+}
+
+describe("interaccion — la bandeja lee solo lo del docente que la abre (#48)", () => {
+  it("cada docente ve sus reclamos y ninguno de los del otro", async () => {
+    const t = convexTest(schema, modules);
+    const e = await sembrarEscenario(t);
+    const otro = await sembrarSegundoDocente(t, e);
+
+    const mio = await abrirReclamo(t, e, "Esto no ocurrio");
+    await otro.representante.mutation(api.interaccion.abrirInconformidad, {
+      accionRegistradaId: otro.accionId, motivo: "OTRO", mensaje: "Quisiera conversarlo",
+    });
+
+    const bandejaUno = await e.docente.query(api.interaccion.inconformidadesDelDocente);
+    const bandejaDos = await otro.docente.query(api.interaccion.inconformidadesDelDocente);
+
+    expect(bandejaUno).toHaveLength(1);
+    expect(bandejaUno[0].id).toBe(mio);
+    expect(bandejaDos).toHaveLength(1);
+    expect(bandejaDos[0].mensaje).toBe("Quisiera conversarlo");
+    // Y sobre todo: ninguno aparece en la lista del otro.
+    expect(bandejaDos.some((r) => r.id === mio)).toBe(false);
+  });
+
+  /**
+   * Esta es la que distingue el arreglo del codigo anterior: el viejo filtraba
+   * por estado y descartaba en memoria, asi que un reclamo sin `docenteId`
+   * habria aparecido igual. Con el indice `por_docente_estado` no aparece --
+   * que es exactamente la consecuencia de dejar de leer el sistema entero.
+   *
+   * Tambien deja escrito el limite de la migracion: los reclamos que ya
+   * existan en un despliegue de desarrollo salen de la bandeja. No hay datos
+   * reales de ninguna institucion, asi que es aceptable.
+   */
+  it("un reclamo sin docenteId no entra en ninguna bandeja", async () => {
+    const t = convexTest(schema, modules);
+    const e = await sembrarEscenario(t);
+    const id = await abrirReclamo(t, e);
+    await t.run(async (ctx) => {
+      await ctx.db.patch(id, { docenteId: undefined });
+    });
+
+    expect(await e.docente.query(api.interaccion.inconformidadesDelDocente)).toHaveLength(0);
+  });
+
+  it("abrir un reclamo guarda el docente de la accion reclamada", async () => {
+    const t = convexTest(schema, modules);
+    const e = await sembrarEscenario(t);
+    const id = await abrirReclamo(t, e);
+
+    const reclamo = await t.run(async (ctx) => await ctx.db.get(id));
+    expect(reclamo?.docenteId).toBe(e.docenteId);
+  });
+
+  it("un reclamo vencido sigue en la bandeja de su docente, y primero", async () => {
+    const t = convexTest(schema, modules);
+    const e = await sembrarEscenario(t);
+    const otro = await sembrarSegundoDocente(t, e);
+    const viejo = await abrirReclamo(t, e, "El primero");
+    vi.setSystemTime(AHORA.getTime() + 20 * DIA);
+    const reciente = await abrirReclamo(t, e, "El segundo");
+
+    vi.setSystemTime(AHORA.getTime() + 31 * DIA);
+    // El vencimiento ahora se programa reclamo por reclamo, asi que se dispara
+    // el del que ya cumplio el plazo -- no un barrido de todos.
+    await vencer(t, viejo);
+
+    const bandeja = await e.docente.query(api.interaccion.inconformidadesDelDocente);
+    expect(bandeja.map((r) => r.id)).toEqual([viejo, reciente]);
+    expect(bandeja[0].estado).toBe("VENCIDA");
+    // El otro docente no hereda nada del vencimiento ajeno.
+    expect(await otro.docente.query(api.interaccion.inconformidadesDelDocente)).toHaveLength(0);
+  });
+});
