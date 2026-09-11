@@ -403,8 +403,15 @@ function Cursos({
           </Boton>
         ) : (
           <Aviso>
-            Has alcanzado los {datos.limitePlan} cursos de tu plan. La opción
-            para ampliar el plan estará disponible próximamente.
+            {/*
+              El plan gratuito permite 1 curso, y "los 1 cursos de tu plan" es
+              justo lo que se lee en un telefono real. El singular se trata
+              aparte en vez de dejar una plantilla que solo funciona en plural.
+            */}
+            {datos.limitePlan === 1
+              ? "Tu plan incluye un curso y ya lo estás usando."
+              : `Has alcanzado los ${datos.limitePlan} cursos de tu plan.`}{" "}
+            La opción para ampliar el plan estará disponible próximamente.
           </Aviso>
         ))}
     </Pagina>
