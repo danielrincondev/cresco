@@ -17,6 +17,19 @@
       "expo-secure-store",
       "expo-web-browser",
       "expo-font"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "27f464bd-add4-4602-8c14-c4454a4279f1"
+      }
+    },
+    "owner": "kchung176",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/27f464bd-add4-4602-8c14-c4454a4279f1"
+    },
+    "ios": {}
   }
 }
