@@ -11,10 +11,30 @@
  * garantiza la transacción.
  */
 
-import { v } from "convex/values";
-import { internalMutation, type MutationCtx } from "./_generated/server";
-import type { Id } from "./_generated/dataModel";
-import { interpretarEvento, leerEvento } from "./lib/revenuecat";
+import { ConvexError, v } from "convex/values";
+import {
+  internalMutation,
+  query,
+  type MutationCtx,
+  type QueryCtx,
+} from "./_generated/server";
+import type { Doc, Id } from "./_generated/dataModel";
+import { AUDIENCIA_PLAN } from "./lib/enums";
+import { ErrorDominio } from "./lib/guardas";
+import { ErrorPermiso, exigirPerfil } from "./lib/permisos";
+import { interpretarEvento, leerEvento, tieneAccesoVigente } from "./lib/revenuecat";
+
+/** Los errores esperados conservan codigo y mensaje al llegar al cliente. */
+async function conErroresPublicos<T>(operacion: () => Promise<T>): Promise<T> {
+  try {
+    return await operacion();
+  } catch (error) {
+    if (error instanceof ErrorDominio || error instanceof ErrorPermiso) {
+      throw new ConvexError({ codigo: error.codigo, mensaje: error.message });
+    }
+    throw error;
+  }
+}
 
 export const procesarEvento = internalMutation({
   args: {
@@ -148,3 +168,134 @@ async function aplicar(ctx: MutationCtx, payload: unknown, ahora: number) {
 
   return { estado: "CREADA" as const, suscripcionId };
 }
+
+/* ------------------------------------------------------------------ *
+ *  LO QUE LEE LA APLICACIÓN  (D19, P11)
+ * ------------------------------------------------------------------ */
+
+const audiencia = v.union(...AUDIENCIA_PLAN.map((a) => v.literal(a)));
+
+/** El plan gratuito de esa audiencia, que es donde cae quien no paga. */
+async function planGratuito(ctx: QueryCtx, aud: Doc<"plan">["audiencia"]) {
+  const planes = await ctx.db.query("plan").collect();
+  return planes.find(
+    (p) => p.audiencia === aud && p.activo && p.entitlementRevenuecat === undefined,
+  ) ?? null;
+}
+
+function presentarPlan(plan: Doc<"plan">) {
+  return {
+    codigo: plan.codigo,
+    nombre: plan.nombre,
+    audiencia: plan.audiencia,
+    periodicidad: plan.periodicidad,
+    sinPublicidad: plan.sinPublicidad,
+    /** Los límites viven en la fila, no en el código: cambiarlos no es desplegar. */
+    limites: plan.limites,
+    productoGooglePlay: plan.productoGooglePlay ?? null,
+  };
+}
+
+/**
+ * El estado de suscripción del usuario autenticado, por audiencia.
+ *
+ * Una misma persona puede ser docente y representante a la vez, y sus planes
+ * son independientes: un profesor con hijos en el colegio puede tener PRO como
+ * docente y seguir en el gratuito como representante. Por eso devuelve las dos
+ * ramas y no un plan único.
+ *
+ * `acceso` sale siempre de `tieneAccesoVigente`, **nunca de comparar el estado
+ * a mano**: una suscripción `CANCELADA` sigue dando acceso hasta que expira, y
+ * tratarla como vencida le quitaría a alguien lo que ya pagó. Esa regla vive
+ * en `lib/revenuecat.ts` para que exista una sola versión de la verdad.
+ *
+ * Devuelve `null` en la rama que la persona no tiene: quien no es docente no
+ * ve un paywall de docente.
+ */
+export const miSuscripcion = query({
+  args: {},
+  handler: (ctx) => conErroresPublicos(async () => {
+    const perfil = await exigirPerfil(ctx);
+    const ahora = Date.now();
+
+    const esDocente = await ctx.db.query("docente")
+      .withIndex("por_perfil", (q) => q.eq("perfilUsuarioId", perfil._id)).unique();
+    const esRepresentante = await ctx.db.query("representante")
+      .withIndex("por_perfil", (q) => q.eq("perfilUsuarioId", perfil._id)).unique();
+
+    // El índice permite consultar solo por el prefijo, sin fijar el estado:
+    // interesan todas, incluidas las canceladas que aún no expiran.
+    const suyas = await ctx.db.query("suscripcion")
+      .withIndex("por_usuario", (q) => q.eq("perfilUsuarioId", perfil._id))
+      .collect();
+
+    const mejorPorAudiencia = new Map<string, {
+      suscripcion: Doc<"suscripcion">; plan: Doc<"plan">; acceso: boolean;
+    }>();
+    for (const suscripcion of suyas) {
+      const plan = await ctx.db.get(suscripcion.planId);
+      if (plan === null) continue;
+      // `expiraEn` es opcional en el documento y la guarda lo pide explicito:
+      // se pasa como null para que "no expira" no se confunda con "sin dato".
+      const acceso = tieneAccesoVigente(
+        { estado: suscripcion.estado, expiraEn: suscripcion.expiraEn ?? null },
+        ahora,
+      );
+      const previa = mejorPorAudiencia.get(plan.audiencia);
+      // Gana la que da acceso; entre iguales, la que empezó después.
+      const mejor = previa === undefined ||
+        (acceso && !previa.acceso) ||
+        (acceso === previa.acceso && suscripcion.iniciaEn > previa.suscripcion.iniciaEn);
+      if (mejor) mejorPorAudiencia.set(plan.audiencia, { suscripcion, plan, acceso });
+    }
+
+    async function rama(aud: Doc<"plan">["audiencia"], tieneElRol: boolean) {
+      if (!tieneElRol) return null;
+      const mejor = mejorPorAudiencia.get(aud);
+      if (mejor !== undefined && mejor.acceso) {
+        return {
+          plan: presentarPlan(mejor.plan),
+          estado: mejor.suscripcion.estado,
+          expiraEn: mejor.suscripcion.expiraEn ?? null,
+          renovacionAutomatica: mejor.suscripcion.renovacionAutomatica,
+          acceso: true as const,
+        };
+      }
+      // Sin acceso vigente se cae al gratuito, aunque exista una suscripción
+      // vencida: lo que la pantalla tiene que mostrar es lo que puede hacer hoy.
+      const gratuito = await planGratuito(ctx, aud);
+      if (gratuito === null) return null;
+      return {
+        plan: presentarPlan(gratuito),
+        estado: mejor?.suscripcion.estado ?? ("SIN_SUSCRIPCION" as const),
+        expiraEn: mejor?.suscripcion.expiraEn ?? null,
+        renovacionAutomatica: false,
+        acceso: false as const,
+      };
+    }
+
+    return {
+      representante: await rama("REPRESENTANTE", esRepresentante !== null),
+      docente: await rama("DOCENTE", esDocente !== null),
+    };
+  }),
+});
+
+/**
+ * El catálogo de planes de pago de una audiencia, para pintar el paywall.
+ *
+ * No incluye el gratuito: no es algo que se compre, es donde se está. Y no
+ * devuelve precios — los pone RevenueCat en el dispositivo, con la moneda y el
+ * formato de cada país (ADR-006). Escribir un precio aquí sería tener dos
+ * fuentes de verdad para lo único que no admite dos.
+ */
+export const planesDisponibles = query({
+  args: { audiencia },
+  handler: (ctx, args) => conErroresPublicos(async () => {
+    await exigirPerfil(ctx);
+    const planes = await ctx.db.query("plan").collect();
+    return planes
+      .filter((p) => p.activo && p.audiencia === args.audiencia && p.entitlementRevenuecat !== undefined)
+      .map((p) => ({ ...presentarPlan(p), entitlement: p.entitlementRevenuecat ?? null }));
+  }),
+});

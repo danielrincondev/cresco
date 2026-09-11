@@ -32,15 +32,18 @@
 # Entrega de notificaciones al telefono -- Persona C.
 /movil/convex/push.ts          @Kenny28-176 @danielrincondev
 
-# Interfaz: tema, componentes base y pantallas — Persona D (@krriveram),
-# incorporada el 31 de agosto de 2026 como responsable de UI. Consume las
-# funciones de convex/ que exponen A, B y C; no las edita.
-# Kenny es el respaldo aqui ademas de en su propio modulo — si esto se vuelve
-# un cuello de botella (muchos PR de D esperando a una sola persona), se
-# reparte por pantalla en vez de concentrarlo en Kenny.
-/movil/src/theme/               @krriveram @Kenny28-176
-/movil/src/components/          @krriveram @Kenny28-176
-/movil/src/screens/             @krriveram @Kenny28-176
+# Interfaz: tema, componentes base y las 31 pantallas -- Persona C.
+# Hasta el 10 de septiembre esto era el modulo de Persona D. DP-012 disolvio
+# ese rol y la interfaz paso a Kenny junto con interaccion e infraestructura;
+# las pantallas NO volvieron a A ni a B, que siguen en sus backends.
+#
+# Esto concentra en Kenny mas superficie de revision que en nadie: es un riesgo
+# asumido, no un descuido. Si los PR de interfaz empiezan a acumularse
+# esperando a una sola persona, se reparte por modulo -- quien escribio el
+# backend de D14-D19 revisa esas pantallas, y asi con cada uno.
+/movil/src/theme/               @Kenny28-176 @danielrincondev
+/movil/src/components/          @Kenny28-176 @danielrincondev
+/movil/src/screens/             @Kenny28-176 @danielrincondev
 
 # Superficie compartida: cambia solo con acuerdo de los tres
 # (docs/02-equipo/manual-equipo.md, sección "Propiedad")
