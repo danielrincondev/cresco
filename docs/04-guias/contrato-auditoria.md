@@ -13,12 +13,38 @@ le enseña a un colegio cuando pregunta *"¿quién vio los datos de mi hijo?"*.
 
 ## Los cuatro eventos de la v1 y quién los produce
 
-| Evento | Quién lo escribe | Estado |
+Un evento necesita **dos** piezas: la función que lo escribe y alguien que la
+llame. Tenerlas separadas es lo que hizo que `LOGIN` y `LEER_SENSIBLE`
+existieran durante días sin registrar nada — la tabla vacía y nadie enterado.
+Por eso esta tabla mira las dos.
+
+| Evento | Quién lo escribe | Quién lo dispara | Estado |
+|---|---|---|---|
+| `APROBAR` estudiante | `nucleo.aprobarEstudiante` | la propia mutation | ✅ |
+| `CREAR` acción | `conducta.registrarAccion` | la propia mutation | ✅ desde el PR #39 |
+| `LOGIN` | `auditoria.registrarInicioSesion` | `useAuditoriaSesion` en `NucleoScreen` | ✅ |
+| `LEER_SENSIBLE` | `auditoria.registrarLecturaSensible` | `useLecturaSensible` en `AprobarForm` | ⚠️ parcial, ver abajo |
+| `ANULAR` acción | `conducta.anularAccion` | — | ⏳ falta la mutation (#9) |
+
+### Lo que falta de `LEER_SENSIBLE`
+
+Hoy solo lo dispara **una** pantalla: la ficha de un estudiante pendiente que
+el docente abre para revisar y aprobar. Es la única que existe ahora mismo y
+que muestra los datos de un menor uno por uno.
+
+Faltan las que aún no están construidas, y cada una tiene que llamarlo al
+abrirse o el acceso no queda registrado:
+
+| Pantalla | `recurso` | Depende de |
 |---|---|---|
-| `APROBAR` estudiante | `nucleo.aprobarEstudiante` | Hecho (Persona A, #7) |
-| `LOGIN` | `auditoria.registrarInicioSesion` | Hecho (#19) |
-| `LEER_SENSIBLE` | `auditoria.registrarLecturaSensible` | Hecho (#19) |
-| `CREAR` / `ANULAR` acción | `conducta.ts` | Pendiente (Persona B, #9) |
+| Reporte diario del hijo (P4) | `REPORTE_ESTUDIANTE` | `conducta.ts` (#10) |
+| Bitácora de acciones (P6) | `BITACORA_ACCIONES` | `conducta.ts` (#10) |
+| Puntaje del parcial (P6) | `PUNTAJE_PERIODO` | `conducta.ts` (#10) |
+
+La lista del curso (`Estudiantes`) **no** lo dispara a propósito: es un listado
+de nombres, no la apertura del expediente de una persona. Registrar cada
+scroll llenaría la bitácora de ruido y haría más difícil responder la pregunta
+que importa.
 
 `EXPORTAR` y `ALERTA` están diferidos a la v2 por DP-006. (`interaccion.ts` ya
 escribe `ALERTA`; es de más, no de menos.)
