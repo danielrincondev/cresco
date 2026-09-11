@@ -74,8 +74,8 @@ alertas de emergencia recibidas y confirmadas.
 ### Técnicos
 
 El identificador del dispositivo para enviar notificaciones, la plataforma y la
-versión de la aplicación, y un **registro de auditoría** de quién accedió a la
-información de un estudiante y cuándo.
+versión de la aplicación, y un **registro de auditoría** de quién realizó cada
+acción sensible sobre la información de un estudiante y cuándo.
 
 ## 4. Qué NO recogemos
 
@@ -99,9 +99,11 @@ información de un estudiante y cuándo.
 En esta primera versión **cada estudiante tiene un solo representante legal
 registrado**, que es quien canjea el código de invitación del curso.
 
-Cada acceso a información de un estudiante queda registrado en una bitácora de
-auditoría, para poder demostrar ante la institución que nadie vio lo que no le
-correspondía.
+Las acciones sensibles sobre un estudiante —abrir su ficha, registrar o anular
+una acción de conducta, aprobar su matrícula, iniciar sesión— quedan registradas
+en una bitácora de auditoría, para poder demostrar ante la institución quién
+hizo qué. En esta primera versión la bitácora cubre esas acciones, no toda
+consulta de pantalla.
 
 ## 6. Terceros que participan en el servicio
 
@@ -133,7 +135,7 @@ no:
 
 | Derecho | Estado en esta versión |
 |---|---|
-| **Acceso** — saber qué datos tenemos y consultarlos | ✅ Disponible. Puede ver toda la información de su representado en la aplicación y descargarla en PDF |
+| **Acceso** — saber qué datos tenemos y consultarlos | ✅ Disponible en la aplicación. La **descarga en PDF** todavía no existe: llega en una versión posterior (DP-009) |
 | **Rectificación** — corregir datos inexactos | ⚠️ Parcial. El docente puede corregir los datos del estudiante. Para otras correcciones, escríbanos |
 | **Oposición** — dejar de usar el servicio | ✅ Disponible. Puede revocar su consentimiento en cualquier momento |
 | **Eliminación** — que borremos los datos | ⚠️ **No disponible todavía.** Ver abajo |
@@ -170,8 +172,8 @@ la carta de acuerdo del piloto**, no lo decidimos unilateralmente.
   consulta, no solo en la aplicación del teléfono.
 - Las contraseñas nunca se almacenan en texto plano: la autenticación la maneja
   un proveedor especializado.
-- Cada acceso a información sensible de un estudiante queda registrado en una
-  bitácora de auditoría.
+- Las acciones sensibles sobre un estudiante quedan registradas en una bitácora
+  de auditoría, con quién las hizo y cuándo.
 - Activar una alerta de emergencia exige que el docente vuelva a confirmar su
   identidad, para que no se dispare por accidente.
 

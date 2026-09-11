@@ -72,6 +72,29 @@ describe("aviso de privacidad — lo que ve el representante", () => {
   });
 
   /**
+   * DP-009 difirió el informe imprimible a la v2, y la pantalla de ajustes ya
+   * se lo dice al docente con todas sus letras. El aviso, en cambio, listaba
+   * la descarga en PDF como un derecho disponible: la misma aplicación daba
+   * dos respuestas opuestas a la misma pregunta, y la del aviso era la que
+   * prometía de más.
+   */
+  it("no ofrece la descarga en PDF que la v1 no tiene", () => {
+    expect(avisoPrivacidad).toContain("descarga en PDF** todavía no existe");
+    expect(avisoPrivacidad).not.toContain("y descargarla en PDF");
+  });
+
+  /**
+   * DP-006: la bitácora de la v1 cubre inicio de sesión, lectura de una ficha,
+   * crear o anular una acción y aprobar un estudiante — no cada consulta de
+   * pantalla. Decir "cada acceso" era prometer una garantía que el piloto no
+   * puede sostener si la institución la audita.
+   */
+  it("describe el alcance real de la bitácora, sin decir 'cada acceso'", () => {
+    expect(avisoPrivacidad).not.toContain("Cada acceso a información");
+    expect(avisoPrivacidad).toContain("la bitácora cubre esas acciones, no toda");
+  });
+
+  /**
    * El guardia contra la deriva. La versión `2026-09-v1` vive en tres sitios
    * —el documento, `VERSION_CONSENTIMIENTO` de `convex/nucleo.ts` y este
    * archivo— y `consentimiento.versionDocumento` guarda la que la persona leyó.
