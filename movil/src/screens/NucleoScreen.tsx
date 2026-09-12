@@ -261,6 +261,13 @@ function PerfilForm({
   onGuardar: () => void;
 }) {
   const completar = useMutation(api.nucleo.completarPerfil);
+  const { user } = useUser();
+  // Clerk ya sabe como se llama la persona si se registro con Google o si lo
+  // escribio al crear la cuenta. Se propone, no se impone: el nombre legal que
+  // el docente firma no siempre es el que puso en su correo, y es un campo
+  // editable, no de solo lectura.
+  const [nombres, setNombres] = useState(perfil?.nombres ?? user?.firstName ?? "");
+  const [apellidos, setApellidos] = useState(perfil?.apellidos ?? user?.lastName ?? "");
   const [documento, setDocumento] = useState<"CEDULA" | "PASAPORTE">("CEDULA");
   const [numero, setNumero] = useState("");
   const [telefono, setTelefono] = useState("");
@@ -274,6 +281,8 @@ function PerfilForm({
     ];
     const r = await op.ejecutar(() =>
       completar({
+        nombres,
+        apellidos,
         tipoDocumento: documento,
         numeroDocumento: numero,
         telefono: telefono.trim() || undefined,
@@ -308,6 +317,22 @@ function PerfilForm({
       </Tarjeta>
       <Tarjeta>
         <Subtitulo>Tu identificación</Subtitulo>
+        <Campo
+          etiqueta="Nombres"
+          value={nombres}
+          onChangeText={setNombres}
+          autoCapitalize="words"
+          maxLength={60}
+          editable={!op.pendiente}
+        />
+        <Campo
+          etiqueta="Apellidos"
+          value={apellidos}
+          onChangeText={setApellidos}
+          autoCapitalize="words"
+          maxLength={60}
+          editable={!op.pendiente}
+        />
         <Opciones
           valor={documento}
           opciones={documentosAdulto}
@@ -336,7 +361,9 @@ function PerfilForm({
       <Boton
         onPress={() => void guardar()}
         pendiente={op.pendiente}
-        disabled={!numero.trim() || (!docente && !representante)}
+        disabled={
+          !nombres.trim() || !apellidos.trim() || !numero.trim() || (!docente && !representante)
+        }
       >
         Guardar y continuar
       </Boton>

@@ -125,6 +125,20 @@ export default defineSchema({
   perfilUsuario: defineTable({
     /** tokenIdentifier (emisor + subject); admite subject legado del emisor configurado. */
     authSubject: v.string(),
+    /**
+     * Como se llama la persona (#52).
+     *
+     * Vivian solo en Clerk, del lado del cliente y solo para uno mismo, asi
+     * que el docente y el representante conversaban -- citas, reclamos,
+     * alertas sobre un menor -- sin saber el nombre del otro. El aviso de
+     * privacidad ya declara que recogemos nombres y apellidos de ambos: el
+     * documento asumia un campo que no existia.
+     *
+     * Opcionales por los perfiles creados antes. `completarPerfil` los exige
+     * de aqui en adelante.
+     */
+    nombres: v.optional(v.string()),
+    apellidos: v.optional(v.string()),
     tipoDocumento: enumDe(TIPO_DOCUMENTO),
     numeroDocumento: v.string(),
     telefono: v.optional(v.string()),

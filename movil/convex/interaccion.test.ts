@@ -907,3 +907,89 @@ describe("interaccion — las citas que ve el representante", () => {
     expect(cita.notasDocente).toBe("Ese día tengo consejo de curso");
   });
 });
+
+describe("interaccion — quien es el docente de mi hijo (P9, #52)", () => {
+  /** Pone nombre y ficha profesional al docente sembrado. */
+  async function darleNombreAlDocente(
+    t: ReturnType<typeof convexTest>,
+    docenteId: Id<"docente">,
+  ) {
+    await t.run(async (ctx) => {
+      const docente = (await ctx.db.get(docenteId))!;
+      await ctx.db.patch(docente.perfilUsuarioId, { nombres: "María", apellidos: "Loor" });
+      await ctx.db.patch(docenteId, {
+        tituloProfesional: "Licenciada en Educación Básica",
+        correoContacto: "mloor@colegio.edu.ec",
+        horarioAtencion: "Martes de 10:00 a 11:00",
+      });
+    });
+  }
+
+  it("el representante ve el nombre y la ficha del titular de su hijo", async () => {
+    const t = convexTest(schema, modules);
+    const e = await sembrarEscenario(t);
+    await darleNombreAlDocente(t, e.docenteId);
+
+    expect(
+      await e.representante.query(api.interaccion.docenteACargo, { estudianteId: e.estudianteId }),
+    ).toMatchObject({
+      nombre: "María Loor",
+      curso: "Quinto A",
+      tituloProfesional: "Licenciada en Educación Básica",
+      correoContacto: "mloor@colegio.edu.ec",
+      telefonoContacto: null,
+    });
+  });
+
+  /**
+   * La razon por la que esta consulta empieza por `exigirVinculo`: sin eso,
+   * cualquiera con una cuenta podria sacar el correo y el telefono de
+   * cualquier docente del sistema probando ids de estudiante.
+   */
+  it("no la puede consultar un representante sin vinculo con ese estudiante", async () => {
+    const t = convexTest(schema, modules);
+    const e = await sembrarEscenario(t);
+
+    await t.run(async (ctx) => {
+      const perfil = await ctx.db.insert("perfilUsuario", {
+        authSubject: "https://convex.test|rep_9", tipoDocumento: "CEDULA",
+        numeroDocumento: "0900000019", actualizadoEn: Date.now(),
+      });
+      await ctx.db.insert("representante", { perfilUsuarioId: perfil, actualizadoEn: Date.now() });
+    });
+
+    await expect(
+      t.withIdentity({ subject: "rep_9" }).query(api.interaccion.docenteACargo, {
+        estudianteId: e.estudianteId,
+      }),
+    ).rejects.toThrow("No tienes acceso");
+  });
+
+  /**
+   * Un perfil creado antes de #52 no tiene nombres. La pantalla tiene que
+   * poder distinguir "todavia no lo sabemos" de una cadena vacia con espacios.
+   */
+  it("devuelve nombre null si el perfil del docente es anterior a los nombres", async () => {
+    const t = convexTest(schema, modules);
+    const e = await sembrarEscenario(t);
+
+    const ficha = await e.representante.query(api.interaccion.docenteACargo, {
+      estudianteId: e.estudianteId,
+    });
+    expect(ficha?.nombre).toBeNull();
+    expect(ficha?.docenteId).toBe(e.docenteId);
+  });
+
+  it("devuelve null cuando el curso no tiene titular vigente", async () => {
+    const t = convexTest(schema, modules);
+    const e = await sembrarEscenario(t);
+    await t.run(async (ctx) => {
+      const asignacion = (await ctx.db.query("asignacionDocente").unique())!;
+      await ctx.db.patch(asignacion._id, { vigenteHasta: "2026-06-30" });
+    });
+
+    expect(
+      await e.representante.query(api.interaccion.docenteACargo, { estudianteId: e.estudianteId }),
+    ).toBeNull();
+  });
+});
