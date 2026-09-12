@@ -475,7 +475,7 @@ export const definirPeriodos = mutation({
 });
 
 // Invitaciones y alta de estudiantes — #7.
-const VERSION_CONSENTIMIENTO = "2026-09-v1";
+const VERSION_CONSENTIMIENTO = "2026-09-v2";
 const tipoDocumentoEstudiante = v.union(...TIPO_DOCUMENTO.map((tipo) => v.literal(tipo)));
 const credencialInvitacion = v.union(
   v.object({ codigo: v.string() }),
