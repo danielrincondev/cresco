@@ -1,6 +1,6 @@
 # DP-013 — Importar la lista del curso por CSV (D9) se difiere a la v2
 
-**Fecha:** 2026-09-11 · **Estado:** Propuesta · **Dueño:** Persona C
+**Fecha:** 2026-09-11 · **Estado:** Aceptada · **Dueño:** Persona C
 
 ## Contexto
 
