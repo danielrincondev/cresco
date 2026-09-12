@@ -620,6 +620,12 @@ export default defineSchema({
     fechaHoraFin: v.number(), // ck_cita_horas → guardas.ts
     modalidad: enumDe(MODALIDAD),
     estado: enumDe(ESTADO_CITA),
+    /**
+     * **Lo ve el representante.** El nombre engaña: no es una nota privada del
+     * docente, es el mensaje que escribe al confirmar o rechazar, y
+     * `responderCita` ya lo manda dentro de la notificacion. No guardar aqui
+     * nada que no se le pueda decir a la familia a la cara.
+     */
     notasDocente: v.optional(v.string()),
     ...actualizadoEn,
   })
