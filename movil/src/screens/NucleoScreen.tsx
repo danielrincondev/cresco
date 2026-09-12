@@ -42,6 +42,7 @@ import {
   Tarjeta,
   useOperacion,
 } from "../components/NucleoUI";
+import { PaywallDocente, PaywallRepresentante } from "./PaywallScreen";
 import {
   AgendaDocente,
   Ajustes,
@@ -80,7 +81,9 @@ type Ruta =
   | { tipo: "inicio" | "perfil" | "registro" | "crearCurso" }
   // Interaccion (#33). Las de familia no llevan curso: el permiso sale del
   // vinculo del representante, no de un curso que la pantalla elija.
-  | { tipo: "notificaciones" | "citas" | "alertas" | "ajustes" | "perfilDocente" }
+  | {
+      tipo: "notificaciones" | "citas" | "alertas" | "ajustes" | "perfilDocente" | "plan";
+    }
   // P9 necesita saber de que hijo se pregunta: un representante con dos hijos
   // en cursos distintos tiene dos docentes a cargo, no uno.
   | { tipo: "docenteACargo"; estudianteId: Id<"estudiante">; nombre: string }
@@ -233,6 +236,11 @@ export function NucleoScreen() {
           <PerfilDocente />
         ) : ruta.tipo === "docenteACargo" ? (
           <ProfesorACargo estudianteId={ruta.estudianteId} nombre={ruta.nombre} />
+        ) : ruta.tipo === "plan" ? (
+          // Un solo destino para los dos muros: cual se pinta lo decide el rol
+          // activo, y `miSuscripcion` devuelve null en la rama que la persona
+          // no tiene, asi que nadie ve el plan de un rol que no usa.
+          rol === "DOCENTE" ? <PaywallDocente /> : <PaywallRepresentante />
         ) : (
           <>
             {perfil.docenteId && perfil.representanteId && (
@@ -586,6 +594,9 @@ function DetalleCurso({
       </Boton>
       <Boton secundario onPress={() => navegar({ tipo: "perfilDocente" })}>
         Tu perfil profesional
+      </Boton>
+      <Boton secundario onPress={() => navegar({ tipo: "plan" })}>
+        Tu plan
       </Boton>
       <Opciones
         valor={pestana}
@@ -1013,6 +1024,9 @@ function MisHijos({
       </Boton>
       <Boton secundario onPress={() => navegar({ tipo: "alertas" })}>
         Alertas del curso
+      </Boton>
+      <Boton secundario onPress={() => navegar({ tipo: "plan" })}>
+        Tu plan
       </Boton>
     </Pagina>
   );

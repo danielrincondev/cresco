@@ -494,6 +494,9 @@ export const abrirInconformidad = mutation({
     const inconformidadId = await ctx.db.insert("inconformidad", {
       accionRegistradaId: args.accionRegistradaId,
       representanteId: representante._id,
+      // Se copia del la accion que se reclama: es lo que hace que la bandeja
+      // del docente sea una lectura indexada y no un barrido de la tabla.
+      docenteId: accion.registradaPorDocenteId,
       motivo: args.motivo,
       mensaje: exigirTexto(args.mensaje, "El mensaje del reclamo"),
       estado: "ABIERTA",
@@ -535,11 +538,17 @@ export const inconformidadesDelDocente = query({
   handler: (ctx) => conErroresPublicos(async () => {
     const docente = await exigirDocente(ctx);
 
+    // Antes esto recorria **todos** los reclamos abiertos del sistema y se
+    // quedaba con los suyos en memoria: el trabajo de cada docente crecia con
+    // los reclamos de todos los demas (#48). Ahora el indice entrega
+    // directamente los de este docente.
     const enCurso: Doc<"inconformidad">[] = [];
     for (const estado of ["ABIERTA", "EN_REVISION"] as const) {
       const lote = await ctx.db
         .query("inconformidad")
-        .withIndex("por_estado_vence", (q) => q.eq("estado", estado))
+        .withIndex("por_docente_estado", (q) =>
+          q.eq("docenteId", docente._id).eq("estado", estado),
+        )
         .collect();
       enCurso.push(...lote);
     }
