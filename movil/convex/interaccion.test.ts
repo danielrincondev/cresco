@@ -678,3 +678,96 @@ describe("interaccion — frontera pública de alertas", () => {
     expect(await t.run(ctx => ctx.db.query("alertaEmergencia").collect())).toEqual([]);
   });
 });
+
+describe("interaccion — las citas que ve el representante", () => {
+  /**
+   * Era la unica funcion publica del backend sin ninguna prueba. Y no es
+   * cualquiera: es una lectura de la agenda de un menor, con un indice por
+   * representante como toda la separacion entre una familia y otra.
+   */
+  it("solo devuelve las citas propias, nunca las de otra familia", async () => {
+    const t = convexTest(schema, modules);
+    const e = await sembrarEscenario(t);
+
+    await t.run(async (ctx) => {
+      const ahora = Date.now();
+      const perfilAjeno = await ctx.db.insert("perfilUsuario", {
+        authSubject: "https://convex.test|rep_8", tipoDocumento: "CEDULA",
+        numeroDocumento: "0900000018", actualizadoEn: ahora,
+      });
+      const representanteAjeno = await ctx.db.insert("representante", {
+        perfilUsuarioId: perfilAjeno, actualizadoEn: ahora,
+      });
+      const base = {
+        docenteId: e.docenteId, estudianteId: e.estudianteId, origen: "SOLICITADA_POR_REPRESENTANTE" as const,
+        fechaHoraInicio: ahora, fechaHoraFin: ahora + 900_000,
+        modalidad: "PRESENCIAL" as const, estado: "SOLICITADA" as const, actualizadoEn: ahora,
+      };
+      await ctx.db.insert("cita", { ...base, representanteId: e.representanteId, motivo: "La mia" });
+      await ctx.db.insert("cita", { ...base, representanteId: representanteAjeno, motivo: "La de otra familia" });
+    });
+
+    const mias = await e.representante.query(api.interaccion.misCitasRepresentante);
+    expect(mias).toHaveLength(1);
+    expect(mias[0].motivo).toBe("La mia");
+  });
+
+  /**
+   * Al representante se le enseñan primero las mas recientes -- lo contrario
+   * que al docente, que necesita ver que tiene por delante. Son dos ordenes
+   * opuestos a proposito y conviene que se rompa una prueba si alguien los
+   * "uniforma".
+   */
+  it("las ordena de la mas reciente a la mas antigua", async () => {
+    const t = convexTest(schema, modules);
+    const e = await sembrarEscenario(t);
+
+    await t.run(async (ctx) => {
+      const ahora = Date.now();
+      for (const [i, motivo] of ["vieja", "media", "nueva"].entries()) {
+        await ctx.db.insert("cita", {
+          docenteId: e.docenteId, representanteId: e.representanteId,
+          estudianteId: e.estudianteId, origen: "SOLICITADA_POR_REPRESENTANTE", motivo,
+          fechaHoraInicio: ahora + i * 86_400_000,
+          fechaHoraFin: ahora + i * 86_400_000 + 900_000,
+          modalidad: "PRESENCIAL", estado: "SOLICITADA", actualizadoEn: ahora,
+        });
+      }
+    });
+
+    expect(
+      (await e.representante.query(api.interaccion.misCitasRepresentante)).map((c) => c.motivo),
+    ).toEqual(["nueva", "media", "vieja"]);
+  });
+
+  /**
+   * `notasDocente` se llama como si fuera privado y **no lo es**: es el
+   * mensaje que el docente escribe al rechazar o confirmar, y
+   * `responderCita` ya lo manda dentro de la notificacion al representante.
+   *
+   * Esta prueba existe para que el nombre no engañe a nadie mas adelante. El
+   * dia que alguien quiera guardar ahi una nota privada sobre una familia,
+   * que se le rompa esto y lea por que.
+   */
+  it("el representante ve notasDocente, porque es un mensaje para el", async () => {
+    const t = convexTest(schema, modules);
+    const e = await sembrarEscenario(t);
+
+    const citaId = await t.run(async (ctx) => {
+      const ahora = Date.now();
+      return await ctx.db.insert("cita", {
+        docenteId: e.docenteId, representanteId: e.representanteId,
+        estudianteId: e.estudianteId, origen: "SOLICITADA_POR_REPRESENTANTE",
+        fechaHoraInicio: ahora, fechaHoraFin: ahora + 900_000,
+        modalidad: "PRESENCIAL", estado: "SOLICITADA", actualizadoEn: ahora,
+      });
+    });
+
+    await e.docente.mutation(api.interaccion.responderCita, {
+      citaId, aceptar: false, notasDocente: "Ese día tengo consejo de curso",
+    });
+
+    const [cita] = await e.representante.query(api.interaccion.misCitasRepresentante);
+    expect(cita.notasDocente).toBe("Ese día tengo consejo de curso");
+  });
+});
