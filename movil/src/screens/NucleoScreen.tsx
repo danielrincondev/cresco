@@ -41,6 +41,7 @@ import {
   Tarjeta,
   useOperacion,
 } from "../components/NucleoUI";
+import { PaywallDocente, PaywallRepresentante } from "./PaywallScreen";
 import {
   AgendaDocente,
   Ajustes,
@@ -77,7 +78,7 @@ type Ruta =
   | { tipo: "inicio" | "perfil" | "registro" | "crearCurso" }
   // Interaccion (#33). Las de familia no llevan curso: el permiso sale del
   // vinculo del representante, no de un curso que la pantalla elija.
-  | { tipo: "notificaciones" | "citas" | "alertas" | "ajustes" }
+  | { tipo: "notificaciones" | "citas" | "alertas" | "ajustes" | "plan" }
   | { tipo: "curso" | "periodos" | "reclamos" | "agenda" | "alerta"; curso: Curso }
   | { tipo: "invitacion"; invitacion: Invitacion; curso: Curso }
   | { tipo: "aprobar"; curso: Curso; alumno: Alumno };
@@ -223,6 +224,11 @@ export function NucleoScreen() {
           <CitasFamilia />
         ) : ruta.tipo === "alertas" ? (
           <AlertasFamilia />
+        ) : ruta.tipo === "plan" ? (
+          // Un solo destino para los dos muros: cual se pinta lo decide el rol
+          // activo, y `miSuscripcion` devuelve null en la rama que la persona
+          // no tiene, asi que nadie ve el plan de un rol que no usa.
+          rol === "DOCENTE" ? <PaywallDocente /> : <PaywallRepresentante />
         ) : (
           <>
             {perfil.docenteId && perfil.representanteId && (
@@ -573,6 +579,9 @@ function DetalleCurso({
       </Boton>
       <Boton secundario onPress={() => navegar({ tipo: "alerta", curso })}>
         Alerta de emergencia
+      </Boton>
+      <Boton secundario onPress={() => navegar({ tipo: "plan" })}>
+        Tu plan
       </Boton>
       <Opciones
         valor={pestana}
@@ -984,6 +993,9 @@ function MisHijos({
       </Boton>
       <Boton secundario onPress={() => navegar({ tipo: "alertas" })}>
         Alertas del curso
+      </Boton>
+      <Boton secundario onPress={() => navegar({ tipo: "plan" })}>
+        Tu plan
       </Boton>
     </Pagina>
   );
