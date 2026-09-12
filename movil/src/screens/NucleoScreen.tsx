@@ -14,6 +14,7 @@ import { useClerk, useUser } from "@clerk/expo";
 import { useMutation, usePaginatedQuery, useQuery } from "convex/react";
 import { ConvexError } from "convex/values";
 import type { FunctionReturnType } from "convex/server";
+import type { Id } from "../../convex/_generated/dataModel";
 import { randomUUID } from "expo-crypto";
 import { api } from "../../convex/_generated/api";
 import { PARENTESCO } from "../../convex/lib/enums";
@@ -44,6 +45,8 @@ import {
 import {
   AgendaDocente,
   Ajustes,
+  PerfilDocente,
+  ProfesorACargo,
   AlertaDocente,
   AlertasFamilia,
   CitasFamilia,
@@ -77,7 +80,10 @@ type Ruta =
   | { tipo: "inicio" | "perfil" | "registro" | "crearCurso" }
   // Interaccion (#33). Las de familia no llevan curso: el permiso sale del
   // vinculo del representante, no de un curso que la pantalla elija.
-  | { tipo: "notificaciones" | "citas" | "alertas" | "ajustes" }
+  | { tipo: "notificaciones" | "citas" | "alertas" | "ajustes" | "perfilDocente" }
+  // P9 necesita saber de que hijo se pregunta: un representante con dos hijos
+  // en cursos distintos tiene dos docentes a cargo, no uno.
+  | { tipo: "docenteACargo"; estudianteId: Id<"estudiante">; nombre: string }
   | { tipo: "curso" | "periodos" | "reclamos" | "agenda" | "alerta"; curso: Curso }
   | { tipo: "invitacion"; invitacion: Invitacion; curso: Curso }
   | { tipo: "aprobar"; curso: Curso; alumno: Alumno };
@@ -223,6 +229,10 @@ export function NucleoScreen() {
           <CitasFamilia />
         ) : ruta.tipo === "alertas" ? (
           <AlertasFamilia />
+        ) : ruta.tipo === "perfilDocente" ? (
+          <PerfilDocente />
+        ) : ruta.tipo === "docenteACargo" ? (
+          <ProfesorACargo estudianteId={ruta.estudianteId} nombre={ruta.nombre} />
         ) : (
           <>
             {perfil.docenteId && perfil.representanteId && (
@@ -573,6 +583,9 @@ function DetalleCurso({
       </Boton>
       <Boton secundario onPress={() => navegar({ tipo: "alerta", curso })}>
         Alerta de emergencia
+      </Boton>
+      <Boton secundario onPress={() => navegar({ tipo: "perfilDocente" })}>
+        Tu perfil profesional
       </Boton>
       <Opciones
         valor={pestana}
@@ -974,6 +987,22 @@ function MisHijos({
                   ? "Tu hijo ya forma parte del curso."
                   : "Consulta con el docente para revisar el registro."}
             </Cuerpo>
+            {a.estadoVerificacion === "APROBADO" && (
+              // Solo con la matricula aprobada: antes de eso no hay curso y
+              // por tanto no hay titular del que hablar.
+              <Boton
+                secundario
+                onPress={() =>
+                  navegar({
+                    tipo: "docenteACargo",
+                    estudianteId: a.estudianteId,
+                    nombre: a.nombres,
+                  })
+                }
+              >
+                Ver al docente a cargo
+              </Boton>
+            )}
           </Tarjeta>
         ))
       )}
