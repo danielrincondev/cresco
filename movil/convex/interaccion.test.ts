@@ -993,3 +993,50 @@ describe("interaccion — quien es el docente de mi hijo (P9, #52)", () => {
     ).toBeNull();
   });
 });
+
+describe("interaccion — la bandeja dice de quien se habla (#52)", () => {
+  /**
+   * Antes la bandeja daba motivo, mensaje y la anotacion, pero **no el
+   * estudiante**. En esa pantalla el docente puede anular una sancion: con
+   * dos reclamos abiertos a la vez, decidir cual anula era cuestion de suerte.
+   */
+  it("trae el nombre del estudiante y el del representante que reclama", async () => {
+    const t = convexTest(schema, modules);
+    const e = await sembrarEscenario(t);
+    const accionRegistradaId = await sembrarAccion(t, e);
+
+    await t.run(async (ctx) => {
+      const representante = (await ctx.db.get(e.representanteId))!;
+      await ctx.db.patch(representante.perfilUsuarioId, {
+        nombres: "Rosa", apellidos: "Pérez",
+      });
+    });
+
+    await e.representante.mutation(api.interaccion.abrirInconformidad, {
+      accionRegistradaId, motivo: "NO_OCURRIO", mensaje: "Mi hija no estuvo ese día.",
+    });
+
+    const [reclamo] = await e.docente.query(api.interaccion.inconformidadesDelDocente);
+    expect(reclamo.estudiante?.nombre).toBe("Ana Pérez");
+    expect(reclamo.representante).toBe("Rosa Pérez");
+  });
+
+  /**
+   * Un perfil creado antes de #52 no tiene nombres. Devolver `null` deja que
+   * la pantalla lo diga con palabras ("lo abrió su representante") en vez de
+   * pintar un hueco o, peor, la cadena "undefined undefined".
+   */
+  it("devuelve null en el representante sin nombres, no una cadena a medias", async () => {
+    const t = convexTest(schema, modules);
+    const e = await sembrarEscenario(t);
+    const accionRegistradaId = await sembrarAccion(t, e);
+
+    await e.representante.mutation(api.interaccion.abrirInconformidad, {
+      accionRegistradaId, motivo: "NO_OCURRIO", mensaje: "No fue así",
+    });
+
+    const [reclamo] = await e.docente.query(api.interaccion.inconformidadesDelDocente);
+    expect(reclamo.representante).toBeNull();
+    expect(reclamo.estudiante?.nombre).toBe("Ana Pérez");
+  });
+});
