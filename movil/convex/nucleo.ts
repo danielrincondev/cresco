@@ -48,10 +48,64 @@ async function presentarPerfil(ctx: QueryCtx, perfil: Doc<"perfilUsuario">) {
     .withIndex("por_perfil", (q) => q.eq("perfilUsuarioId", perfil._id)).unique();
   return {
     perfilUsuarioId: perfil._id,
+    nombres: perfil.nombres ?? null,
+    apellidos: perfil.apellidos ?? null,
     docenteId: docente?._id ?? null,
     representanteId: representante?._id ?? null,
   };
 }
+
+/**
+ * D18: los datos profesionales que el docente edita y el representante ve.
+ *
+ * La tabla `docente` tenia estos cuatro campos desde el primer esquema y
+ * **ninguna mutation los escribia** (#52): estaban siempre vacios, asi que P9
+ * no tenia nada que mostrar.
+ *
+ * Todo es opcional y todo se puede borrar: un docente que no quiere publicar
+ * su telefono personal manda cadena vacia y el campo desaparece. Obligarlo a
+ * dar un telefono para poder usar la aplicacion seria pedirle un dato que el
+ * servicio no necesita.
+ */
+export const actualizarDatosDocente = mutation({
+  args: {
+    tituloProfesional: v.optional(v.string()),
+    correoContacto: v.optional(v.string()),
+    telefonoContacto: v.optional(v.string()),
+    horarioAtencion: v.optional(v.string()),
+  },
+  handler: (ctx, args) => conErroresPublicos(async () => {
+    const docente = await exigirDocente(ctx);
+
+    // Cadena vacia significa "quitalo"; `undefined` significa "no lo toques".
+    const limpiar = (valor: string | undefined) =>
+      valor === undefined ? undefined : valor.trim() === "" ? null : valor.trim();
+
+    const correo = limpiar(args.correoContacto);
+    if (typeof correo === "string" && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(correo)) {
+      throw new ErrorDominio("VALIDACION", "Revisa el correo de contacto.");
+    }
+    const telefono = limpiar(args.telefonoContacto);
+    if (typeof telefono === "string" && !/^\+?[0-9 ()-]{7,25}$/.test(telefono)) {
+      throw new ErrorDominio("VALIDACION", "Revisa el teléfono de contacto.");
+    }
+
+    const campos = {
+      tituloProfesional: limpiar(args.tituloProfesional),
+      correoContacto: correo,
+      telefonoContacto: telefono,
+      horarioAtencion: limpiar(args.horarioAtencion),
+    };
+    const parche: Record<string, string | undefined> = { actualizadoEn: Date.now() } as never;
+    for (const [clave, valor] of Object.entries(campos)) {
+      if (valor === undefined) continue;
+      parche[clave] = valor === null ? undefined : valor;
+    }
+
+    await ctx.db.patch("docente", docente._id, parche as never);
+    return { ok: true };
+  }),
+});
 
 /** null significa que falta completar el perfil, no que haya que cerrar sesión. */
 export const obtenerPerfil = query({
@@ -68,6 +122,8 @@ export const obtenerPerfil = query({
 /** Alta idempotente. Añadir un rol nunca elimina el otro ni reasigna una cuenta. */
 export const completarPerfil = mutation({
   args: {
+    nombres: v.string(),
+    apellidos: v.string(),
     tipoDocumento: v.union(v.literal("CEDULA"), v.literal("PASAPORTE")),
     numeroDocumento: v.string(),
     telefono: v.optional(v.string()),
@@ -78,6 +134,13 @@ export const completarPerfil = mutation({
     if (!identidad) throw new ErrorPermiso("NO_AUTENTICADO", "Inicia sesión para continuar.");
     if (args.roles.length < 1 || args.roles.length > 2 || new Set(args.roles).size !== args.roles.length) {
       throw new ErrorDominio("VALIDACION", "Selecciona uno o ambos roles, sin repetirlos.");
+    }
+    // Un nombre no se valida contra un patron: hay apellidos compuestos, con
+    // apostrofes y de una sola letra. Lo unico que se exige es que diga algo.
+    const nombres = args.nombres.trim();
+    const apellidos = args.apellidos.trim();
+    if (nombres.length === 0 || apellidos.length === 0) {
+      throw new ErrorDominio("VALIDACION", "Escribe tu nombre y tu apellido.");
     }
     const numeroDocumento = normalizarDocumento(args.tipoDocumento, args.numeroDocumento);
     const telefono = args.telefono?.trim();
@@ -98,6 +161,8 @@ export const completarPerfil = mutation({
     if (!perfil) {
       const id = await ctx.db.insert("perfilUsuario", {
         authSubject: identidad.tokenIdentifier,
+        nombres,
+        apellidos,
         tipoDocumento: args.tipoDocumento,
         numeroDocumento,
         telefono,
@@ -108,9 +173,14 @@ export const completarPerfil = mutation({
       // Migra en el lugar: conserva el _id que usan suscripciones y permisos.
       await ctx.db.patch("perfilUsuario", perfil._id, {
         authSubject: identidad.tokenIdentifier,
+        // A diferencia del documento, el nombre si se corrige: un apellido
+        // mal escrito no es un cambio de identidad, es una errata.
+        nombres,
+        apellidos,
         ...(telefono === undefined ? {} : { telefono }),
         actualizadoEn,
       });
+      perfil = (await ctx.db.get("perfilUsuario", perfil._id))!;
     }
     for (const rol of args.roles) {
       const tabla = rol === "DOCENTE" ? "docente" : "representante";

@@ -41,6 +41,7 @@ import {
   Tarjeta,
   useOperacion,
 } from "../components/NucleoUI";
+import { PaywallDocente, PaywallRepresentante } from "./PaywallScreen";
 import {
   AgendaDocente,
   Ajustes,
@@ -77,7 +78,7 @@ type Ruta =
   | { tipo: "inicio" | "perfil" | "registro" | "crearCurso" }
   // Interaccion (#33). Las de familia no llevan curso: el permiso sale del
   // vinculo del representante, no de un curso que la pantalla elija.
-  | { tipo: "notificaciones" | "citas" | "alertas" | "ajustes" }
+  | { tipo: "notificaciones" | "citas" | "alertas" | "ajustes" | "plan" }
   | { tipo: "curso" | "periodos" | "reclamos" | "agenda" | "alerta"; curso: Curso }
   | { tipo: "invitacion"; invitacion: Invitacion; curso: Curso }
   | { tipo: "aprobar"; curso: Curso; alumno: Alumno };
@@ -223,6 +224,11 @@ export function NucleoScreen() {
           <CitasFamilia />
         ) : ruta.tipo === "alertas" ? (
           <AlertasFamilia />
+        ) : ruta.tipo === "plan" ? (
+          // Un solo destino para los dos muros: cual se pinta lo decide el rol
+          // activo, y `miSuscripcion` devuelve null en la rama que la persona
+          // no tiene, asi que nadie ve el plan de un rol que no usa.
+          rol === "DOCENTE" ? <PaywallDocente /> : <PaywallRepresentante />
         ) : (
           <>
             {perfil.docenteId && perfil.representanteId && (
@@ -261,6 +267,13 @@ function PerfilForm({
   onGuardar: () => void;
 }) {
   const completar = useMutation(api.nucleo.completarPerfil);
+  const { user } = useUser();
+  // Clerk ya sabe como se llama la persona si se registro con Google o si lo
+  // escribio al crear la cuenta. Se propone, no se impone: el nombre legal que
+  // el docente firma no siempre es el que puso en su correo, y es un campo
+  // editable, no de solo lectura.
+  const [nombres, setNombres] = useState(perfil?.nombres ?? user?.firstName ?? "");
+  const [apellidos, setApellidos] = useState(perfil?.apellidos ?? user?.lastName ?? "");
   const [documento, setDocumento] = useState<"CEDULA" | "PASAPORTE">("CEDULA");
   const [numero, setNumero] = useState("");
   const [telefono, setTelefono] = useState("");
@@ -274,6 +287,8 @@ function PerfilForm({
     ];
     const r = await op.ejecutar(() =>
       completar({
+        nombres,
+        apellidos,
         tipoDocumento: documento,
         numeroDocumento: numero,
         telefono: telefono.trim() || undefined,
@@ -308,6 +323,22 @@ function PerfilForm({
       </Tarjeta>
       <Tarjeta>
         <Subtitulo>Tu identificación</Subtitulo>
+        <Campo
+          etiqueta="Nombres"
+          value={nombres}
+          onChangeText={setNombres}
+          autoCapitalize="words"
+          maxLength={60}
+          editable={!op.pendiente}
+        />
+        <Campo
+          etiqueta="Apellidos"
+          value={apellidos}
+          onChangeText={setApellidos}
+          autoCapitalize="words"
+          maxLength={60}
+          editable={!op.pendiente}
+        />
         <Opciones
           valor={documento}
           opciones={documentosAdulto}
@@ -336,7 +367,9 @@ function PerfilForm({
       <Boton
         onPress={() => void guardar()}
         pendiente={op.pendiente}
-        disabled={!numero.trim() || (!docente && !representante)}
+        disabled={
+          !nombres.trim() || !apellidos.trim() || !numero.trim() || (!docente && !representante)
+        }
       >
         Guardar y continuar
       </Boton>
@@ -546,6 +579,9 @@ function DetalleCurso({
       </Boton>
       <Boton secundario onPress={() => navegar({ tipo: "alerta", curso })}>
         Alerta de emergencia
+      </Boton>
+      <Boton secundario onPress={() => navegar({ tipo: "plan" })}>
+        Tu plan
       </Boton>
       <Opciones
         valor={pestana}
@@ -957,6 +993,9 @@ function MisHijos({
       </Boton>
       <Boton secundario onPress={() => navegar({ tipo: "alertas" })}>
         Alertas del curso
+      </Boton>
+      <Boton secundario onPress={() => navegar({ tipo: "plan" })}>
+        Tu plan
       </Boton>
     </Pagina>
   );

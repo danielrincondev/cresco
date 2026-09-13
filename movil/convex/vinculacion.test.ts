@@ -25,9 +25,9 @@ async function escenario() {
   const docente = t.withIdentity({ subject: "docente" });
   const representante = t.withIdentity({ subject: "representante" });
   const otro = t.withIdentity({ subject: "otro" });
-  const perfilDocente = await docente.mutation(api.nucleo.completarPerfil, { tipoDocumento: "CEDULA", numeroDocumento: "0900000001", roles: ["DOCENTE"] });
-  const perfilRepresentante = await representante.mutation(api.nucleo.completarPerfil, { tipoDocumento: "CEDULA", numeroDocumento: "0900000002", roles: ["REPRESENTANTE"] });
-  await otro.mutation(api.nucleo.completarPerfil, { tipoDocumento: "CEDULA", numeroDocumento: "0900000003", roles: ["DOCENTE", "REPRESENTANTE"] });
+  const perfilDocente = await docente.mutation(api.nucleo.completarPerfil, { nombres: "Jeremias", apellidos: "Poveda", tipoDocumento: "CEDULA", numeroDocumento: "0900000001", roles: ["DOCENTE"] });
+  const perfilRepresentante = await representante.mutation(api.nucleo.completarPerfil, { nombres: "Daniel", apellidos: "Rincon", tipoDocumento: "CEDULA", numeroDocumento: "0900000002", roles: ["REPRESENTANTE"] });
+  await otro.mutation(api.nucleo.completarPerfil, { nombres: "Kamila", apellidos: "Rivera", tipoDocumento: "CEDULA", numeroDocumento: "0900000003", roles: ["DOCENTE", "REPRESENTANTE"] });
   const curso = await docente.mutation(api.nucleo.crearCurso, {
     nombreInstitucion: "Escuela de prueba", nombreCurso: "Quinto A", nivel: "5", paralelo: "A", anioInicio: "2026-05-01", anioFin: "2027-02-28",
   });
