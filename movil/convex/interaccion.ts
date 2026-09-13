@@ -930,16 +930,35 @@ export const registrarDispositivo = mutation({
   }),
 });
 
-/** Bandeja de notificaciones del usuario autenticado. */
+/**
+ * Las ultimas notificaciones del usuario autenticado.
+ *
+ * Antes leia **todas** las suyas desde siempre y las ordenaba en memoria. Una
+ * bandeja no encoge nunca: un representante recibe el reporte diario de su
+ * hijo, y a lo largo de un año lectivo eso son unas doscientas, mas las
+ * respuestas a reclamos y el estado de sus citas. Cada apertura de la campana
+ * leia la pila entera para pintar las diez de arriba.
+ *
+ * Convex añade `_creationTime` al final de todo indice, asi que `por_usuario`
+ * ya sabe ordenar por fecha: `.order("desc").take(...)` trae las mas recientes
+ * sin leer el resto y sin ordenar nada a mano.
+ *
+ * El tope es generoso a proposito. La pantalla no tiene paginacion todavia, y
+ * un tope corto convertiria una mejora de lectura en perdida de informacion
+ * visible. El dia que la bandeja necesite historial, esto pasa a
+ * `paginationOpts` como `listarMisEstudiantes`.
+ */
+const NOTIFICACIONES_EN_BANDEJA = 100;
+
 export const misNotificaciones = query({
   args: {},
   handler: (ctx) => conErroresPublicos(async () => {
     const perfil = await exigirPerfil(ctx);
-    const notificaciones = await ctx.db
+    return await ctx.db
       .query("notificacion")
       .withIndex("por_usuario", (q) => q.eq("perfilUsuarioId", perfil._id))
-      .collect();
-    return notificaciones.sort((a, b) => b._creationTime - a._creationTime);
+      .order("desc")
+      .take(NOTIFICACIONES_EN_BANDEJA);
   }),
 });
 
