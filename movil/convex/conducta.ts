@@ -431,6 +431,46 @@ export const cierreNocturno = internalMutation({
       generados += await generarReportesDelCurso(ctx, reporte.cursoId, reporte.periodoAcademicoId, fecha, actualizado);
       publicados++;
     }
+    // Un docente puede omitir el texto general; una acción nunca debe quedar
+    // invisible por eso. Solo se generan las matrículas que sí tuvieron acción.
+    const cursos = await ctx.db.query("curso")
+      .filter((q) => q.eq(q.field("estado"), "ACTIVO")).take(50);
+    for (const curso of cursos) {
+      const periodo = await ctx.db.query("periodoAcademico")
+        .withIndex("por_anio_orden", (q) => q.eq("anioLectivoId", curso.anioLectivoId))
+        .filter((q) => q.eq(q.field("estado"), "EN_CURSO")).first();
+      if (periodo === null) continue;
+      const matriculas = await ctx.db.query("matricula")
+        .withIndex("por_curso_estado", (q) => q.eq("cursoId", curso._id).eq("estado", "CURSANDO"))
+        .collect();
+      for (const matricula of matriculas) {
+        const existe = await ctx.db.query("reporteEstudiante")
+          .withIndex("por_matricula_fecha", (q) => q.eq("matriculaId", matricula._id).eq("fecha", fecha)).unique();
+        if (existe !== null) continue;
+        const acciones = await ctx.db.query("accionRegistrada")
+          .withIndex("por_matricula_fecha", (q) => q.eq("matriculaId", matricula._id).eq("fechaOcurrencia", fecha)).collect();
+        const vigentes = acciones.filter((accion) => accion.estado === "VIGENTE");
+        if (vigentes.length === 0) continue;
+        const puntaje = await ctx.db.query("puntajePeriodo")
+          .withIndex("por_matricula_periodo", (q) => q.eq("matriculaId", matricula._id).eq("periodoAcademicoId", periodo._id)).unique();
+        const actual = puntaje?.puntajeActual ?? REGLAS.PUNTAJE_BASE;
+        const reporteId = await ctx.db.insert("reporteEstudiante", {
+          matriculaId: matricula._id, periodoAcademicoId: periodo._id, fecha,
+          tieneNovedades: true, puntajeAlCierre: actual, franjaConductaId: await franjaDe(ctx, actual),
+          generadoEn: Date.now(),
+        });
+        let orden = 0;
+        for (const accion of vigentes) await ctx.db.insert("reporteEstudianteItem", {
+          reporteEstudianteId: reporteId, tipoItem: "ACCION", accionRegistradaId: accion._id, orden: orden++,
+        });
+        const vinculo = await ctx.db.query("vinculoRepresentacion")
+          .withIndex("por_estudiante_estado", (q) => q.eq("estudianteId", matricula.estudianteId).eq("estado", "ACTIVO")).unique();
+        if (vinculo !== null) await ctx.db.insert("entregaReporte", {
+          reporteEstudianteId: reporteId, representanteId: vinculo.representanteId, entregadoEn: Date.now(),
+        });
+        generados++;
+      }
+    }
     return { publicados, generados };
   },
 });

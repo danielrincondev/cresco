@@ -2,7 +2,7 @@
 /// <reference types="vite/client" />
 import { convexTest } from "convex-test";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { api } from "./_generated/api";
+import { api, internal } from "./_generated/api";
 import schema from "./schema";
 
 const modules = import.meta.glob(["./conducta.ts", "./_generated/*.js"]);
@@ -23,7 +23,9 @@ async function sembrar(t: ReturnType<typeof convexTest>) {
     const categoria = await ctx.db.insert("categoriaAccion", { institucionId, codigo: "DISCIPLINA", nombre: "Disciplina", aplicaA: "ESTUDIANTE", orden: 1, activa: true, actualizadoEn: ahora });
     const negativaId = await ctx.db.insert("tipoAccion", { institucionId, categoriaAccionId: categoria, codigo: "NEG", nombre: "Neg", signo: "NEGATIVA", puntosDefecto: -1, puntosMin: -3, puntosMax: -1, requiereDescripcion: true, admiteInconformidad: true, cuentaEnBitacora: true, activa: true, actualizadoEn: ahora });
     const positivaId = await ctx.db.insert("tipoAccion", { institucionId, categoriaAccionId: categoria, codigo: "POS", nombre: "Pos", signo: "POSITIVA", puntosDefecto: 1, puntosMin: 1, puntosMax: 2, requiereDescripcion: true, admiteInconformidad: false, cuentaEnBitacora: true, activa: true, actualizadoEn: ahora });
-    return { estudianteId, matriculaId, periodoAcademicoId, cursoId, negativaId, positivaId };
+    const plantillaReporteId = await ctx.db.insert("plantillaReporte", { nombre: "Diario", version: 1, activa: true, actualizadoEn: ahora });
+    const plantillaCampoId = await ctx.db.insert("plantillaCampo", { plantillaReporteId, codigo: "ANUNCIOS", etiqueta: "Anuncios", tipoDato: "TEXTO_LARGO", orden: 1, activo: true });
+    return { estudianteId, matriculaId, periodoAcademicoId, cursoId, negativaId, positivaId, plantillaCampoId };
   });
   return { ...ids, docente: t.withIdentity({ subject: "docente_1" }) };
 }
@@ -60,5 +62,23 @@ describe("conducta", () => {
     const t = convexTest(schema, modules); const e = await sembrar(t);
     const respuesta = await e.docente.query(api.conducta.asistenciaDelDia, { cursoId: e.cursoId });
     expect(respuesta.estudiantes).toEqual([expect.objectContaining({ estudianteId: e.estudianteId, estado: null, observacion: null })]);
+  });
+  it("guarda un borrador y publica una fotografía por estudiante", async () => {
+    const t = convexTest(schema, modules); const e = await sembrar(t);
+    await e.docente.mutation(api.conducta.guardarReporteGeneral, { cursoId: e.cursoId, valores: [{ plantillaCampoId: e.plantillaCampoId, valorTexto: "Mañana hay evaluación" }] });
+    const publicado = await e.docente.mutation(api.conducta.publicarReporteGeneral, { cursoId: e.cursoId });
+    expect(publicado.generados).toBe(1);
+    expect(await t.run((ctx) => ctx.db.query("reporteEstudiante").collect())).toHaveLength(1);
+  });
+  it("rechaza notas que superan siete días", async () => {
+    const t = convexTest(schema, modules); const e = await sembrar(t);
+    await expect(e.docente.mutation(api.conducta.publicarComunicado, { cursoId: e.cursoId, tipo: "NOTA_PROFESOR", alcance: "CURSO", titulo: "Aviso", contenido: "Texto", diasVisible: 8 })).rejects.toThrow("entre 1 y 7");
+  });
+  it("el cierre nocturno genera el reporte de una acción sin borrador", async () => {
+    const t = convexTest(schema, modules); const e = await sembrar(t);
+    await e.docente.mutation(api.conducta.registrarAccion, { estudianteId: e.estudianteId, tipoAccionId: e.negativaId, descripcion: "Interrumpe", puntosAplicados: -1 });
+    const primero = await t.mutation(internal.conducta.cierreNocturno, { fecha: "2026-09-15" });
+    const segundo = await t.mutation(internal.conducta.cierreNocturno, { fecha: "2026-09-15" });
+    expect(primero.generados).toBe(1); expect(segundo.generados).toBe(0);
   });
 });

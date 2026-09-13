@@ -12,6 +12,7 @@
 
 import { v } from "convex/values";
 
+import { recalcularPuntaje } from "./conducta";
 import type { Doc, Id } from "./_generated/dataModel";
 import { mutation, query, type MutationCtx, type QueryCtx } from "./_generated/server";
 import {
@@ -539,9 +540,7 @@ export const resolverInconformidad = mutation({
         motivoResolucion: respuesta,
         actualizadoEn: ahora,
       });
-      // RECALCULO_PENDIENTE (#9, Persona B): cuando `conducta.ts` exponga el
-      // recálculo del período, se invoca aquí con accion.matriculaId y
-      // accion.periodoAcademicoId.
+      await recalcularPuntaje(ctx, accion.matriculaId, accion.periodoAcademicoId);
     }
 
     await auditar(ctx, {
