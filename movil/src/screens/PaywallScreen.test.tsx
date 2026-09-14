@@ -1,3 +1,5 @@
+/// <reference types="vite/client" />
+
 import React from "react";
 import { expect, it, vi } from "vitest";
 import { act, create, type ReactTestRenderer } from "react-test-renderer";
@@ -100,4 +102,55 @@ it("traduce los limites del plan a frases, no a nombres de campo", () => {
   const t = texto(pintar(<PaywallRepresentante />));
   expect(t).toContain("Solo el reporte más reciente");
   expect(t).not.toContain("reportesPrevios");
+});
+
+/**
+ * El guardia contra la deriva entre la pantalla y la semilla.
+ *
+ * `limitesLegibles` mira las claves de `plan.limites` por nombre. La primera
+ * version leia `limites.cursos` y `convex/semillas.ts` escribe
+ * `cursosActivos`: el plan del docente se pintaba **sin un solo limite**, como
+ * si no tuviera ninguno. No es un error visible en una captura; se descubre
+ * cuando alguien pregunta por que su plan no dice nada.
+ *
+ * Esta prueba lee el archivo de semillas como texto y exige que cada clave que
+ * siembra la sepa pintar la pantalla. Si mañana se añade un limite nuevo y
+ * nadie toca el paywall, esto se rompe aqui y no en el telefono de una madre.
+ */
+it("la pantalla sabe pintar todas las claves de limite que siembra el backend", async () => {
+  const fuente = (await import("../../convex/semillas.ts?raw")).default as string;
+
+  const claves = new Set<string>();
+  for (const bloque of fuente.matchAll(/limites:\s*\{([^}]*)\}/g)) {
+    for (const clave of bloque[1].matchAll(/(\w+)\s*:/g)) claves.add(clave[1]);
+  }
+
+  // Si esto sale vacio, el regex dejo de encontrar los planes y la prueba
+  // estaria pasando por no comprobar nada.
+  expect(claves.size).toBeGreaterThan(2);
+
+  const conocidas = new Set([
+    "reportesPrevios",
+    "cursosActivos",
+    "estudiantesPorCurso",
+    "exportarPdf",
+  ]);
+  expect([...claves].filter((c) => !conocidas.has(c))).toEqual([]);
+});
+
+it("pinta los limites del plan del docente, que antes salian en blanco", () => {
+  estado.suscripcion = {
+    representante: null,
+    docente: {
+      // La forma exacta que siembra `semillas.ts` para DOC_FREE.
+      plan: { codigo: "DOC_FREE", nombre: "Docente — Gratuito", audiencia: "DOCENTE",
+        periodicidad: "PERPETUO", sinPublicidad: false,
+        limites: { cursosActivos: 1, estudiantesPorCurso: 40 }, productoGooglePlay: null },
+      estado: "SIN_SUSCRIPCION", expiraEn: null, renovacionAutomatica: false, acceso: false,
+    },
+  };
+  estado.planes = [];
+  const t = texto(pintar(<PaywallDocente />));
+  expect(t).toContain("Un curso a la vez");
+  expect(t).toContain("Hasta 40 estudiantes por curso");
 });

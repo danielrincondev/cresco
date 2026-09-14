@@ -37,6 +37,7 @@ import {
   auditar,
   exigirAccesoDocenteAEstudiante,
   exigirPerfil,
+  exigirTitularDelCurso,
   exigirVinculo,
   perfilActual,
 } from "./lib/permisos";
@@ -121,7 +122,11 @@ export const registrarInicioSesion = mutation({
  * es siempre el mismo exista o no el estudiante: si distinguiera "no existe"
  * de "no es tuyo", esta mutation sería un buscador de estudiantes ajenos.
  */
-async function exigirAccesoAlEstudiante(ctx: MutationCtx, estudianteId: Id<"estudiante">) {
+async function exigirAccesoAlEstudiante(
+  ctx: MutationCtx,
+  estudianteId: Id<"estudiante">,
+  recurso: string,
+) {
   const perfil = await exigirPerfil(ctx);
   try {
     await exigirVinculo(ctx, estudianteId);
@@ -134,8 +139,33 @@ async function exigirAccesoAlEstudiante(ctx: MutationCtx, estudianteId: Id<"estu
     return { perfil, rol: "DOCENTE" as const };
   } catch (error) {
     if (!(error instanceof ErrorPermiso)) throw error;
-    throw new ErrorPermiso("SIN_VINCULO", "No tienes acceso a la información de este estudiante.");
   }
+
+  // AprobarForm abre pendientes sin matrícula. Para su ficha se demuestra
+  // el curso por el vínculo y la invitación, igual que en listarPendientes.
+  // Este camino no concede acceso a reportes, puntajes ni bitácoras.
+  if (recurso === "FICHA_ESTUDIANTE") {
+    const estudiante = await ctx.db.get(estudianteId);
+    if (estudiante?.estado === "ACTIVO" && estudiante.estadoVerificacion === "PENDIENTE") {
+      const vinculo = await ctx.db.query("vinculoRepresentacion")
+        .withIndex("por_estudiante_estado", (q) =>
+          q.eq("estudianteId", estudianteId).eq("estado", "ACTIVO"))
+        .unique();
+      const invitacion = vinculo?.invitacionCursoId
+        ? await ctx.db.get(vinculo.invitacionCursoId) : null;
+      const curso = invitacion ? await ctx.db.get(invitacion.cursoId) : null;
+      const anio = curso ? await ctx.db.get(curso.anioLectivoId) : null;
+      if (curso && anio?.institucionId === estudiante.institucionId) {
+        try {
+          await exigirTitularDelCurso(ctx, curso._id);
+          return { perfil, rol: "DOCENTE" as const };
+        } catch (error) {
+          if (!(error instanceof ErrorPermiso)) throw error;
+        }
+      }
+    }
+  }
+  throw new ErrorPermiso("SIN_VINCULO", "No tienes acceso a la información de este estudiante.");
 }
 
 /**
@@ -148,7 +178,7 @@ async function exigirAccesoAlEstudiante(ctx: MutationCtx, estudianteId: Id<"estu
 export const registrarLecturaSensible = mutation({
   args: { estudianteId: v.id("estudiante"), recurso: recursoSensible },
   handler: async (ctx, args) => {
-    const { perfil, rol } = await exigirAccesoAlEstudiante(ctx, args.estudianteId);
+    const { perfil, rol } = await exigirAccesoAlEstudiante(ctx, args.estudianteId, args.recurso);
     const estudiante = await ctx.db.get(args.estudianteId);
     if (estudiante === null) {
       // Las guardas de arriba ya lo leyeron; llegar aquí sería un bug.

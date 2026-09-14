@@ -133,7 +133,7 @@ No se usa un archivo `.env` local para secretos.
 | `npm run env:check` | Valida y resuelve la configuración |
 | `npm run typecheck` | Comprueba TypeScript |
 | `npm test` | Ejecuta las pruebas de funciones Convex |
-| `npm run build` | Ejecuta la comprobación de compilación de la app |
+| `npm run build` | Comprueba tipos (no empaqueta; el bundle lo verifica el CI) |
 
 ## Comprobaciones antes de un PR
 
