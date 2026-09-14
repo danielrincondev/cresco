@@ -557,12 +557,31 @@ export const inconformidadesDelDocente = query({
     for (const i of enCurso) {
       const accion = await ctx.db.get(i.accionRegistradaId);
       if (accion === null || accion.registradaPorDocenteId !== docente._id) continue;
+
+      // De quien se habla y quien reclama. Hasta que #52 guardo los nombres
+      // esto no se podia decir, y la bandeja pedia al docente que decidiera
+      // si anula una sancion **sin saber de que estudiante es**: con dos
+      // reclamos abiertos, anular el equivocado era cuestion de suerte.
+      const matricula = await ctx.db.get(accion.matriculaId);
+      const estudiante = matricula ? await ctx.db.get(matricula.estudianteId) : null;
+      const representante = await ctx.db.get(i.representanteId);
+      const perfil = representante ? await ctx.db.get(representante.perfilUsuarioId) : null;
+
       mias.push({
         id: i._id,
         motivo: i.motivo,
         mensaje: i.mensaje,
         estado: i.estado,
         venceEn: i.venceEn,
+        estudiante: estudiante
+          ? { id: estudiante._id, nombre: `${estudiante.nombres} ${estudiante.apellidos}` }
+          : null,
+        // `null` cuando el perfil es anterior a los nombres. La pantalla lo
+        // dice con palabras en vez de enseñar un hueco.
+        representante:
+          perfil && (perfil.nombres || perfil.apellidos)
+            ? `${perfil.nombres ?? ""} ${perfil.apellidos ?? ""}`.trim()
+            : null,
         accion: {
           id: accion._id,
           descripcion: accion.descripcion,
