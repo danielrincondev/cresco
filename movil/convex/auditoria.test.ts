@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "./_generated/api";
 import schema from "./schema";
 
-const modules = import.meta.glob(["./auditoria.ts", "./_generated/*.js"]);
+const modules = import.meta.glob(["./auditoria.ts", "./nucleo.ts", "./_generated/*.js"]);
 
 const AHORA = new Date("2026-09-09T15:00:00Z");
 const MINUTO = 60_000;
@@ -87,7 +87,7 @@ async function sembrarEscenario(t: ReturnType<typeof convexTest>) {
       estado: "ACTIVO", vigenteDesde: "2026-05-04", actualizadoEn: ahora,
     });
 
-    return { estudianteId, institucionId, perfilDocente, perfilRep };
+    return { estudianteId, institucionId, perfilDocente, perfilRep, cursoId, docenteId };
   });
 
   return {
@@ -188,6 +188,63 @@ describe("auditoria - LOGIN", () => {
 });
 
 describe("auditoria - LEER_SENSIBLE", () => {
+  async function pendiente(t: ReturnType<typeof convexTest>) {
+    const e = await sembrarEscenario(t);
+    await t.run(async (ctx) => {
+      const matricula = (await ctx.db.query("matricula").unique())!;
+      await ctx.db.delete(matricula._id);
+      await ctx.db.patch(e.estudianteId, { estadoVerificacion: "PENDIENTE" });
+      const invitacionCursoId = await ctx.db.insert("invitacionCurso", {
+        cursoId: e.cursoId, emitidaPorDocenteId: e.docenteId,
+        codigoCorto: "PRUEBA", token: "invitacion-de-prueba", usosRealizados: 1,
+        estado: "PENDIENTE", expiraEn: Date.now() - 1, actualizadoEn: Date.now(),
+      });
+      const vinculo = (await ctx.db.query("vinculoRepresentacion").unique())!;
+      await ctx.db.patch(vinculo._id, { invitacionCursoId });
+    });
+    return e;
+  }
+
+  it("audita la ficha pendiente que ve el titular aunque aún no tenga matrícula", async () => {
+    const t = convexTest(schema, modules);
+    const e = await pendiente(t);
+    const lista = await e.docente.query(api.nucleo.listarPendientes, {
+      cursoId: e.cursoId, paginationOpts: { numItems: 20, cursor: null },
+    });
+    expect(lista.page.map((alumno) => alumno.estudianteId)).toContain(e.estudianteId);
+    expect(await e.docente.mutation(api.auditoria.registrarLecturaSensible, {
+      estudianteId: e.estudianteId, recurso: "FICHA_ESTUDIANTE",
+    })).toEqual({ registrado: true });
+    expect((await bitacora(t))[0]).toMatchObject({
+      perfilUsuarioId: e.perfilDocente, entidadId: e.estudianteId,
+      datosDespues: { recurso: "FICHA_ESTUDIANTE", rol: "DOCENTE" },
+    });
+  });
+
+  it.each(["ajeno", "revocado", "sin invitación", "retirado", "otra institución", "otro recurso"])(
+    "no permite auditar una ficha pendiente sin acceso: %s", async (caso) => {
+      const t = convexTest(schema, modules);
+      const e = await pendiente(t);
+      await t.run(async (ctx) => {
+        const vinculo = (await ctx.db.query("vinculoRepresentacion").unique())!;
+        if (caso === "revocado") await ctx.db.patch(vinculo._id, { estado: "REVOCADO" });
+        if (caso === "sin invitación") await ctx.db.patch(vinculo._id, { invitacionCursoId: undefined });
+        if (caso === "retirado") await ctx.db.patch(e.estudianteId, { estado: "RETIRADO" });
+        if (caso === "otra institución") {
+          const { _id, _creationTime, ...datos } = (await ctx.db.get(e.institucionId))!;
+          const institucionId = await ctx.db.insert("institucion", datos);
+          await ctx.db.patch(e.estudianteId, { institucionId });
+        }
+      });
+      const cliente = caso === "ajeno" ? e.otroDocente : e.docente;
+      await expect(cliente.mutation(api.auditoria.registrarLecturaSensible, {
+        estudianteId: e.estudianteId,
+        recurso: caso === "otro recurso" ? "REPORTE_ESTUDIANTE" : "FICHA_ESTUDIANTE",
+      })).rejects.toThrow("No tienes acceso a la información de este estudiante");
+      expect(await bitacora(t)).toHaveLength(0);
+    },
+  );
+
   it("registra la lectura del representante con la institucion del estudiante", async () => {
     const t = convexTest(schema, modules);
     const e = await sembrarEscenario(t);

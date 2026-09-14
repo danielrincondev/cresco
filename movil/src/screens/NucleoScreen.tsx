@@ -23,6 +23,7 @@ import {
   Espacio,
   Marca,
   Radio,
+  Semantico,
   Superficie,
   Tamano,
   Texto,
@@ -43,6 +44,7 @@ import {
   useOperacion,
 } from "../components/NucleoUI";
 import { PaywallDocente, PaywallRepresentante } from "./PaywallScreen";
+import { AnotarConducta } from "./ConductaScreen";
 import {
   ReporteAcumulado,
   ReporteDeHoy,
@@ -51,6 +53,8 @@ import {
 import {
   AgendaDocente,
   Ajustes,
+  PerfilDocente,
+  ProfesorACargo,
   AlertaDocente,
   AlertasFamilia,
   CitasFamilia,
@@ -64,6 +68,7 @@ import {
   versionConsentimiento,
 } from "../content/consentimiento";
 import { useAuditoriaSesion } from "../lib/useAuditoriaSesion";
+import { useLecturaSensible } from "../lib/useLecturaSensible";
 import {
   borrarRegistro,
   guardarRegistro,
@@ -84,15 +89,28 @@ type Ruta =
   | { tipo: "inicio" | "perfil" | "registro" | "crearCurso" }
   // Interaccion (#33). Las de familia no llevan curso: el permiso sale del
   // vinculo del representante, no de un curso que la pantalla elija.
-  | { tipo: "notificaciones" | "citas" | "alertas" | "ajustes" | "plan" }
-  // P4, P5 y P6 llevan el hijo consigo: un representante con dos hijos tiene
-  // dos reportes distintos, y la pantalla no puede adivinar cual mira.
   | {
-      tipo: "reporteHoy" | "reportesAnteriores" | "acumulado";
+      tipo:
+        | "notificaciones"
+        | "citas"
+        | "alertas"
+        | "ajustes"
+        | "plan"
+        | "perfilDocente"
+        // Los reclamos son de **todos** los cursos del docente, no de uno:
+        // `inconformidadesDelDocente` no recibe curso. Viajaba con uno que la
+        // pantalla nunca leyo, y eso hacia creer que estaba acotada.
+        | "reclamos";
+    }
+  // Las cuatro que hablan de un hijo concreto viajan con el: un representante
+  // con dos hijos tiene dos docentes a cargo y dos reportes distintos, y la
+  // pantalla no puede adivinar cual mira.
+  | {
+      tipo: "docenteACargo" | "reporteHoy" | "reportesAnteriores" | "acumulado";
       estudianteId: Id<"estudiante">;
       nombre: string;
     }
-  | { tipo: "curso" | "periodos" | "reclamos" | "agenda" | "alerta"; curso: Curso }
+  | { tipo: "curso" | "periodos" | "agenda" | "alerta" | "anotar"; curso: Curso }
   | { tipo: "invitacion"; invitacion: Invitacion; curso: Curso }
   | { tipo: "aprobar"; curso: Curso; alumno: Alumno };
 
@@ -110,6 +128,19 @@ export function NucleoScreen() {
   useAuditoriaSesion(perfil === null ? null : perfil?.perfilUsuarioId);
   const { user } = useUser();
   const { signOut } = useClerk();
+  /**
+   * Cuantas novedades no ha abierto la persona.
+   *
+   * Sin esto la campana no distingue "nada nuevo" de "tres respuestas a tus
+   * reclamos", y el representante tiene que acordarse de mirar. En una
+   * aplicacion que existe para avisar, eso es dejar el aviso a medias.
+   *
+   * No cuesta una consulta de mas: `misNotificaciones` ya esta acotada a las
+   * cien mas recientes y Convex la mantiene viva por suscripcion, asi que
+   * abrir la bandeja no vuelve a pedir nada.
+   */
+  const novedades = useQuery(api.interaccion.misNotificaciones);
+  const sinLeer = (novedades ?? []).filter((n) => n.leidaEn === undefined).length;
   const [ruta, setRuta] = useState<Ruta>({ tipo: "inicio" });
   const [rolElegido, setRol] = useState<Rol>();
   const salida = useOperacion();
@@ -162,11 +193,25 @@ export function NucleoScreen() {
           <>
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="Novedades"
+              accessibilityLabel={
+                sinLeer === 0
+                  ? "Novedades"
+                  : `Novedades, ${sinLeer} sin leer`
+              }
               onPress={() => setRuta({ tipo: "notificaciones" })}
               style={styles.iconButton}
             >
-              <Icono nombre="bell" decorativo />
+              {/* La campana suena distinto cuando hay algo: el icono relleno
+                  es el mismo recurso que ya usa la navegacion para "estas
+                  aqui", asi que no hace falta un glifo nuevo. */}
+              <Icono nombre={sinLeer > 0 ? "bell-ring" : "bell"} activo={sinLeer > 0} decorativo />
+              {sinLeer > 0 && (
+                <View style={styles.contador}>
+                  <Text style={styles.contadorTexto}>
+                    {sinLeer > 9 ? "9+" : sinLeer}
+                  </Text>
+                </View>
+              )}
             </Pressable>
             <Pressable
               accessibilityRole="button"
@@ -233,6 +278,11 @@ export function NucleoScreen() {
           <AgendaDocente curso={ruta.curso} />
         ) : ruta.tipo === "alerta" ? (
           <AlertaDocente curso={ruta.curso} />
+        ) : ruta.tipo === "anotar" ? (
+          <AnotarConducta
+            cursoId={ruta.curso.id}
+            onVolver={() => setRuta({ tipo: "curso", curso: ruta.curso })}
+          />
         ) : ruta.tipo === "citas" ? (
           <CitasFamilia />
         ) : ruta.tipo === "alertas" ? (
@@ -257,6 +307,10 @@ export function NucleoScreen() {
             nombre={ruta.nombre}
             onVolver={() => setRuta({ ...ruta, tipo: "reporteHoy" })}
           />
+        ) : ruta.tipo === "perfilDocente" ? (
+          <PerfilDocente />
+        ) : ruta.tipo === "docenteACargo" ? (
+          <ProfesorACargo estudianteId={ruta.estudianteId} nombre={ruta.nombre} />
         ) : ruta.tipo === "plan" ? (
           // Un solo destino para los dos muros: cual se pinta lo decide el rol
           // activo, y `miSuscripcion` devuelve null en la rama que la persona
@@ -462,6 +516,11 @@ function Cursos({
           </Pressable>
         ))
       )}
+      {/* Vive aqui y no dentro de un curso porque cubre todos: con el plan
+          PRO son hasta cinco, y abrirla desde uno hacia creer lo contrario. */}
+      <Boton secundario onPress={() => navegar({ tipo: "reclamos" })}>
+        Reclamos de las familias
+      </Boton>
       {datos &&
         (datos.cursos.length < datos.limitePlan ? (
           <Boton onPress={() => navegar({ tipo: "crearCurso" })}>
@@ -604,14 +663,17 @@ function DetalleCurso({
         Invitar representantes
       </Boton>
       <ErrorMensaje mensaje={op.error} />
-      <Boton secundario onPress={() => navegar({ tipo: "reclamos", curso })}>
-        Reclamos de las familias
+      <Boton onPress={() => navegar({ tipo: "anotar", curso })}>
+        Anotar conducta
       </Boton>
       <Boton secundario onPress={() => navegar({ tipo: "agenda", curso })}>
         Atención a familias
       </Boton>
       <Boton secundario onPress={() => navegar({ tipo: "alerta", curso })}>
         Alerta de emergencia
+      </Boton>
+      <Boton secundario onPress={() => navegar({ tipo: "perfilDocente" })}>
+        Tu perfil profesional
       </Boton>
       <Boton secundario onPress={() => navegar({ tipo: "plan" })}>
         Tu plan
@@ -879,6 +941,10 @@ function AprobarForm({
   onGuardar: () => void;
 }) {
   const aprobar = useMutation(api.nucleo.aprobarEstudiante);
+  // DP-006: abrir la ficha de un pendiente es leer datos de un menor -- nombre,
+  // documento y fecha de nacimiento -- asi que queda en la bitacora. Es la
+  // primera pantalla del proyecto que dispara `LEER_SENSIBLE` de verdad.
+  useLecturaSensible(alumno.estudianteId, "FICHA_ESTUDIANTE");
   const [nombres, setNombres] = useState(alumno.nombres);
   const [apellidos, setApellidos] = useState(alumno.apellidos);
   const [tipo, setTipo] = useState(alumno.tipoDocumento);
@@ -1027,6 +1093,22 @@ function MisHijos({
                 }
               >
                 Ver su reporte de hoy
+              </Boton>
+            )}
+            {/* Solo con la matricula aprobada: antes de eso no hay curso y
+                por tanto no hay titular del que hablar. */}
+            {a.estadoVerificacion === "APROBADO" && (
+              <Boton
+                secundario
+                onPress={() =>
+                  navegar({
+                    tipo: "docenteACargo",
+                    estudianteId: a.estudianteId,
+                    nombre: a.nombres,
+                  })
+                }
+              >
+                Ver al docente a cargo
               </Boton>
             )}
           </Tarjeta>
@@ -1383,6 +1465,24 @@ const styles = StyleSheet.create({
     fontFamily: "Inter",
     fontSize: Tamano.sm,
     marginTop: Espacio.xs,
+  },
+  contador: {
+    position: "absolute",
+    top: 2,
+    right: 2,
+    minWidth: 18,
+    height: 18,
+    paddingHorizontal: 4,
+    borderRadius: 9,
+    backgroundColor: Semantico.error,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  contadorTexto: {
+    color: Texto.sobreColor,
+    fontFamily: "Inter-Semibold",
+    fontSize: 11,
+    lineHeight: 14,
   },
   iconButton: {
     width: 44,

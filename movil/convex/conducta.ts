@@ -89,9 +89,19 @@ export const registrarAccion = mutation({
   handler: (ctx, args) => conErroresPublicos(async () => {
     const { docente, matricula } = await exigirAccesoDocenteAEstudiante(ctx, args.estudianteId);
     const { curso, anio, institucion } = await institucionDeMatricula(ctx, matricula._id);
+    // La fecha se resuelve antes que el periodo, porque el periodo se elige
+    // **por la fecha**: tomar cualquiera EN_CURSO archivaba una accion fechada
+    // en 1900 o en octubre dentro del parcial de hoy.
+    const fecha = args.fechaOcurrencia ?? hoyEnGuayaquil();
+    const dia = exigirFechaDeCalendario(fecha);
+
     const periodo = await ctx.db.query("periodoAcademico")
       .withIndex("por_anio_orden", (q) => q.eq("anioLectivoId", curso.anioLectivoId))
-      .filter((q) => q.eq(q.field("estado"), "EN_CURSO")).first();
+      .filter((q) => q.and(
+        q.eq(q.field("estado"), "EN_CURSO"),
+        q.lte(q.field("fechaInicio"), fecha),
+        q.gte(q.field("fechaFin"), fecha),
+      )).first();
     if (periodo === null) throw new ErrorDominio("PERIODO_CERRADO", "No hay un período académico en curso para registrar acciones.");
     const descripcion = args.descripcion.trim();
     if (!descripcion) throw new ErrorDominio("VALIDACION", "La descripción de la acción es obligatoria.");
@@ -124,9 +134,6 @@ export const registrarAccion = mutation({
     exigirSignoCoherente(tipo.signo, tipo.puntosMin, tipo.puntosMax);
     exigirRangoTipoAccion(tipo.puntosMin, args.puntosAplicados, tipo.puntosMax);
 
-    const fecha = args.fechaOcurrencia ?? hoyEnGuayaquil();
-    const dia = exigirFechaDeCalendario(fecha);
-
     // Fin de semana o dia marcado como no lectivo: no se anota conducta un
     // dia en que el estudiante no estuvo en clase.
     const diaNoLectivo = await ctx.db
@@ -138,8 +145,17 @@ export const registrarAccion = mutation({
     }
     const hoy = await ctx.db.query("accionRegistrada").withIndex("por_matricula_fecha", (q) => q.eq("matriculaId", matricula._id).eq("fechaOcurrencia", fecha)).collect();
     exigirTopeDiario(hoy.filter((a) => a.estado === "VIGENTE" && a.signo === tipo.signo).reduce((s, a) => s + a.puntosAplicados, 0), args.puntosAplicados);
-    const id = await ctx.db.insert("accionRegistrada", { matriculaId: matricula._id, periodoAcademicoId: periodo._id, tipoAccionId: tipo._id, categoriaAccionId: tipo.categoriaAccionId, signo: tipo.signo, puntosAplicados: args.puntosAplicados, cuentaEnBitacora: tipo.cuentaEnBitacora, descripcion, fechaOcurrencia: fecha, registradaPorDocenteId: docente._id, estado: "VIGENTE", actualizadoEn: Date.now() });
+
+    // El puntaje congelado se comprueba **antes** de escribir nada. `congelado`
+    // existe para que un parcial cerrado no se pueda mover, y leerlo despues
+    // del insert dejaba la accion guardada contra un puntaje que ya no
+    // admitia cambios: el total decia una cosa y la bitacora otra.
     const fila = await ctx.db.query("puntajePeriodo").withIndex("por_matricula_periodo", (q) => q.eq("matriculaId", matricula._id).eq("periodoAcademicoId", periodo._id)).unique();
+    if (fila?.congelado) {
+      throw new ErrorDominio("PERIODO_CERRADO", "El puntaje de este período ya está cerrado.");
+    }
+
+    const id = await ctx.db.insert("accionRegistrada", { matriculaId: matricula._id, periodoAcademicoId: periodo._id, tipoAccionId: tipo._id, categoriaAccionId: tipo.categoriaAccionId, signo: tipo.signo, puntosAplicados: args.puntosAplicados, cuentaEnBitacora: tipo.cuentaEnBitacora, descripcion, fechaOcurrencia: fecha, registradaPorDocenteId: docente._id, estado: "VIGENTE", actualizadoEn: Date.now() });
     if (fila === null) {
       const actual = calcularPuntaje([args.puntosAplicados], institucion.puntajeBase, institucion.puntajeMinimo, institucion.puntajeMaximo);
       await ctx.db.insert("puntajePeriodo", { matriculaId: matricula._id, periodoAcademicoId: periodo._id, puntajeBase: institucion.puntajeBase, puntosPositivos: args.puntosAplicados > 0 ? args.puntosAplicados : 0, puntosNegativos: args.puntosAplicados < 0 ? args.puntosAplicados : 0, puntajeActual: actual, franjaConductaId: await franjaDe(ctx, actual), congelado: false, recalculadoEn: Date.now() });
