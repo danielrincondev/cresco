@@ -48,10 +48,64 @@ async function presentarPerfil(ctx: QueryCtx, perfil: Doc<"perfilUsuario">) {
     .withIndex("por_perfil", (q) => q.eq("perfilUsuarioId", perfil._id)).unique();
   return {
     perfilUsuarioId: perfil._id,
+    nombres: perfil.nombres ?? null,
+    apellidos: perfil.apellidos ?? null,
     docenteId: docente?._id ?? null,
     representanteId: representante?._id ?? null,
   };
 }
+
+/**
+ * D18: los datos profesionales que el docente edita y el representante ve.
+ *
+ * La tabla `docente` tenia estos cuatro campos desde el primer esquema y
+ * **ninguna mutation los escribia** (#52): estaban siempre vacios, asi que P9
+ * no tenia nada que mostrar.
+ *
+ * Todo es opcional y todo se puede borrar: un docente que no quiere publicar
+ * su telefono personal manda cadena vacia y el campo desaparece. Obligarlo a
+ * dar un telefono para poder usar la aplicacion seria pedirle un dato que el
+ * servicio no necesita.
+ */
+export const actualizarDatosDocente = mutation({
+  args: {
+    tituloProfesional: v.optional(v.string()),
+    correoContacto: v.optional(v.string()),
+    telefonoContacto: v.optional(v.string()),
+    horarioAtencion: v.optional(v.string()),
+  },
+  handler: (ctx, args) => conErroresPublicos(async () => {
+    const docente = await exigirDocente(ctx);
+
+    // Cadena vacia significa "quitalo"; `undefined` significa "no lo toques".
+    const limpiar = (valor: string | undefined) =>
+      valor === undefined ? undefined : valor.trim() === "" ? null : valor.trim();
+
+    const correo = limpiar(args.correoContacto);
+    if (typeof correo === "string" && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(correo)) {
+      throw new ErrorDominio("VALIDACION", "Revisa el correo de contacto.");
+    }
+    const telefono = limpiar(args.telefonoContacto);
+    if (typeof telefono === "string" && !/^\+?[0-9 ()-]{7,25}$/.test(telefono)) {
+      throw new ErrorDominio("VALIDACION", "Revisa el teléfono de contacto.");
+    }
+
+    const campos = {
+      tituloProfesional: limpiar(args.tituloProfesional),
+      correoContacto: correo,
+      telefonoContacto: telefono,
+      horarioAtencion: limpiar(args.horarioAtencion),
+    };
+    const parche: Record<string, string | undefined> = { actualizadoEn: Date.now() } as never;
+    for (const [clave, valor] of Object.entries(campos)) {
+      if (valor === undefined) continue;
+      parche[clave] = valor === null ? undefined : valor;
+    }
+
+    await ctx.db.patch("docente", docente._id, parche as never);
+    return { ok: true };
+  }),
+});
 
 /** null significa que falta completar el perfil, no que haya que cerrar sesión. */
 export const obtenerPerfil = query({
@@ -68,6 +122,8 @@ export const obtenerPerfil = query({
 /** Alta idempotente. Añadir un rol nunca elimina el otro ni reasigna una cuenta. */
 export const completarPerfil = mutation({
   args: {
+    nombres: v.string(),
+    apellidos: v.string(),
     tipoDocumento: v.union(v.literal("CEDULA"), v.literal("PASAPORTE")),
     numeroDocumento: v.string(),
     telefono: v.optional(v.string()),
@@ -78,6 +134,13 @@ export const completarPerfil = mutation({
     if (!identidad) throw new ErrorPermiso("NO_AUTENTICADO", "Inicia sesión para continuar.");
     if (args.roles.length < 1 || args.roles.length > 2 || new Set(args.roles).size !== args.roles.length) {
       throw new ErrorDominio("VALIDACION", "Selecciona uno o ambos roles, sin repetirlos.");
+    }
+    // Un nombre no se valida contra un patron: hay apellidos compuestos, con
+    // apostrofes y de una sola letra. Lo unico que se exige es que diga algo.
+    const nombres = args.nombres.trim();
+    const apellidos = args.apellidos.trim();
+    if (nombres.length === 0 || apellidos.length === 0) {
+      throw new ErrorDominio("VALIDACION", "Escribe tu nombre y tu apellido.");
     }
     const numeroDocumento = normalizarDocumento(args.tipoDocumento, args.numeroDocumento);
     const telefono = args.telefono?.trim();
@@ -98,6 +161,8 @@ export const completarPerfil = mutation({
     if (!perfil) {
       const id = await ctx.db.insert("perfilUsuario", {
         authSubject: identidad.tokenIdentifier,
+        nombres,
+        apellidos,
         tipoDocumento: args.tipoDocumento,
         numeroDocumento,
         telefono,
@@ -108,9 +173,14 @@ export const completarPerfil = mutation({
       // Migra en el lugar: conserva el _id que usan suscripciones y permisos.
       await ctx.db.patch("perfilUsuario", perfil._id, {
         authSubject: identidad.tokenIdentifier,
+        // A diferencia del documento, el nombre si se corrige: un apellido
+        // mal escrito no es un cambio de identidad, es una errata.
+        nombres,
+        apellidos,
         ...(telefono === undefined ? {} : { telefono }),
         actualizadoEn,
       });
+      perfil = (await ctx.db.get("perfilUsuario", perfil._id))!;
     }
     for (const rol of args.roles) {
       const tabla = rol === "DOCENTE" ? "docente" : "representante";
@@ -831,6 +901,83 @@ export const listarMisEstudiantes = query({
 });
 
 /** Calendario del curso para mostrar parciales definidos aunque aún estén planificados. */
+/**
+ * El catalogo de acciones que el docente puede aplicar en su curso (D11).
+ *
+ * ## Por que esto no existia
+ *
+ * `conducta.registrarAccion` recibe un `tipoAccionId`, y **ninguna consulta
+ * decia que ids existen**. La pantalla central del producto -- el docente
+ * anota la conducta de un estudiante -- no se podia construir: habia como
+ * escribir la accion y ninguna forma de elegir cual.
+ *
+ * ## Por que vive en `nucleo.ts` y no en `conducta.ts`
+ *
+ * El catalogo es **configuracion de la institucion**, como los cursos y los
+ * periodos, no un registro de conducta: se siembra una vez y solo se lee. Y
+ * ponerlo aqui evita chocar con la rama de conducta que esta en revision
+ * (#77). Si el dueño de `conducta.ts` lo prefiere alli, mudarlo es mover una
+ * funcion sin tocar su contenido.
+ *
+ * ## Lo que devuelve y lo que no
+ *
+ * Solo lo **activo**, y solo lo de la institucion del curso o lo global
+ * (`institucionId` ausente = catalogo base para todas). Un tipo desactivado no
+ * se ofrece: `registrarAccion` lo rechazaria despues, y ofrecer algo que el
+ * servidor va a rechazar es peor que no ofrecerlo.
+ *
+ * Viene agrupado por categoria y ya ordenado, porque el orden es un dato del
+ * catalogo (`orden`) y no una preferencia de la pantalla.
+ */
+export const catalogoDeAcciones = query({
+  args: { cursoId: v.id("curso") },
+  handler: (ctx, args) => conErroresPublicos(async () => {
+    await exigirTitularDelCurso(ctx, args.cursoId);
+    const { anio } = await contextoCurso(ctx, args.cursoId);
+    const institucionId = anio.institucionId;
+
+    const suyas = (documento: { institucionId?: Id<"institucion"> }) =>
+      documento.institucionId === undefined || documento.institucionId === institucionId;
+
+    const categorias = (await ctx.db.query("categoriaAccion").collect())
+      .filter((c) => c.activa && suyas(c))
+      .sort((a, b) => a.orden - b.orden);
+
+    const tipos = (await ctx.db.query("tipoAccion").collect()).filter(
+      (t) => t.activa && suyas(t),
+    );
+
+    return categorias
+      .map((categoria) => ({
+        id: categoria._id,
+        codigo: categoria.codigo,
+        nombre: categoria.nombre,
+        descripcion: categoria.descripcion ?? null,
+        tipos: tipos
+          .filter((t) => t.categoriaAccionId === categoria._id)
+          .sort((a, b) => a.nombre.localeCompare(b.nombre, "es"))
+          .map((t) => ({
+            id: t._id,
+            nombre: t.nombre,
+            descripcion: t.descripcion ?? null,
+            signo: t.signo,
+            // Los tres puntajes viajan juntos: la pantalla necesita el rango
+            // para no dejar elegir algo que el servidor rechazaria, y el
+            // defecto para no obligar al docente a decidir un numero cuando
+            // no quiere pensarlo.
+            puntosDefecto: t.puntosDefecto,
+            puntosMin: t.puntosMin,
+            puntosMax: t.puntosMax,
+            requiereDescripcion: t.requiereDescripcion,
+            admiteInconformidad: t.admiteInconformidad,
+          })),
+      }))
+      // Una categoria sin tipos activos no se enseña: seria una seccion vacia
+      // que el docente abre para nada.
+      .filter((categoria) => categoria.tipos.length > 0);
+  }),
+});
+
 export const obtenerCalendarioCurso = query({
   args: { cursoId: v.id("curso") },
   handler: (ctx, args) => conErroresPublicos(async () => {

@@ -14,6 +14,7 @@
 import { ConvexError, v } from "convex/values";
 import {
   internalMutation,
+  internalQuery,
   query,
   type MutationCtx,
   type QueryCtx,
@@ -82,8 +83,56 @@ export const procesarEvento = internalMutation({
        */
       const mensaje = error instanceof Error ? error.message : String(error);
       await ctx.db.patch(eventoId, { errorProcesamiento: mensaje });
+      /**
+       * Y se grita en el log.
+       *
+       * Guardar el fallo en la fila es lo correcto, pero durante un tiempo
+       * **nadie lo leia**: `errorProcesamiento` se escribia y no habia
+       * consulta, panel ni aviso que lo mirara. Un evento aqui es alguien que
+       * **pago y no tiene su plan**, y el equipo se enteraba solo si esa
+       * persona se quejaba.
+       *
+       * `console.error` aparece en el log de Convex al instante y es lo que
+       * dispara cualquier alerta que se configure despues.
+       */
+      console.error(
+        `[revenuecat] evento ${args.eventoIdExterno} (${args.tipoEvento}) guardado sin aplicar:`,
+        mensaje,
+      );
       return { estado: "GUARDADO_CON_ERROR" as const, error: mensaje };
     }
+  },
+});
+
+/**
+ * Los eventos de pago que llegaron y **no** se pudieron aplicar.
+ *
+ * Cada fila aqui es una persona que pago y puede no tener su plan. Es la
+ * lista que hay que revisar antes de dar por bueno un dia de cobros, y la
+ * unica forma de encontrarlos sin esperar a que alguien reclame.
+ *
+ * Se corre con `npx convex run suscripciones:eventosSinAplicar`. Es
+ * `internalQuery` a proposito: lleva el `payload` crudo de RevenueCat y no
+ * tiene por que existir como superficie publica.
+ */
+export const eventosSinAplicar = internalQuery({
+  args: {},
+  handler: async (ctx) => {
+    const eventos = await ctx.db.query("eventoRevenuecat").collect();
+    const fallidos = eventos.filter((e) => e.errorProcesamiento !== undefined);
+    return {
+      total: eventos.length,
+      sinAplicar: fallidos.length,
+      eventos: fallidos
+        .sort((a, b) => b.recibidoEn - a.recibidoEn)
+        .map((e) => ({
+          eventoIdExterno: e.eventoIdExterno,
+          tipoEvento: e.tipoEvento,
+          revenuecatAppUserId: e.revenuecatAppUserId,
+          recibidoEn: e.recibidoEn,
+          error: e.errorProcesamiento,
+        })),
+    };
   },
 });
 
