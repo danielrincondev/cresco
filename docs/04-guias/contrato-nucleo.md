@@ -11,7 +11,7 @@ Convex; ninguna función acepta el id de otro usuario como identidad.
    o `null`; pueden existir ambos. El selector de vista es una decisión de UI,
    no una modificación de permisos.
 2. Mostrar el formulario de documento y roles si falta el alta.
-3. Llamar `completarPerfil({ tipoDocumento, numeroDocumento, telefono?, roles })`.
+3. Llamar `completarPerfil({ nombres, apellidos, tipoDocumento, numeroDocumento, telefono?, roles })`.
    Documento del adulto: `CEDULA` (10 dígitos) o `PASAPORTE` (3–30 caracteres
    alfanuméricos o guion). Es validación de formato, no verificación de identidad.
    `roles`: `["DOCENTE"]`, `["REPRESENTANTE"]` o ambos. Teléfono opcional;

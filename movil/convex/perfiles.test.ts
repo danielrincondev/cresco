@@ -7,7 +7,7 @@ import { api } from "./_generated/api";
 import schema from "./schema";
 
 const modules = import.meta.glob(["./nucleo.ts", "./_generated/*.js"]);
-const datos = { tipoDocumento: "CEDULA" as const, numeroDocumento: "0900000001", roles: ["DOCENTE" as const] };
+const datos = { nombres: "Kenny", apellidos: "Chung", tipoDocumento: "CEDULA" as const, numeroDocumento: "0900000001", roles: ["DOCENTE" as const] };
 
 afterEach(() => vi.unstubAllEnvs());
 
@@ -23,6 +23,9 @@ describe("núcleo — perfiles", () => {
     const t = convexTest(schema, modules);
     const cliente = t.withIdentity({ subject: "a" });
     const perfil = await cliente.mutation(api.nucleo.completarPerfil, datos);
+    // #52: sin esto, el representante recibe anotaciones sobre su hijo
+    // firmadas por alguien sin nombre.
+    expect(perfil).toMatchObject({ nombres: "Kenny", apellidos: "Chung" });
     expect(perfil.docenteId).not.toBeNull();
     expect(perfil.representanteId).toBeNull();
     expect(await cliente.query(api.nucleo.obtenerPerfil)).toEqual(perfil);
@@ -31,6 +34,22 @@ describe("núcleo — perfiles", () => {
       anioInicio: "2026-05-01", anioFin: "2027-02-28",
     });
     expect((await cliente.query(api.nucleo.listarCursos)).cursos[0].id).toBe(curso.id);
+  });
+
+  it("acepta nombres de una letra y permite corregirlos sin cambiar la identidad", async () => {
+    const t = convexTest(schema, modules);
+    const cliente = t.withIdentity({ subject: "a" });
+    const perfil = await cliente.mutation(api.nucleo.completarPerfil, {
+      ...datos, nombres: "  A  ", apellidos: "  O  ",
+    });
+    expect(perfil).toMatchObject({ nombres: "A", apellidos: "O" });
+    const corregido = await cliente.mutation(api.nucleo.completarPerfil, {
+      ...datos, nombres: "Ana", apellidos: "O'Connor",
+    });
+    expect(corregido).toMatchObject({
+      perfilUsuarioId: perfil.perfilUsuarioId, docenteId: perfil.docenteId,
+      nombres: "Ana", apellidos: "O'Connor",
+    });
   });
 
   it("repetir el alta concurrentemente conserva un solo perfil y rol", async () => {
@@ -97,9 +116,82 @@ describe("núcleo — perfiles", () => {
     { ...datos, roles: ["DOCENTE" as const, "DOCENTE" as const] },
     { ...datos, numeroDocumento: "incorrecto" },
     { ...datos, telefono: "" },
+    { ...datos, nombres: " " },
+    { ...datos, apellidos: " " },
   ])("rechaza datos inválidos sin crear registros (%j)", async (args) => {
     const t = convexTest(schema, modules);
     await expect(t.withIdentity({ subject: "a" }).mutation(api.nucleo.completarPerfil, args)).rejects.toThrow("VALIDACION");
     expect(await t.run((ctx) => ctx.db.query("perfilUsuario").collect())).toHaveLength(0);
+  });
+});
+
+describe("núcleo — datos profesionales del docente (#52)", () => {
+  const alta = async (t: ReturnType<typeof convexTest>) => {
+    const cliente = t.withIdentity({ subject: "a" });
+    await cliente.mutation(api.nucleo.completarPerfil, datos);
+    return cliente;
+  };
+
+  /**
+   * Estos cuatro campos existian en la tabla `docente` desde el primer esquema
+   * y ninguna mutation los escribia: P9 mostraba una ficha vacia porque no
+   * habia forma de llenarla.
+   */
+  it("los guarda y los devuelve", async () => {
+    const t = convexTest(schema, modules);
+    const cliente = await alta(t);
+    await cliente.mutation(api.nucleo.actualizarDatosDocente, {
+      tituloProfesional: "  Licenciado en Educación Básica  ",
+      correoContacto: "docente@colegio.edu.ec",
+      horarioAtencion: "Martes de 10:00 a 11:00",
+    });
+    const docente = await t.run((ctx) => ctx.db.query("docente").unique());
+    expect(docente).toMatchObject({
+      tituloProfesional: "Licenciado en Educación Básica",
+      correoContacto: "docente@colegio.edu.ec",
+      horarioAtencion: "Martes de 10:00 a 11:00",
+    });
+    // Lo que no se mandó no se toca.
+    expect(docente?.telefonoContacto).toBeUndefined();
+  });
+
+  /**
+   * Un docente que publicó su teléfono personal y se arrepiente tiene que
+   * poder quitarlo. Cadena vacía lo borra; `undefined` significa "no lo
+   * toques", que es lo que manda un formulario que no edita ese campo.
+   */
+  it("la cadena vacia borra el campo, y no mandarlo lo conserva", async () => {
+    const t = convexTest(schema, modules);
+    const cliente = await alta(t);
+    await cliente.mutation(api.nucleo.actualizarDatosDocente, {
+      telefonoContacto: "0990000000", tituloProfesional: "Licenciado",
+    });
+    await cliente.mutation(api.nucleo.actualizarDatosDocente, { telefonoContacto: "" });
+
+    const docente = await t.run((ctx) => ctx.db.query("docente").unique());
+    expect(docente?.telefonoContacto).toBeUndefined();
+    expect(docente?.tituloProfesional).toBe("Licenciado");
+  });
+
+  it.each([
+    { correoContacto: "esto-no-es-un-correo" },
+    { telefonoContacto: "abc" },
+  ])("rechaza datos de contacto mal escritos (%j)", async (args) => {
+    const t = convexTest(schema, modules);
+    const cliente = await alta(t);
+    await expect(
+      cliente.mutation(api.nucleo.actualizarDatosDocente, args),
+    ).rejects.toThrow("VALIDACION");
+  });
+
+  it("un representante no puede editar la ficha de un docente", async () => {
+    const t = convexTest(schema, modules);
+    const cliente = t.withIdentity({ subject: "b" });
+    await cliente.mutation(api.nucleo.completarPerfil, {
+      ...datos, numeroDocumento: "0900000002", roles: ["REPRESENTANTE"],
+    });
+    await expect(
+      cliente.mutation(api.nucleo.actualizarDatosDocente, { tituloProfesional: "Doctor" }),
+    ).rejects.toThrow();
   });
 });

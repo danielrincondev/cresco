@@ -1,4 +1,10 @@
-import { Component, type PropsWithChildren, useRef, useState } from "react";
+import {
+  Component,
+  type PropsWithChildren,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -168,11 +174,50 @@ export function ErrorMensaje({ mensaje }: { mensaje: string | null }) {
     </Text>
   ) : null;
 }
+/**
+ * Cuantos segundos se espera antes de admitir que algo va mal.
+ *
+ * Lo bastante largo para no asustar en una conexion lenta de un plantel
+ * fiscal, y lo bastante corto para que nadie se quede mirando un disco que
+ * gira sin saber si esperar. Ocho segundos es mas de lo que tarda cualquier
+ * consulta sana del proyecto.
+ */
+const SEGUNDOS_ANTES_DE_SOSPECHAR = 8;
+
+/**
+ * Cargando, con un limite de paciencia.
+ *
+ * ## El caso que esto cubre
+ *
+ * `LimiteError` captura lo que **se lanza**. Pero cuando el telefono se queda
+ * sin red, Convex no lanza nada: el websocket no conecta y `useQuery` se queda
+ * en `undefined` indefinidamente. La pantalla entonces muestra "Cargando..."
+ * para siempre, sin distinguirse de una consulta lenta y sin ninguna salida.
+ *
+ * Es el estado mas probable del piloto -- una madre abriendo la aplicacion en
+ * la puerta del aula, con una barra de cobertura -- y era el unico que la
+ * aplicacion no sabia contar. Pasados unos segundos se dice lo que pasa. No se
+ * reintenta ni se cancela nada: Convex reconecta solo en cuanto vuelve la red,
+ * y entonces esto desaparece porque el dato llega.
+ */
 export function Cargando({ mensaje = "Cargando..." }: { mensaje?: string }) {
+  const [tarda, setTarda] = useState(false);
+
+  useEffect(() => {
+    const reloj = setTimeout(() => setTarda(true), SEGUNDOS_ANTES_DE_SOSPECHAR * 1000);
+    return () => clearTimeout(reloj);
+  }, []);
+
   return (
     <View accessibilityLiveRegion="polite" style={s.cargando}>
       <ActivityIndicator color={Marca.base} />
       <Cuerpo>{mensaje}</Cuerpo>
+      {tarda && (
+        <Cuerpo>
+          Está tardando más de lo normal. Revisa tu conexión: en cuanto vuelva,
+          esto se carga solo.
+        </Cuerpo>
+      )}
     </View>
   );
 }
