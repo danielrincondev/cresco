@@ -741,6 +741,211 @@ export function AlertasFamilia() {
   );
 }
 
+/* =======================================================================
+ * D18 — Perfil del docente
+ * ======================================================================= */
+
+/**
+ * Lo que el docente publica sobre si mismo, y que el representante ve en P9.
+ *
+ * Los cuatro campos son opcionales y **todos se pueden borrar**: dejar uno en
+ * blanco lo quita. Un docente que publico su telefono personal y se arrepiente
+ * tiene que poder deshacerlo sin pedirle permiso a nadie, y obligarlo a
+ * publicarlo para usar la aplicacion seria pedirle un dato que el servicio no
+ * necesita.
+ *
+ * El nombre no se edita aqui: vive en el perfil de la cuenta, junto al
+ * documento, porque es la identidad y no un dato de contacto.
+ */
+export function PerfilDocente() {
+  const guardar = useMutation(api.nucleo.actualizarDatosDocente);
+  const perfil = useQuery(api.nucleo.obtenerPerfil);
+  const [titulo, setTitulo] = useState("");
+  const [correo, setCorreo] = useState("");
+  const [telefono, setTelefono] = useState("");
+  const [horario, setHorario] = useState("");
+  const [guardado, setGuardado] = useState(false);
+  const op = useOperacion();
+
+  async function enviar() {
+    setGuardado(false);
+    const r = await op.ejecutar(() =>
+      guardar({
+        tituloProfesional: titulo,
+        correoContacto: correo,
+        telefonoContacto: telefono,
+        horarioAtencion: horario,
+      }),
+    );
+    if (r.ok) setGuardado(true);
+  }
+
+  if (perfil === undefined) return <Cargando />;
+
+  return (
+    <Pagina
+      titulo="Tu perfil profesional"
+      descripcion="Esto es lo que los representantes de tu curso ven sobre ti. Todo es opcional."
+    >
+      <Tarjeta>
+        <Subtitulo>
+          {perfil?.nombres
+            ? `${perfil.nombres} ${perfil.apellidos ?? ""}`.trim()
+            : "Tu cuenta"}
+        </Subtitulo>
+        <Cuerpo>
+          Tu nombre y tu documento se cambian desde el perfil de la cuenta, no
+          desde aquí.
+        </Cuerpo>
+      </Tarjeta>
+
+      <Tarjeta>
+        <Subtitulo>Cómo te ven las familias</Subtitulo>
+        <Campo
+          etiqueta="Título profesional"
+          value={titulo}
+          onChangeText={setTitulo}
+          ayuda="Por ejemplo: Licenciado en Educación Básica."
+          maxLength={80}
+          editable={!op.pendiente}
+        />
+        <Campo
+          etiqueta="Correo de contacto"
+          value={correo}
+          onChangeText={setCorreo}
+          autoCapitalize="none"
+          keyboardType="email-address"
+          maxLength={120}
+          editable={!op.pendiente}
+        />
+        <Campo
+          etiqueta="Teléfono de contacto"
+          value={telefono}
+          onChangeText={setTelefono}
+          keyboardType="phone-pad"
+          ayuda="Solo si quieres que te escriban. Puedes dejarlo vacío."
+          maxLength={25}
+          editable={!op.pendiente}
+        />
+        <Campo
+          etiqueta="Horario de atención"
+          value={horario}
+          onChangeText={setHorario}
+          ayuda="Por ejemplo: martes de 10:00 a 11:00."
+          maxLength={120}
+          editable={!op.pendiente}
+        />
+        <Aviso>
+          Deja un campo vacío para quitarlo. Lo que borres deja de verse en la
+          ficha que consultan los representantes.
+        </Aviso>
+      </Tarjeta>
+
+      <ErrorMensaje mensaje={op.error} />
+      {guardado && !op.error && <Aviso>Guardado. Ya se ve así en la ficha.</Aviso>}
+      <Boton onPress={() => void enviar()} pendiente={op.pendiente}>
+        Guardar
+      </Boton>
+    </Pagina>
+  );
+}
+
+/* =======================================================================
+ * P9 — El docente a cargo
+ * ======================================================================= */
+
+/**
+ * Quien es la persona que le escribe sobre su hijo.
+ *
+ * Hasta #52 la aplicacion hacia conversar a un docente y a un representante
+ * sin que ninguno supiera el nombre del otro. De las entrevistas del 1 de
+ * septiembre salio que el problema es que los padres **no aceptan** lo que se
+ * les informa: saber quien se lo esta diciendo no es un adorno.
+ *
+ * Si el docente no ha llenado su ficha, esto no inventa nada ni deja la
+ * pantalla en blanco como si fuera un error: dice que todavia no la publico.
+ */
+export function ProfesorACargo({
+  estudianteId,
+  nombre,
+}: {
+  estudianteId: Id<"estudiante">;
+  nombre: string;
+}) {
+  const ficha = useQuery(api.interaccion.docenteACargo, { estudianteId });
+
+  if (ficha === undefined) return <Cargando />;
+
+  if (ficha === null) {
+    return (
+      <Pagina titulo="Docente a cargo">
+        <EstadoVacio icono="account-question" titulo="Todavía no hay docente asignado">
+          Cuando la institución asigne al titular de {nombre}, vas a verlo aquí
+          con sus datos de contacto.
+        </EstadoVacio>
+      </Pagina>
+    );
+  }
+
+  const sinDatos =
+    ficha.tituloProfesional === null &&
+    ficha.correoContacto === null &&
+    ficha.telefonoContacto === null &&
+    ficha.horarioAtencion === null;
+
+  return (
+    <Pagina
+      titulo="Docente a cargo"
+      descripcion={ficha.curso ? `Titular de ${ficha.curso}.` : undefined}
+    >
+      <Tarjeta>
+        <Subtitulo>{ficha.nombre ?? "Docente titular"}</Subtitulo>
+        {ficha.tituloProfesional && <Cuerpo>{ficha.tituloProfesional}</Cuerpo>}
+        {ficha.nombre === null && (
+          <Cuerpo>
+            Su nombre todavía no aparece porque completó su cuenta antes de que
+            la aplicación los pidiera.
+          </Cuerpo>
+        )}
+      </Tarjeta>
+
+      {sinDatos ? (
+        <Tarjeta>
+          <Cuerpo>
+            El docente todavía no publicó cómo prefiere que lo contacten. Puedes
+            pedirle una cita desde la sección Citas.
+          </Cuerpo>
+        </Tarjeta>
+      ) : (
+        <Tarjeta>
+          <Subtitulo>Cómo contactarlo</Subtitulo>
+          {ficha.horarioAtencion && <Cuerpo>Atiende: {ficha.horarioAtencion}</Cuerpo>}
+          {ficha.correoContacto && (
+            <Boton
+              secundario
+              onPress={() => void Linking.openURL(`mailto:${ficha.correoContacto}`)}
+            >
+              Escribirle al correo
+            </Boton>
+          )}
+          {ficha.telefonoContacto && (
+            <Boton
+              secundario
+              onPress={() => void Linking.openURL(`tel:${ficha.telefonoContacto}`)}
+            >
+              Llamar a {ficha.telefonoContacto}
+            </Boton>
+          )}
+        </Tarjeta>
+      )}
+
+      <Aviso>
+        Para algo urgente fuera del horario, usa los canales de la institución.
+        Cresco no es un servicio de emergencia.
+      </Aviso>
+    </Pagina>
+  );
+}
 /* ==========================================================================
  * P12 — Ajustes
  * ======================================================================= */

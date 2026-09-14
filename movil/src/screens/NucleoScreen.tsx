@@ -14,6 +14,7 @@ import { useClerk, useUser } from "@clerk/expo";
 import { useMutation, usePaginatedQuery, useQuery } from "convex/react";
 import { ConvexError } from "convex/values";
 import type { FunctionReturnType } from "convex/server";
+import type { Id } from "../../convex/_generated/dataModel";
 import { randomUUID } from "expo-crypto";
 import { api } from "../../convex/_generated/api";
 import { PARENTESCO } from "../../convex/lib/enums";
@@ -47,6 +48,8 @@ import { AnotarConducta } from "./ConductaScreen";
 import {
   AgendaDocente,
   Ajustes,
+  PerfilDocente,
+  ProfesorACargo,
   AlertaDocente,
   AlertasFamilia,
   CitasFamilia,
@@ -87,11 +90,15 @@ type Ruta =
         | "alertas"
         | "ajustes"
         | "plan"
+        | "perfilDocente"
         // Los reclamos son de **todos** los cursos del docente, no de uno:
         // `inconformidadesDelDocente` no recibe curso. Viajaba con uno que la
         // pantalla nunca leyo, y eso hacia creer que estaba acotada.
         | "reclamos";
     }
+  // P9 necesita saber de que hijo se pregunta: un representante con dos hijos
+  // en cursos distintos tiene dos docentes a cargo, no uno.
+  | { tipo: "docenteACargo"; estudianteId: Id<"estudiante">; nombre: string }
   | { tipo: "curso" | "periodos" | "agenda" | "alerta" | "anotar"; curso: Curso }
   | { tipo: "invitacion"; invitacion: Invitacion; curso: Curso }
   | { tipo: "aprobar"; curso: Curso; alumno: Alumno };
@@ -269,6 +276,10 @@ export function NucleoScreen() {
           <CitasFamilia />
         ) : ruta.tipo === "alertas" ? (
           <AlertasFamilia />
+        ) : ruta.tipo === "perfilDocente" ? (
+          <PerfilDocente />
+        ) : ruta.tipo === "docenteACargo" ? (
+          <ProfesorACargo estudianteId={ruta.estudianteId} nombre={ruta.nombre} />
         ) : ruta.tipo === "plan" ? (
           // Un solo destino para los dos muros: cual se pinta lo decide el rol
           // activo, y `miSuscripcion` devuelve null en la rama que la persona
@@ -629,6 +640,9 @@ function DetalleCurso({
       </Boton>
       <Boton secundario onPress={() => navegar({ tipo: "alerta", curso })}>
         Alerta de emergencia
+      </Boton>
+      <Boton secundario onPress={() => navegar({ tipo: "perfilDocente" })}>
+        Tu perfil profesional
       </Boton>
       <Boton secundario onPress={() => navegar({ tipo: "plan" })}>
         Tu plan
@@ -1033,6 +1047,22 @@ function MisHijos({
                   ? "Tu hijo ya forma parte del curso."
                   : "Consulta con el docente para revisar el registro."}
             </Cuerpo>
+            {a.estadoVerificacion === "APROBADO" && (
+              // Solo con la matricula aprobada: antes de eso no hay curso y
+              // por tanto no hay titular del que hablar.
+              <Boton
+                secundario
+                onPress={() =>
+                  navegar({
+                    tipo: "docenteACargo",
+                    estudianteId: a.estudianteId,
+                    nombre: a.nombres,
+                  })
+                }
+              >
+                Ver al docente a cargo
+              </Boton>
+            )}
           </Tarjeta>
         ))
       )}
