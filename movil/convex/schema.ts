@@ -123,8 +123,22 @@ export default defineSchema({
    * ux_perfil_documento → índice `por_documento`, unicidad en la mutation
    */
   perfilUsuario: defineTable({
-    /** El `subject` del JWT de Clerk. Ver `viewer.ts`. */
+    /** tokenIdentifier (emisor + subject); admite subject legado del emisor configurado. */
     authSubject: v.string(),
+    /**
+     * Como se llama la persona (#52).
+     *
+     * Vivian solo en Clerk, del lado del cliente y solo para uno mismo, asi
+     * que el docente y el representante conversaban -- citas, reclamos,
+     * alertas sobre un menor -- sin saber el nombre del otro. El aviso de
+     * privacidad ya declara que recogemos nombres y apellidos de ambos: el
+     * documento asumia un campo que no existia.
+     *
+     * Opcionales por los perfiles creados antes. `completarPerfil` los exige
+     * de aqui en adelante.
+     */
+    nombres: v.optional(v.string()),
+    apellidos: v.optional(v.string()),
     tipoDocumento: enumDe(TIPO_DOCUMENTO),
     numeroDocumento: v.string(),
     telefono: v.optional(v.string()),
@@ -302,6 +316,9 @@ export default defineSchema({
     estudianteId: v.id("estudiante"),
     parentesco: enumDe(PARENTESCO),
     invitacionCursoId: v.optional(v.id("invitacionCurso")),
+    /** Clave del formulario y huella normalizada para reintentos de registro. */
+    solicitudId: v.optional(v.string()),
+    huellaSolicitud: v.optional(v.string()),
     estado: enumDe(ESTADO_VINCULO),
     vigenteDesde: v.string(),
     vigenteHasta: v.optional(v.string()),
@@ -309,6 +326,7 @@ export default defineSchema({
     ...actualizadoEn,
   })
     .index("por_representante_estudiante", ["representanteId", "estudianteId"]) // ux_vinculo
+    .index("por_representante_solicitud", ["representanteId", "solicitudId"])
     // ux_vinculo_estudiante_unico: uno solo ACTIVO por estudiante
     .index("por_estudiante_estado", ["estudianteId", "estado"])
     .index("por_representante_estado", ["representanteId", "estado"]),
@@ -616,6 +634,12 @@ export default defineSchema({
     fechaHoraFin: v.number(), // ck_cita_horas → guardas.ts
     modalidad: enumDe(MODALIDAD),
     estado: enumDe(ESTADO_CITA),
+    /**
+     * **Lo ve el representante.** El nombre engaña: no es una nota privada del
+     * docente, es el mensaje que escribe al confirmar o rechazar, y
+     * `responderCita` ya lo manda dentro de la notificacion. No guardar aqui
+     * nada que no se le pueda decir a la familia a la cara.
+     */
     notasDocente: v.optional(v.string()),
     ...actualizadoEn,
   })
@@ -632,6 +656,18 @@ export default defineSchema({
   inconformidad: defineTable({
     accionRegistradaId: v.id("accionRegistrada"),
     representanteId: v.id("representante"),
+    /**
+     * A quien le toca responder. Se puede deducir siguiendo
+     * `accionRegistradaId` hasta `accion.registradaPorDocenteId`, pero
+     * entonces la bandeja del docente no se puede indexar: habria que leer
+     * **todos** los reclamos abiertos del sistema y filtrarlos en memoria
+     * (issue #48). Se denormaliza para que `por_docente_estado` exista.
+     *
+     * Opcional solo por los reclamos creados antes de este campo; los nuevos
+     * siempre lo llevan. `migraciones.rellenarDocenteEnInconformidades` lo
+     * completa, y despues de correrla no deberia quedar ninguno sin el.
+     */
+    docenteId: v.optional(v.id("docente")),
     motivo: enumDe(MOTIVO_INCONFORMIDAD),
     mensaje: v.string(),
     estado: enumDe(ESTADO_INCONFORMIDAD),
@@ -643,7 +679,8 @@ export default defineSchema({
     ...actualizadoEn,
   })
     .index("por_accion_representante", ["accionRegistradaId", "representanteId"])
-    .index("por_estado_vence", ["estado", "venceEn"]),
+    .index("por_estado_vence", ["estado", "venceEn"])
+    .index("por_docente_estado", ["docenteId", "estado"]),
 
   /**
    * G1: exige reautenticación; `reautenticadoEn` deja constancia.

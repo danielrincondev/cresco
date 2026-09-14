@@ -2,13 +2,15 @@
 /// <reference types="vite/client" />
 
 import { convexTest } from "convex-test";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { ConvexError } from "convex/values";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { api } from "./_generated/api";
+import { api, internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import schema from "./schema";
+import { exportJWK, generateKeyPair, SignJWT } from "jose";
 
-const modules = import.meta.glob(["./interaccion.ts", "./_generated/*.js"]);
+const modules = import.meta.glob(["./interaccion.ts", "./migraciones.ts", "./_generated/*.js"]);
 
 const AHORA = new Date("2026-09-07T15:00:00Z");
 
@@ -18,7 +20,7 @@ async function sembrarEscenario(t: ReturnType<typeof convexTest>) {
     const ahora = Date.now();
 
     const perfilDocente = await ctx.db.insert("perfilUsuario", {
-      authSubject: "docente_1", tipoDocumento: "CEDULA", numeroDocumento: "0900000001",
+      authSubject: "https://convex.test|docente_1", tipoDocumento: "CEDULA", numeroDocumento: "0900000001",
       actualizadoEn: ahora,
     });
     const docenteId = await ctx.db.insert("docente", {
@@ -26,7 +28,7 @@ async function sembrarEscenario(t: ReturnType<typeof convexTest>) {
     });
 
     const perfilRep = await ctx.db.insert("perfilUsuario", {
-      authSubject: "rep_1", tipoDocumento: "CEDULA", numeroDocumento: "0900000002",
+      authSubject: "https://convex.test|rep_1", tipoDocumento: "CEDULA", numeroDocumento: "0900000002",
       actualizadoEn: ahora,
     });
     const representanteId = await ctx.db.insert("representante", {
@@ -80,7 +82,7 @@ async function sembrarEscenario(t: ReturnType<typeof convexTest>) {
 
   return {
     ...ids,
-    docente: t.withIdentity({ subject: "docente_1" }),
+    docente: t.withIdentity({ subject: "docente_1", sid: "sesion_docente" }),
     representante: t.withIdentity({ subject: "rep_1" }),
   };
 }
@@ -184,7 +186,7 @@ describe("interaccion — citas", () => {
 
     const ajeno = await t.run(async (ctx) => {
       const perfil = await ctx.db.insert("perfilUsuario", {
-        authSubject: "rep_2", tipoDocumento: "CEDULA", numeroDocumento: "0900000003",
+        authSubject: "https://convex.test|rep_2", tipoDocumento: "CEDULA", numeroDocumento: "0900000003",
         actualizadoEn: Date.now(),
       });
       await ctx.db.insert("representante", { perfilUsuarioId: perfil, actualizadoEn: Date.now() });
@@ -207,7 +209,7 @@ describe("interaccion — citas", () => {
 
     await t.run(async (ctx) => {
       const perfil = await ctx.db.insert("perfilUsuario", {
-        authSubject: "rep_2", tipoDocumento: "CEDULA", numeroDocumento: "0900000003",
+        authSubject: "https://convex.test|rep_2", tipoDocumento: "CEDULA", numeroDocumento: "0900000003",
         actualizadoEn: Date.now(),
       });
       await ctx.db.insert("representante", { perfilUsuarioId: perfil, actualizadoEn: Date.now() });
@@ -223,7 +225,7 @@ describe("interaccion — citas", () => {
     const suyos = await e.representante.query(api.interaccion.bloquesDisponibles, {
       estudianteId: e.estudianteId, desde: "2026-09-01",
     });
-    expect(suyos).toHaveLength(1);
+    expect(suyos).toHaveLength(2);
     expect(suyos[0].duracionMinutos).toBe(15);
   });
 
@@ -282,7 +284,7 @@ describe("interaccion — inconformidades", () => {
 
     await t.run(async (ctx) => {
       const perfil = await ctx.db.insert("perfilUsuario", {
-        authSubject: "rep_2", tipoDocumento: "CEDULA", numeroDocumento: "0900000003",
+        authSubject: "https://convex.test|rep_2", tipoDocumento: "CEDULA", numeroDocumento: "0900000003",
         actualizadoEn: Date.now(),
       });
       await ctx.db.insert("representante", { perfilUsuarioId: perfil, actualizadoEn: Date.now() });
@@ -378,7 +380,7 @@ describe("interaccion — inconformidades", () => {
 
     await t.run(async (ctx) => {
       const perfil = await ctx.db.insert("perfilUsuario", {
-        authSubject: "docente_2", tipoDocumento: "CEDULA", numeroDocumento: "0900000004",
+        authSubject: "https://convex.test|docente_2", tipoDocumento: "CEDULA", numeroDocumento: "0900000004",
         actualizadoEn: Date.now(),
       });
       await ctx.db.insert("docente", { perfilUsuarioId: perfil, actualizadoEn: Date.now() });
@@ -398,7 +400,7 @@ describe("interaccion — alertas de emergencia", () => {
     const e = await sembrarEscenario(t);
 
     await expect(
-      e.docente.mutation(api.interaccion.activarAlerta, {
+      e.docente.mutation(internal.interaccion.activarAlertaVerificada, {
         cursoId: e.cursoId, alcance: "CURSO", tipo: "EVACUACION",
         titulo: "Evacuación", mensaje: "Vengan por sus hijos",
         esSimulacro: false,
@@ -412,7 +414,7 @@ describe("interaccion — alertas de emergencia", () => {
     const e = await sembrarEscenario(t);
 
     await expect(
-      e.docente.mutation(api.interaccion.activarAlerta, {
+      e.docente.mutation(internal.interaccion.activarAlertaVerificada, {
         cursoId: e.cursoId, alcance: "CURSO", tipo: "SIMULACRO",
         titulo: "Simulacro", mensaje: "Es una práctica",
         esSimulacro: false, reautenticadoEn: AHORA.getTime(),
@@ -425,7 +427,7 @@ describe("interaccion — alertas de emergencia", () => {
     const e = await sembrarEscenario(t);
 
     await expect(
-      e.docente.mutation(api.interaccion.activarAlerta, {
+      e.docente.mutation(internal.interaccion.activarAlertaVerificada, {
         cursoId: e.cursoId, alcance: "CURSO", estudianteId: e.estudianteId,
         tipo: "ACCIDENTE", titulo: "Accidente", mensaje: "Vengan",
         esSimulacro: false, reautenticadoEn: AHORA.getTime(),
@@ -437,7 +439,7 @@ describe("interaccion — alertas de emergencia", () => {
     const t = convexTest(schema, modules);
     const e = await sembrarEscenario(t);
 
-    const r = await e.docente.mutation(api.interaccion.activarAlerta, {
+    const r = await e.docente.mutation(internal.interaccion.activarAlertaVerificada, {
       cursoId: e.cursoId, alcance: "CURSO", tipo: "SUSPENSION_CLASES",
       titulo: "Se suspenden las clases", mensaje: "No hay agua en el plantel",
       esSimulacro: false, reautenticadoEn: AHORA.getTime(),
@@ -457,7 +459,7 @@ describe("interaccion — alertas de emergencia", () => {
   it("el representante confirma la lectura y no puede confirmar la de otro", async () => {
     const t = convexTest(schema, modules);
     const e = await sembrarEscenario(t);
-    await e.docente.mutation(api.interaccion.activarAlerta, {
+    await e.docente.mutation(internal.interaccion.activarAlertaVerificada, {
       cursoId: e.cursoId, alcance: "CURSO", tipo: "RETIRO_ANTICIPADO",
       titulo: "Salida anticipada", mensaje: "Hoy salen a las 11:00",
       esSimulacro: false, reautenticadoEn: AHORA.getTime(),
@@ -515,5 +517,479 @@ describe("interaccion — dispositivos y notificaciones", () => {
         notificacionId: delDocente[0]._id,
       }),
     ).rejects.toThrow("no es tuya");
+  });
+});
+
+describe("interaccion — los errores llegan utiles a la pantalla", () => {
+  /**
+   * Sin envolverlos, un `ErrorDominio` cruza la frontera de Convex como un
+   * fallo generico y la unica frase que la pantalla puede mostrar es "no
+   * pudimos completar la solicitud". El representante que reserva un horario
+   * que acaban de tomar merece leer por que.
+   */
+  async function capturar(fn: () => Promise<unknown>) {
+    try {
+      await fn();
+    } catch (error) {
+      return error;
+    }
+    throw new Error("se esperaba un error y no hubo ninguno");
+  }
+
+  it("un choque de reglas viaja con su codigo y su mensaje", async () => {
+    const t = convexTest(schema, modules);
+    const e = await sembrarEscenario(t);
+    const bloque = { fecha: "2026-09-10", horaInicio: "12:30", horaFin: "13:30" };
+    await e.docente.mutation(api.interaccion.publicarDisponibilidad, bloque);
+
+    const error = await capturar(() =>
+      e.docente.mutation(api.interaccion.publicarDisponibilidad, {
+        ...bloque, horaInicio: "13:00", horaFin: "14:00",
+      }),
+    );
+
+    expect(error).toBeInstanceOf(ConvexError);
+    expect((error as ConvexError<{ codigo: string; mensaje: string }>).data).toMatchObject({
+      codigo: "CONFLICTO",
+    });
+    expect((error as ConvexError<{ mensaje: string }>).data.mensaje).toContain("se cruza");
+  });
+
+  it("una falta de permiso tambien, y sin filtrar detalles de mas", async () => {
+    const t = convexTest(schema, modules);
+    const e = await sembrarEscenario(t);
+
+    const error = await capturar(() =>
+      e.representante.mutation(api.interaccion.publicarDisponibilidad, {
+        fecha: "2026-09-10", horaInicio: "12:30", horaFin: "13:00",
+      }),
+    );
+
+    expect((error as ConvexError<{ codigo: string; mensaje: string }>).data).toMatchObject({
+      codigo: "SIN_PERMISO",
+      mensaje: "Esta acción es solo para docentes.",
+    });
+  });
+
+  it("las query tambien, no solo las mutation", async () => {
+    const t = convexTest(schema, modules);
+    const error = await capturar(() =>
+      t.query(api.interaccion.inconformidadesDelDocente),
+    );
+    expect((error as ConvexError<{ codigo: string }>).data).toMatchObject({
+      codigo: "NO_AUTENTICADO",
+    });
+  });
+});
+
+
+describe("interaccion — franjas de quince minutos", () => {
+  it("reserva dos citas consecutivas y rechazar una solo libera su tramo", async () => {
+    const t = convexTest(schema, modules);
+    const e = await sembrarEscenario(t);
+    const primerId = await e.docente.mutation(api.interaccion.publicarDisponibilidad, {
+      cursoId: e.cursoId, fecha: "2026-09-10", horaInicio: "12:30", horaFin: "13:00",
+      modalidad: "VIRTUAL", lugarOEnlace: "https://example.com/reunion",
+    });
+    const consultar = () => e.representante.query(api.interaccion.bloquesDisponibles, {
+      estudianteId: e.estudianteId, desde: "2026-09-10",
+    });
+    const bloques = await consultar();
+    expect(bloques.map(b => [b.horaInicio, b.horaFin])).toEqual([["12:30", "12:45"], ["12:45", "13:00"]]);
+    expect(bloques[0].id).toBe(primerId);
+    for (const b of bloques) expect(b).toMatchObject({ modalidad: "VIRTUAL", lugarOEnlace: "https://example.com/reunion" });
+    const primera = await e.representante.mutation(api.interaccion.solicitarCita, {
+      estudianteId: e.estudianteId, disponibilidadDocenteId: bloques[0].id,
+    });
+    expect((await consultar()).map(b => b.id)).toEqual([bloques[1].id]);
+    await e.representante.mutation(api.interaccion.solicitarCita, {
+      estudianteId: e.estudianteId, disponibilidadDocenteId: bloques[1].id,
+    });
+    expect(await consultar()).toEqual([]);
+    const citas = await e.docente.query(api.interaccion.misCitasDocente, {});
+    expect(citas.map(c => c.fechaHoraFin - c.fechaHoraInicio)).toEqual([900000, 900000]);
+    await e.docente.mutation(api.interaccion.responderCita, { citaId: primera, aceptar: false });
+    expect((await consultar()).map(b => b.id)).toEqual([bloques[0].id]);
+  });
+
+  it("no deja bloques parciales cuando una franja se solapa", async () => {
+    const t = convexTest(schema, modules);
+    const e = await sembrarEscenario(t);
+    await e.docente.mutation(api.interaccion.publicarDisponibilidad, { fecha: "2026-09-10", horaInicio: "12:45", horaFin: "13:00" });
+    await expect(e.docente.mutation(api.interaccion.publicarDisponibilidad, {
+      fecha: "2026-09-10", horaInicio: "12:30", horaFin: "13:15",
+    })).rejects.toThrow("se cruza");
+    expect(await t.run(ctx => ctx.db.query("disponibilidadDocente").collect())).toHaveLength(1);
+  });
+
+  it.each([
+    { fecha: "2026-09-10", horaInicio: "12:30", horaFin: "12:40" },
+    { fecha: "2026-09-10", horaInicio: "12:30", horaFin: "12:50" },
+    { fecha: "2026-09-31", horaInicio: "12:30", horaFin: "13:00" },
+  ])("rechaza la franja inválida $fecha $horaInicio–$horaFin sin escribir", async args => {
+    const t = convexTest(schema, modules);
+    const e = await sembrarEscenario(t);
+    await expect(e.docente.mutation(api.interaccion.publicarDisponibilidad, args)).rejects.toThrow();
+    expect(await t.run(ctx => ctx.db.query("disponibilidadDocente").collect())).toEqual([]);
+  });
+});
+
+describe("interaccion — frontera pública de alertas", () => {
+  let claves: Awaited<ReturnType<typeof generateKeyPair>>;
+  beforeAll(async () => { claves = await generateKeyPair("RS256"); });
+  beforeEach(async () => {
+    vi.stubEnv("CLERK_JWT_ISSUER_DOMAIN", "https://convex.test");
+    const jwk = { ...await exportJWK(claves.publicKey), kid: "alertas", alg: "RS256", use: "sig" };
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ keys: [jwk] }), { status: 200 })));
+  });
+  afterEach(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs(); });
+  async function prueba(edad = 0, sub = "docente_1", sid = "sesion_docente") {
+    return await new SignJWT({ sid, fva: [edad, -1] }).setProtectedHeader({ alg: "RS256", kid: "alertas" })
+      .setIssuer("https://convex.test").setSubject(sub).setIssuedAt(AHORA.getTime() / 1000)
+      .setExpirationTime(AHORA.getTime() / 1000 + 60).sign(claves.privateKey);
+  }
+  const datos = { alcance: "CURSO" as const, tipo: "EVACUACION" as const, titulo: "Evacuación", mensaje: "Estamos en el patio", esSimulacro: false };
+
+  it("persiste solo la fecha calculada desde la prueba firmada", async () => {
+    const t = convexTest(schema, modules);
+    const e = await sembrarEscenario(t);
+    const r = await e.docente.action(api.interaccion.activarAlerta, { ...datos, cursoId: e.cursoId, tokenReautenticacion: await prueba() });
+    expect(r.entregas).toBe(1);
+    const alerta = await t.run(ctx => ctx.db.get(r.id));
+    expect(alerta?.reautenticadoEn).toBe(AHORA.getTime() - 60_000);
+    expect(alerta).not.toHaveProperty("tokenReautenticacion");
+  });
+
+  it("rechaza la prueba vieja sin crear alertas, entregas ni notificaciones", async () => {
+    const t = convexTest(schema, modules);
+    const e = await sembrarEscenario(t);
+    await expect(e.docente.action(api.interaccion.activarAlerta, { ...datos, cursoId: e.cursoId, tokenReautenticacion: await prueba(30) }))
+      .rejects.toThrow("Vuelve a confirmar");
+    expect(await t.run(async ctx => [await ctx.db.query("alertaEmergencia").collect(), await ctx.db.query("entregaAlerta").collect(), await ctx.db.query("notificacion").collect()]))
+      .toEqual([[], [], []]);
+  });
+
+  it("la reautenticación no concede titularidad del curso", async () => {
+    const t = convexTest(schema, modules);
+    const e = await sembrarEscenario(t);
+    const rep = t.withIdentity({ subject: "rep_1", sid: "sesion_rep" });
+    await expect(rep.action(api.interaccion.activarAlerta, { ...datos, cursoId: e.cursoId, tokenReautenticacion: await prueba(0, "rep_1", "sesion_rep") }))
+      .rejects.toThrow();
+    expect(await t.run(ctx => ctx.db.query("alertaEmergencia").collect())).toEqual([]);
+  });
+});
+
+describe("interaccion — la bandeja del docente se lee por indice (#48)", () => {
+  it("migra varios lotes, tolera huérfanos y puede repetirse", async () => {
+    const t = convexTest(schema, modules);
+    const e = await sembrarEscenario(t);
+    const accionRegistradaId = await sembrarAccion(t, e);
+    const accionHuerfana = await sembrarAccion(t, e);
+    await t.run(async (ctx) => {
+      for (let i = 0; i < 205; i++) {
+        await ctx.db.insert("inconformidad", {
+          accionRegistradaId: i === 110 ? accionHuerfana : accionRegistradaId,
+          representanteId: e.representanteId, motivo: "NO_OCURRIO", mensaje: `Reclamo ${i}`,
+          estado: "ABIERTA", venceEn: Date.now() + 86_400_000, actualizadoEn: Date.now(),
+        });
+      }
+      await ctx.db.delete(accionHuerfana);
+    });
+    expect(await t.mutation(internal.migraciones.rellenarDocenteEnInconformidades, {}))
+      .toMatchObject({ revisadas: 100, continuacionProgramada: true });
+    await t.finishAllScheduledFunctions(vi.runAllTimers);
+    const antes = await t.run(ctx => ctx.db.query("inconformidad").collect());
+    expect(antes.filter(i => i.docenteId === e.docenteId)).toHaveLength(204);
+    expect(antes.filter(i => i.docenteId === undefined)).toHaveLength(1);
+    expect(await t.mutation(internal.migraciones.rellenarDocenteEnInconformidades, {}))
+      .toMatchObject({ rellenadas: 0 });
+    await t.finishAllScheduledFunctions(vi.runAllTimers);
+    expect(await t.run(ctx => ctx.db.query("inconformidad").collect())).toEqual(antes);
+  });
+
+  it("no expone una acción ajena aunque el docenteId copiado sea incorrecto", async () => {
+    const t = convexTest(schema, modules);
+    const e = await sembrarEscenario(t);
+    const accionRegistradaId = await sembrarAccion(t, e);
+    await t.run(async (ctx) => {
+      const perfilUsuarioId = await ctx.db.insert("perfilUsuario", {
+        authSubject: "https://convex.test|otro", tipoDocumento: "CEDULA",
+        numeroDocumento: "0900000009", actualizadoEn: Date.now(),
+      });
+      const docenteId = await ctx.db.insert("docente", { perfilUsuarioId, actualizadoEn: Date.now() });
+      await ctx.db.patch(accionRegistradaId, { registradaPorDocenteId: docenteId });
+      await ctx.db.insert("inconformidad", {
+        accionRegistradaId, docenteId: e.docenteId, representanteId: e.representanteId,
+        motivo: "NO_OCURRIO", mensaje: "Detalle ajeno", estado: "ABIERTA",
+        venceEn: Date.now() + 86_400_000, actualizadoEn: Date.now(),
+      });
+    });
+    expect(await e.docente.query(api.interaccion.inconformidadesDelDocente)).toEqual([]);
+  });
+
+  /**
+   * La consulta paso de recorrer todos los reclamos abiertos del sistema a
+   * leer solo los suyos por `por_docente_estado`. El precio de esa mejora es
+   * que un reclamo **sin** `docenteId` ya no esta en el indice y por tanto no
+   * aparece — y los reclamos creados antes del campo no lo tienen.
+   *
+   * Esta prueba es el recordatorio de que la migracion no es opcional: fija
+   * por escrito que sin correrla el docente deja de ver un reclamo que existe
+   * y cuyo plazo de 30 dias sigue corriendo.
+   */
+  it("un reclamo anterior al campo no se ve hasta que corre la migracion", async () => {
+    const t = convexTest(schema, modules);
+    const e = await sembrarEscenario(t);
+    const accionRegistradaId = await sembrarAccion(t, e);
+
+    // Tal como quedo en la base antes del cambio de esquema: sin `docenteId`.
+    await t.run(async (ctx) => {
+      await ctx.db.insert("inconformidad", {
+        accionRegistradaId,
+        representanteId: e.representanteId,
+        motivo: "NO_OCURRIO",
+        mensaje: "Mi hijo no estuvo ese dia en clase.",
+        estado: "ABIERTA",
+        venceEn: Date.now() + 30 * 86_400_000,
+        actualizadoEn: Date.now(),
+      });
+    });
+
+    expect(await e.docente.query(api.interaccion.inconformidadesDelDocente)).toHaveLength(0);
+
+    const resultado = await t.mutation(internal.migraciones.rellenarDocenteEnInconformidades, {});
+    expect(resultado).toMatchObject({ rellenadas: 1, huerfanas: 0 });
+
+    const bandeja = await e.docente.query(api.interaccion.inconformidadesDelDocente);
+    expect(bandeja).toHaveLength(1);
+    expect(bandeja[0].mensaje).toContain("no estuvo ese dia");
+  });
+
+  it("la migracion se puede correr dos veces sin tocar nada la segunda", async () => {
+    const t = convexTest(schema, modules);
+    const e = await sembrarEscenario(t);
+    const accionRegistradaId = await sembrarAccion(t, e);
+
+    await e.representante.mutation(api.interaccion.abrirInconformidad, {
+      accionRegistradaId, motivo: "NO_OCURRIO", mensaje: "No fue así",
+    });
+
+    // El reclamo nuevo ya nace con `docenteId`, asi que no hay nada que llenar.
+    expect(
+      await t.mutation(internal.migraciones.rellenarDocenteEnInconformidades, {}),
+    ).toMatchObject({ revisadas: 1, rellenadas: 0 });
+    expect(
+      await t.mutation(internal.migraciones.rellenarDocenteEnInconformidades, {}),
+    ).toMatchObject({ revisadas: 1, rellenadas: 0 });
+  });
+
+  it("el docente no ve el reclamo de otro docente", async () => {
+    const t = convexTest(schema, modules);
+    const e = await sembrarEscenario(t);
+    const accionRegistradaId = await sembrarAccion(t, e);
+
+    // Un reclamo identico pero atribuido a otro docente: si la consulta
+    // volviera a barrer la tabla, este entraria y habria que descartarlo a
+    // mano. Con el indice no llega siquiera a leerse.
+    await t.run(async (ctx) => {
+      const perfil = await ctx.db.insert("perfilUsuario", {
+        authSubject: "https://convex.test|docente_9", tipoDocumento: "CEDULA",
+        numeroDocumento: "0900000009", actualizadoEn: Date.now(),
+      });
+      const otroDocenteId = await ctx.db.insert("docente", {
+        perfilUsuarioId: perfil, actualizadoEn: Date.now(),
+      });
+      await ctx.db.insert("inconformidad", {
+        accionRegistradaId,
+        representanteId: e.representanteId,
+        docenteId: otroDocenteId,
+        motivo: "NO_OCURRIO",
+        mensaje: "Reclamo de otro curso.",
+        estado: "ABIERTA",
+        venceEn: Date.now() + 30 * 86_400_000,
+        actualizadoEn: Date.now(),
+      });
+    });
+
+    expect(await e.docente.query(api.interaccion.inconformidadesDelDocente)).toHaveLength(0);
+  });
+});
+
+describe("interaccion — las citas que ve el representante", () => {
+  /**
+   * Era la unica funcion publica del backend sin ninguna prueba. Y no es
+   * cualquiera: es una lectura de la agenda de un menor, con un indice por
+   * representante como toda la separacion entre una familia y otra.
+   */
+  it("solo devuelve las citas propias, nunca las de otra familia", async () => {
+    const t = convexTest(schema, modules);
+    const e = await sembrarEscenario(t);
+
+    await t.run(async (ctx) => {
+      const ahora = Date.now();
+      const perfilAjeno = await ctx.db.insert("perfilUsuario", {
+        authSubject: "https://convex.test|rep_8", tipoDocumento: "CEDULA",
+        numeroDocumento: "0900000018", actualizadoEn: ahora,
+      });
+      const representanteAjeno = await ctx.db.insert("representante", {
+        perfilUsuarioId: perfilAjeno, actualizadoEn: ahora,
+      });
+      const base = {
+        docenteId: e.docenteId, estudianteId: e.estudianteId, origen: "SOLICITADA_POR_REPRESENTANTE" as const,
+        fechaHoraInicio: ahora, fechaHoraFin: ahora + 900_000,
+        modalidad: "PRESENCIAL" as const, estado: "SOLICITADA" as const, actualizadoEn: ahora,
+      };
+      await ctx.db.insert("cita", { ...base, representanteId: e.representanteId, motivo: "La mia" });
+      await ctx.db.insert("cita", { ...base, representanteId: representanteAjeno, motivo: "La de otra familia" });
+    });
+
+    const mias = await e.representante.query(api.interaccion.misCitasRepresentante);
+    expect(mias).toHaveLength(1);
+    expect(mias[0].motivo).toBe("La mia");
+  });
+
+  /**
+   * Al representante se le enseñan primero las mas recientes -- lo contrario
+   * que al docente, que necesita ver que tiene por delante. Son dos ordenes
+   * opuestos a proposito y conviene que se rompa una prueba si alguien los
+   * "uniforma".
+   */
+  it("las ordena de la mas reciente a la mas antigua", async () => {
+    const t = convexTest(schema, modules);
+    const e = await sembrarEscenario(t);
+
+    await t.run(async (ctx) => {
+      const ahora = Date.now();
+      for (const [i, motivo] of ["vieja", "media", "nueva"].entries()) {
+        await ctx.db.insert("cita", {
+          docenteId: e.docenteId, representanteId: e.representanteId,
+          estudianteId: e.estudianteId, origen: "SOLICITADA_POR_REPRESENTANTE", motivo,
+          fechaHoraInicio: ahora + i * 86_400_000,
+          fechaHoraFin: ahora + i * 86_400_000 + 900_000,
+          modalidad: "PRESENCIAL", estado: "SOLICITADA", actualizadoEn: ahora,
+        });
+      }
+    });
+
+    expect(
+      (await e.representante.query(api.interaccion.misCitasRepresentante)).map((c) => c.motivo),
+    ).toEqual(["nueva", "media", "vieja"]);
+  });
+
+  /**
+   * `notasDocente` se llama como si fuera privado y **no lo es**: es el
+   * mensaje que el docente escribe al rechazar o confirmar, y
+   * `responderCita` ya lo manda dentro de la notificacion al representante.
+   *
+   * Esta prueba existe para que el nombre no engañe a nadie mas adelante. El
+   * dia que alguien quiera guardar ahi una nota privada sobre una familia,
+   * que se le rompa esto y lea por que.
+   */
+  it("el representante ve notasDocente, porque es un mensaje para el", async () => {
+    const t = convexTest(schema, modules);
+    const e = await sembrarEscenario(t);
+
+    const citaId = await t.run(async (ctx) => {
+      const ahora = Date.now();
+      return await ctx.db.insert("cita", {
+        docenteId: e.docenteId, representanteId: e.representanteId,
+        estudianteId: e.estudianteId, origen: "SOLICITADA_POR_REPRESENTANTE",
+        fechaHoraInicio: ahora, fechaHoraFin: ahora + 900_000,
+        modalidad: "PRESENCIAL", estado: "SOLICITADA", actualizadoEn: ahora,
+      });
+    });
+
+    await e.docente.mutation(api.interaccion.responderCita, {
+      citaId, aceptar: false, notasDocente: "Ese día tengo consejo de curso",
+    });
+
+    const [cita] = await e.representante.query(api.interaccion.misCitasRepresentante);
+    expect(cita.notasDocente).toBe("Ese día tengo consejo de curso");
+  });
+});
+
+describe("interaccion — quien es el docente de mi hijo (P9, #52)", () => {
+  /** Pone nombre y ficha profesional al docente sembrado. */
+  async function darleNombreAlDocente(
+    t: ReturnType<typeof convexTest>,
+    docenteId: Id<"docente">,
+  ) {
+    await t.run(async (ctx) => {
+      const docente = (await ctx.db.get(docenteId))!;
+      await ctx.db.patch(docente.perfilUsuarioId, { nombres: "María", apellidos: "Loor" });
+      await ctx.db.patch(docenteId, {
+        tituloProfesional: "Licenciada en Educación Básica",
+        correoContacto: "mloor@colegio.edu.ec",
+        horarioAtencion: "Martes de 10:00 a 11:00",
+      });
+    });
+  }
+
+  it("el representante ve el nombre y la ficha del titular de su hijo", async () => {
+    const t = convexTest(schema, modules);
+    const e = await sembrarEscenario(t);
+    await darleNombreAlDocente(t, e.docenteId);
+
+    expect(
+      await e.representante.query(api.interaccion.docenteACargo, { estudianteId: e.estudianteId }),
+    ).toMatchObject({
+      nombre: "María Loor",
+      curso: "Quinto A",
+      tituloProfesional: "Licenciada en Educación Básica",
+      correoContacto: "mloor@colegio.edu.ec",
+      telefonoContacto: null,
+    });
+  });
+
+  /**
+   * La razon por la que esta consulta empieza por `exigirVinculo`: sin eso,
+   * cualquiera con una cuenta podria sacar el correo y el telefono de
+   * cualquier docente del sistema probando ids de estudiante.
+   */
+  it("no la puede consultar un representante sin vinculo con ese estudiante", async () => {
+    const t = convexTest(schema, modules);
+    const e = await sembrarEscenario(t);
+
+    await t.run(async (ctx) => {
+      const perfil = await ctx.db.insert("perfilUsuario", {
+        authSubject: "https://convex.test|rep_9", tipoDocumento: "CEDULA",
+        numeroDocumento: "0900000019", actualizadoEn: Date.now(),
+      });
+      await ctx.db.insert("representante", { perfilUsuarioId: perfil, actualizadoEn: Date.now() });
+    });
+
+    await expect(
+      t.withIdentity({ subject: "rep_9" }).query(api.interaccion.docenteACargo, {
+        estudianteId: e.estudianteId,
+      }),
+    ).rejects.toThrow("No tienes acceso");
+  });
+
+  /**
+   * Un perfil creado antes de #52 no tiene nombres. La pantalla tiene que
+   * poder distinguir "todavia no lo sabemos" de una cadena vacia con espacios.
+   */
+  it("devuelve nombre null si el perfil del docente es anterior a los nombres", async () => {
+    const t = convexTest(schema, modules);
+    const e = await sembrarEscenario(t);
+
+    const ficha = await e.representante.query(api.interaccion.docenteACargo, {
+      estudianteId: e.estudianteId,
+    });
+    expect(ficha?.nombre).toBeNull();
+    expect(ficha?.docenteId).toBe(e.docenteId);
+  });
+
+  it("devuelve null cuando el curso no tiene titular vigente", async () => {
+    const t = convexTest(schema, modules);
+    const e = await sembrarEscenario(t);
+    await t.run(async (ctx) => {
+      const asignacion = (await ctx.db.query("asignacionDocente").unique())!;
+      await ctx.db.patch(asignacion._id, { vigenteHasta: "2026-06-30" });
+    });
+
+    expect(
+      await e.representante.query(api.interaccion.docenteACargo, { estudianteId: e.estudianteId }),
+    ).toBeNull();
   });
 });

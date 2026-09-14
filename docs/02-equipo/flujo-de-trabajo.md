@@ -81,36 +81,45 @@ crear) — código real, compilado y probado, simplemente apagado hasta que est�
 listo. Ya lo decidimos así para el diferenciador de IA (`DP-008`); la idea es
 usarlo como práctica general.
 
-## El contrato con la interfaz (desde el 31 de agosto)
+## La interfaz (actualizado el 10 de septiembre — DP-012)
 
-Con A, B y C todos escribiendo backend, el reparto era limpio: un archivo, un
-dueño, sin superposición. Con D construyendo la interfaz de las 31 pantallas,
-aparece un tipo de dependencia que no existía antes: **su código llama al de
-los otros tres, en tiempo de ejecución, no solo en revisión de PR.**
+Entre el 31 de agosto y el 9 de septiembre hubo un cuarto rol dedicado a
+construir la interfaz de las 31 pantallas. **Ese rol se disolvió** y la
+interfaz pasó a Persona C, junto con interacción e infraestructura. El porqué
+está en `docs/00-producto/decisiones/012-rol-interfaz-se-disuelve.md`.
 
-Qué cambia en la práctica:
+Qué significa en la práctica:
 
-- **D no espera a que un módulo esté "terminado" para empezar su pantalla.**
-  Empieza en cuanto la función que necesita existe en `main` — puede pedirla
-  antes de que estén las 31, una por una, según el orden del inventario de
-  pantallas.
-- **Si cambias la firma de una función que D ya usa, avísale.** No hay forma
-  automática de saber quién construyó una pantalla sobre tu función — a
-  diferencia de un archivo compartido, esto no lo detecta CODEOWNERS. Un
-  comentario en el Issue de la pantalla afectada es suficiente.
-- **CODEOWNERS de D** (`movil/src/theme/`, `components/`, `screens/`) tiene a
-  Kenny como respaldo, igual que en los tres módulos de backend y en toda la
-  superficie compartida. Esto concentra en Kenny más superficies de revisión
-  obligatoria que en cualquier otro — es una decisión consciente, no un
-  descuido: si sus PR empiezan a acumularse esperando aprobación, la primera
-  señal es que hay que repartir el respaldo por pantalla (quien construyó el
-  backend de D14–D19 respalda esas pantallas, y así con cada módulo) en vez
-  de dejarlo todo sobre una persona.
-- **D no es parte de "cambiar superficie compartida exige acuerdo de los
-  tres"** — ese acuerdo sigue siendo de A, B y C sobre `schema.ts`,
-  `enums.ts`, `guardas.ts`, `permisos.ts` y `flags.ts`. Si D necesita un campo
-  o una función nueva, es la misma regla de siempre: la pide al dueño del
-  módulo, no la agrega ella.
+- **Las pantallas no volvieron a A ni a B.** Es deliberado: A tiene su módulo
+  terminado y B es la ruta crítica del producto. Si te llega una pantalla que
+  toca tu backend, la construye C y te pregunta lo que necesite.
+- **Si cambias la firma de una función que una pantalla ya usa, avísale a C.**
+  No hay forma automática de saber quién construyó una pantalla sobre tu
+  función — a diferencia de un archivo compartido, esto no lo detecta
+  CODEOWNERS. Un comentario en el issue de la pantalla afectada es suficiente.
+- **CODEOWNERS de `movil/src/`** tiene a C como dueño y a A como respaldo. Eso
+  concentra en C más superficie de revisión que en nadie, y es un riesgo
+  asumido a sabiendas. **La señal de que hay que repartir** es que los PR de
+  interfaz empiecen a acumularse esperando a una sola persona, o que C deje de
+  avanzar en su propio módulo. Si eso pasa, se reparte por módulo: quien
+  escribió el backend de D14–D19 revisa esas pantallas, y así con cada uno.
+- **La superficie compartida no cambió.** `schema.ts`, `enums.ts`,
+  `guardas.ts`, `permisos.ts` y `flags.ts` siguen exigiendo el acuerdo de A, B
+  y C. Que C tenga ahora la interfaz no le da un voto extra ahí.
+
+## Producto y entrega
+
+Persona D (@krriveram) no escribe código. Su lane son tres cosas con fecha:
+
+- **La sumisión al Devpost** — video de menos de dos minutos y repositorio
+  público (ADR-007). Cierra el 30 de septiembre, igual que todo lo demás.
+- **Validación con usuarios reales** — entrevistas antes del piloto. De la
+  primera, el 1 de septiembre, salieron DP-009 y DP-010.
+- **Los textos de la aplicación y del piloto** — en lenguaje llano, revisados
+  contra lo que la aplicación realmente hace.
+
+Cada una vive en su propio issue con fecha de entrega. Un lane sin código
+necesita entregables con fecha, o deja de poder seguirse.
 
 ## Qué falta configurar, y qué te toca a ti (Daniel)
 

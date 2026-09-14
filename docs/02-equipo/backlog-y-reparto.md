@@ -24,20 +24,25 @@ Cada persona es dueña de sus tablas, sus endpoints y sus pantallas. **Nadie
 modifica el módulo de otro**: si necesita un campo, lo pide y se agrega en una
 migración acordada.
 
-> **Incorporación del 31 de agosto de 2026: Persona D (@krriveram), interfaz.**
-> Antes cada uno de A/B/C era dueño de su lógica de backend *y* de las
-> pantallas que la usan. Desde ahora D construye la interfaz de las **31
-> pantallas**, consumiendo las funciones que A, B y C exponen — ella no
-> escribe en `convex/`. El detalle de cómo se coordina esto vive en
-> `flujo-de-trabajo.md`, sección "El contrato con la interfaz".
+> **Actualización del 10 de septiembre de 2026 — DP-012.** El rol de interfaz
+> se disuelve. Persona C asume la interfaz completa (`theme/`, `components/`,
+> `screens/`) además de interacción e infraestructura; **las pantallas no
+> vuelven a A ni a B**, que siguen en sus backends. Persona D (@krriveram)
+> pasa a producto, validación y entrega — la sumisión al Devpost, las
+> entrevistas y los textos de la aplicación — sin escribir código.
+>
+> Esto reemplaza la incorporación del 31 de agosto de 2026, que le daba a D la
+> interfaz de las 31 pantallas. El porqué está en
+> `docs/00-producto/decisiones/012-rol-interfaz-se-disuelve.md`; DP-001 sigue
+> vigente y las 31 pantallas se construyen igual.
 
-| | **Persona A — Núcleo** | **Persona B — Conducta** | **Persona C — Interacción e infra** | **Persona D — Interfaz** |
+| | **Persona A — Núcleo** | **Persona B — Conducta** | **Persona C — Interacción, infra e interfaz** | **Persona D — Producto y entrega** |
 |---|---|---|---|---|
 | **Tablas** | `institucion`, `perfil_usuario`, `docente`, `representante`, `anio_lectivo`, `periodo_academico`, `dia_no_lectivo`, `curso`, `asignacion_docente`, `estudiante`, `matricula`, `invitacion_curso`, `vinculo_representacion`, `consentimiento` | `categoria_accion`, `tipo_accion`, `accion_registrada`, `comunicado_curso`, `franja_conducta`, `puntaje_periodo`, `registro_asistencia`, `plantilla_*`, `reporte_*`, `entrega_reporte` | `disponibilidad_docente`, `cita`, `inconformidad`, `alerta_emergencia`, `entrega_alerta`, `plan`, `suscripcion`, `evento_revenuecat`, `desbloqueo_recompensado`, `dispositivo`, `notificacion`, `auditoria` | — (no toca tablas) |
-| **Responsable de** | Clerk, capa de permisos, importación CSV, flujo de vinculación | Motor de puntaje, generación nocturna de reportes, gráfico de evolución | RevenueCat, notificaciones push, PDF, CI, despliegue | Tema, los 6 componentes base y las 31 pantallas |
-| **Su archivo de funciones** | `convex/nucleo.ts` | `convex/conducta.ts` | `convex/interaccion.ts` | `movil/src/screens/`, `components/`, `theme/` |
+| **Responsable de** | Clerk, capa de permisos, importación CSV, flujo de vinculación | Motor de puntaje, generación nocturna de reportes, gráfico de evolución | RevenueCat, notificaciones push, CI, despliegue, **y el tema, los componentes y las 31 pantallas** | Devpost, validación con usuarios, textos de la aplicación y del piloto |
+| **Su archivo de funciones** | `convex/nucleo.ts` | `convex/conducta.ts` | `convex/interaccion.ts` · `convex/push.ts` · `convex/auditoria.ts` · `movil/src/` | — (no escribe código) |
 | **Pantallas — lógica de negocio** | D1–D8, P1–P3 | D9–D13, P4–P6 | D14–D19, P7–P12 | — |
-| **Pantallas — interfaz** | | | | **Las 31**, sobre las funciones de A/B/C |
+| **Pantallas — interfaz** | | | **Las 31**, sobre las funciones de A/B/C | |
 
 > Los nombres de tabla de la fila anterior están en `snake_case` porque vienen
 > del modelo relacional original. En Convex son **`camelCase`**

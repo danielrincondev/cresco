@@ -27,7 +27,7 @@ const periodosValidos = [
 async function sembrarDocente(t: ReturnType<typeof convexTest>, subject = "docente_1") {
   const ids = await t.run(async (ctx) => {
     const perfilUsuarioId = await ctx.db.insert("perfilUsuario", {
-      authSubject: subject,
+      authSubject: `https://convex.test|${subject}`,
       tipoDocumento: "CEDULA",
       numeroDocumento: `090000000${subject.at(-1) ?? "1"}`,
       actualizadoEn: Date.now(),
@@ -172,6 +172,22 @@ describe("nucleo — periodos", () => {
     if (!curso) throw new Error("No se creó el curso de prueba");
     return { cliente, cursoId: curso.id };
   }
+
+  it("muestra el año y los parciales planificados solo a su titular", async () => {
+    const t = convexTest(schema, modules);
+    const { cliente, cursoId } = await cursoDe(t);
+    expect(await cliente.query(api.nucleo.obtenerCalendarioCurso, { cursoId })).toEqual({
+      fechaInicio: datosCurso.anioInicio,
+      fechaFin: datosCurso.anioFin,
+      periodos: [],
+    });
+    await cliente.mutation(api.nucleo.definirPeriodos, { cursoId, periodos: [...periodosValidos].reverse() });
+    const calendario = await cliente.query(api.nucleo.obtenerCalendarioCurso, { cursoId });
+    expect(calendario.periodos).toMatchObject(periodosValidos.map((p) => ({ ...p, estado: "PLANIFICADO" })));
+    const otro = await sembrarDocente(t, "docente_2");
+    await expect(otro.cliente.query(api.nucleo.obtenerCalendarioCurso, { cursoId })).rejects.toThrow("No eres el docente titular");
+    await expect(t.query(api.nucleo.obtenerCalendarioCurso, { cursoId })).rejects.toThrow("Inicia sesión para continuar");
+  });
 
   it("solo permite que el docente titular defina los periodos", async () => {
     const t = convexTest(schema, modules);

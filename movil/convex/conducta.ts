@@ -2,7 +2,7 @@ import { ConvexError, v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
 import { internalMutation, mutation, query, type MutationCtx, type QueryCtx } from "./_generated/server";
 import { ALCANCE_COMUNICADO, ENTITLEMENTS, ESTADO_ASISTENCIA, REGLAS, TIPO_COMUNICADO } from "./lib/enums";
-import { ErrorDominio, exigirAlcanceCoherente, exigirDuracionNota, exigirFechaEvento, exigirTopeDiario, exigirVentanaComunicado, calcularPuntaje, hoyEnGuayaquil, sumarDias } from "./lib/guardas";
+import { ErrorDominio, exigirAlcanceCoherente, exigirDuracionNota, exigirFechaEvento, exigirRangoTipoAccion, exigirSignoCoherente, exigirTopeDiario, exigirVentanaComunicado, calcularPuntaje, hoyEnGuayaquil, sumarDias } from "./lib/guardas";
 import { ErrorPermiso, auditar, exigirAccesoDocenteAEstudiante, exigirDocente, exigirTitularDelCurso, exigirVinculo } from "./lib/permisos";
 import { tieneAccesoVigente } from "./lib/revenuecat";
 
@@ -69,6 +69,21 @@ async function institucionDeMatricula(ctx: MutationCtx, matriculaId: Id<"matricu
   return { matricula, curso, anio, institucion };
 }
 
+/**
+ * Rescatada de la version que #39 dejo en `main`: sin esto `fechaOcurrencia`
+ * entra sin validar y `"2026-02-31"` o `"hola"` se guardan tal cual, y ademas
+ * van al indice `por_matricula_fecha`. La rama de conducta nacio antes de que
+ * #39 se fusionara, asi que la perdio.
+ */
+function exigirFechaDeCalendario(fecha: string): Date {
+  const dia = new Date(`${fecha}T00:00:00Z`);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha) ||
+      !Number.isFinite(dia.getTime()) || dia.toISOString().slice(0, 10) !== fecha) {
+    throw new ErrorDominio("FECHAS_INVALIDAS", "La fecha de ocurrencia debe ser una fecha válida con formato YYYY-MM-DD.");
+  }
+  return dia;
+}
+
 export const registrarAccion = mutation({
   args: { estudianteId: v.id("estudiante"), tipoAccionId: v.id("tipoAccion"), descripcion: v.string(), puntosAplicados: v.number(), fechaOcurrencia: v.optional(v.string()) },
   handler: (ctx, args) => conErroresPublicos(async () => {
@@ -80,10 +95,47 @@ export const registrarAccion = mutation({
     if (periodo === null) throw new ErrorDominio("PERIODO_CERRADO", "No hay un período académico en curso para registrar acciones.");
     const descripcion = args.descripcion.trim();
     if (!descripcion) throw new ErrorDominio("VALIDACION", "La descripción de la acción es obligatoria.");
+    // El tipo tiene que ser de esta institucion, no solo existir: sin esa
+    // comprobacion un docente puede aplicar el catalogo de otro plantel.
     const tipo = await ctx.db.get(args.tipoAccionId);
-    if (tipo === null || !tipo.activa) throw new ErrorDominio("VALIDACION", "Tipo de acción inválido o inactivo.");
-    if (args.puntosAplicados < tipo.puntosMin || args.puntosAplicados > tipo.puntosMax) throw new ErrorDominio("VALIDACION", `Los puntos aplicados deben estar entre ${tipo.puntosMin} y ${tipo.puntosMax}.`);
+    if (
+      tipo === null || !tipo.activa ||
+      (tipo.institucionId !== undefined && tipo.institucionId !== institucion._id)
+    ) {
+      throw new ErrorDominio("VALIDACION", "Tipo de acción inválido o inactivo.");
+    }
+
+    const categoria = await ctx.db.get(tipo.categoriaAccionId);
+    if (
+      !categoria || !categoria.activa ||
+      (categoria.institucionId !== undefined && categoria.institucionId !== institucion._id)
+    ) {
+      throw new ErrorDominio("VALIDACION", "Categoría de acción inválida o inactiva.");
+    }
+
+    // `Number.isInteger` primero, y no la comparacion de rango: con `NaN`
+    // **las dos comparaciones son falsas**, asi que un NaN atravesaba el
+    // rango entero y se guardaba como puntaje. Un solo NaN envenena el
+    // puntaje derivado del periodo para siempre, porque `calcularPuntaje`
+    // suma sobre las acciones vigentes. Vale para 1.5 e Infinity igual.
+    if (!Number.isInteger(args.puntosAplicados)) {
+      throw new ErrorDominio("VALIDACION", "Los puntos aplicados deben ser un número entero.");
+    }
+    exigirSignoCoherente(tipo.signo, tipo.puntosMin, tipo.puntosMax);
+    exigirRangoTipoAccion(tipo.puntosMin, args.puntosAplicados, tipo.puntosMax);
+
     const fecha = args.fechaOcurrencia ?? hoyEnGuayaquil();
+    const dia = exigirFechaDeCalendario(fecha);
+
+    // Fin de semana o dia marcado como no lectivo: no se anota conducta un
+    // dia en que el estudiante no estuvo en clase.
+    const diaNoLectivo = await ctx.db
+      .query("diaNoLectivo")
+      .withIndex("por_anio_fecha", (q) => q.eq("anioLectivoId", curso.anioLectivoId).eq("fecha", fecha))
+      .first();
+    if (dia.getUTCDay() === 0 || dia.getUTCDay() === 6 || diaNoLectivo) {
+      throw new ErrorDominio("DIA_NO_LECTIVO", "Solo se pueden registrar acciones en días de clase.");
+    }
     const hoy = await ctx.db.query("accionRegistrada").withIndex("por_matricula_fecha", (q) => q.eq("matriculaId", matricula._id).eq("fechaOcurrencia", fecha)).collect();
     exigirTopeDiario(hoy.filter((a) => a.estado === "VIGENTE" && a.signo === tipo.signo).reduce((s, a) => s + a.puntosAplicados, 0), args.puntosAplicados);
     const id = await ctx.db.insert("accionRegistrada", { matriculaId: matricula._id, periodoAcademicoId: periodo._id, tipoAccionId: tipo._id, categoriaAccionId: tipo.categoriaAccionId, signo: tipo.signo, puntosAplicados: args.puntosAplicados, cuentaEnBitacora: tipo.cuentaEnBitacora, descripcion, fechaOcurrencia: fecha, registradaPorDocenteId: docente._id, estado: "VIGENTE", actualizadoEn: Date.now() });
