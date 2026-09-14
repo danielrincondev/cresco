@@ -235,12 +235,24 @@ function FormularioAccion({
               texto: tipo.signo === "POSITIVA" ? "Suma puntos" : "Resta puntos",
             }}
           />
-          <Opciones
-            valor={puntos}
-            opciones={opcionesDePuntos(tipo)}
-            onChange={setPuntos}
-            disabled={op.pendiente}
-          />
+          {/* Varios tipos del catalogo sembrado tienen minimo y maximo
+              iguales -- "Irresponsabilidad" vale exactamente -1 -- y ahi un
+              selector de una sola opcion pide una decision que no existe.
+              Se dice el valor y se acabo. */}
+          {opcionesDePuntos(tipo).length === 1 ? (
+            <Cuerpo>
+              {`Esta anotación vale ${Number(puntos) > 0 ? `+${puntos}` : puntos} punto${
+                Math.abs(Number(puntos)) === 1 ? "" : "s"
+              }.`}
+            </Cuerpo>
+          ) : (
+            <Opciones
+              valor={puntos}
+              opciones={opcionesDePuntos(tipo)}
+              onChange={setPuntos}
+              disabled={op.pendiente}
+            />
+          )}
           {tipo.admiteInconformidad && (
             <Aviso>
               El representante va a poder reclamar esta anotación, y tú tendrás
