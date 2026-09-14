@@ -18,7 +18,9 @@ import {
   type TextInputProps,
 } from "react-native";
 import { ConvexError } from "convex/values";
+import { Icono } from "../theme/Icono";
 import {
+  AREA_TACTIL_MINIMA,
   Espacio,
   Marca,
   Radio,
@@ -64,11 +66,30 @@ export function useOperacion() {
   return { pendiente, error, ejecutar, setError };
 }
 
+/**
+ * Encabezado de pantalla (componente 5 del issue #5).
+ *
+ * `atras` y `accion` son opcionales y se omiten en la mayoria de pantallas:
+ * la primera de cada rol no tiene a donde volver, y muy pocas tienen una
+ * accion de cabecera. Lo que no es opcional es el area tactil -- ambos
+ * cumplen `AREA_TACTIL_MINIMA`, porque el docente los usa de pie y con el
+ * telefono en una mano.
+ *
+ * El boton de atras lleva etiqueta de accesibilidad propia: una flecha sola no
+ * le dice nada a quien usa lector de pantalla.
+ */
 export function Pagina({
   titulo,
   descripcion,
+  atras,
+  accion,
   children,
-}: PropsWithChildren<{ titulo: string; descripcion?: string }>) {
+}: PropsWithChildren<{
+  titulo: string;
+  descripcion?: string;
+  atras?: { onPress: () => void; etiqueta?: string };
+  accion?: { texto: string; onPress: () => void; deshabilitada?: boolean };
+}>) {
   return (
     <KeyboardAvoidingView
       style={s.flex}
@@ -79,6 +100,39 @@ export function Pagina({
         contentContainerStyle={s.pagina}
       >
         <View style={s.encabezado}>
+          {(atras || accion) && (
+            <View style={s.barraEncabezado}>
+              {atras ? (
+                <Pressable
+                  onPress={atras.onPress}
+                  accessibilityRole="button"
+                  accessibilityLabel={atras.etiqueta ?? "Volver"}
+                  hitSlop={Espacio.sm}
+                  style={s.iconoTactil}
+                >
+                  <Icono nombre="arrow-left" activo decorativo />
+                </Pressable>
+              ) : (
+                <View style={s.iconoTactil} />
+              )}
+              {accion && (
+                <Pressable
+                  onPress={accion.onPress}
+                  disabled={accion.deshabilitada}
+                  accessibilityRole="button"
+                  accessibilityState={{ disabled: !!accion.deshabilitada }}
+                  hitSlop={Espacio.sm}
+                  style={s.accionEncabezado}
+                >
+                  <Text
+                    style={[s.textoAccion, accion.deshabilitada && s.deshabilitado]}
+                  >
+                    {accion.texto}
+                  </Text>
+                </Pressable>
+              )}
+            </View>
+          )}
           <Text accessibilityRole="header" style={s.titulo}>
             {titulo}
           </Text>
@@ -202,11 +256,33 @@ export function Boton({
     </Pressable>
   );
 }
+/**
+ * Campo de texto (componente 3 del issue #5): etiqueta, ayuda, **mensaje de
+ * error** y **contador de caracteres**.
+ *
+ * El contador solo aparece si el campo tiene `maxLength`, y solo cuando ya
+ * queda poco: un "0/500" bajo un campo vacio es ruido, y el numero importa
+ * justo cuando el docente esta a punto de quedarse sin espacio describiendo
+ * lo que paso.
+ *
+ * Con `error`, el mensaje sustituye a la ayuda en vez de acumularse: dos
+ * lineas de texto bajo un campo, una de las cuales ya no aplica, es como se
+ * ignoran los dos.
+ */
 export function Campo({
   etiqueta,
   ayuda,
+  error,
   ...props
-}: TextInputProps & { etiqueta: string; ayuda?: string }) {
+}: TextInputProps & { etiqueta: string; ayuda?: string; error?: string }) {
+  const largo = typeof props.value === "string" ? props.value.length : 0;
+  const tope = props.maxLength;
+  // Se enseña en el ultimo 20% del tope o en los ultimos 20 caracteres,
+  // lo que ocurra mas tarde. Un campo vacío nunca muestra el contador.
+  const muestraContador =
+    tope !== undefined && tope > 0 &&
+    largo >= tope - Math.min(20, Math.floor(tope * 0.2));
+
   return (
     <View style={s.campo}>
       <Text style={s.etiqueta}>{etiqueta}</Text>
@@ -217,10 +293,27 @@ export function Campo({
         style={[
           s.input,
           props.editable === false && s.deshabilitado,
+          error !== undefined && s.inputConError,
           props.style,
         ]}
       />
-      {ayuda && <Cuerpo>{ayuda}</Cuerpo>}
+      <View style={s.pieCampo}>
+        {error !== undefined ? (
+          <Text style={s.textoError}>{error}</Text>
+        ) : ayuda ? (
+          <Text style={[s.texto, s.ayudaCampo]}>{ayuda}</Text>
+        ) : (
+          <View />
+        )}
+        {muestraContador && (
+          <Text
+            style={s.contador}
+            accessibilityLabel={`${largo} de ${tope} caracteres`}
+          >
+            {largo}/{tope}
+          </Text>
+        )}
+      </View>
     </View>
   );
 }
@@ -364,6 +457,49 @@ export const s = StyleSheet.create({
     borderRadius: Radio.base,
     padding: Espacio.base,
   },
+  barraEncabezado: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    minHeight: AREA_TACTIL_MINIMA,
+  },
+  iconoTactil: {
+    minWidth: AREA_TACTIL_MINIMA,
+    minHeight: AREA_TACTIL_MINIMA,
+    alignItems: "flex-start",
+    justifyContent: "center",
+  },
+  accionEncabezado: {
+    minHeight: AREA_TACTIL_MINIMA,
+    justifyContent: "center",
+    paddingHorizontal: Espacio.sm,
+  },
+  textoAccion: {
+    color: Marca.base,
+    fontFamily: "Inter-Semibold",
+    fontSize: Tamano.base,
+  },
+  pieCampo: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: Espacio.sm,
+  },
+  ayudaCampo: { flexShrink: 1 },
+  textoError: {
+    flexShrink: 1,
+    color: Semantico.error,
+    fontFamily: "Inter",
+    fontSize: Tamano.sm,
+    lineHeight: 22,
+  },
+  contador: {
+    color: Texto.secundario,
+    fontFamily: "Inter",
+    fontSize: Tamano.sm,
+    lineHeight: 22,
+  },
+  inputConError: { borderColor: Semantico.error },
   cargando: { alignItems: "center", padding: Espacio.lg, gap: Espacio.base },
   boton: {
     minHeight: 52,

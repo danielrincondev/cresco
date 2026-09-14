@@ -8,6 +8,12 @@ vi.mock("react-native", () => ({
   View: "View", Platform: { OS: "android" }, StyleSheet: { create: (e: unknown) => e },
 }));
 
+// `NucleoUI` importa `Icono` desde #66 (el boton de atras del encabezado).
+// Sin simularlo, vitest intenta parsear el JSX de `@expo/vector-icons`, que
+// viene en archivos `.js`, y el archivo entero no carga. No se nota hasta que
+// las dos ramas se juntan: por separado cada una pasa.
+vi.mock("../theme/Icono", () => ({ Icono: "Icono" }));
+
 const { Cargando } = await import("./NucleoUI");
 
 const pintar = (e: React.ReactElement) => {
