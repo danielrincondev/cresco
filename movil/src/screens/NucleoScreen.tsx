@@ -63,6 +63,7 @@ import {
   versionConsentimiento,
 } from "../content/consentimiento";
 import { useAuditoriaSesion } from "../lib/useAuditoriaSesion";
+import { useLecturaSensible } from "../lib/useLecturaSensible";
 import {
   borrarRegistro,
   guardarRegistro,
@@ -910,6 +911,10 @@ function AprobarForm({
   onGuardar: () => void;
 }) {
   const aprobar = useMutation(api.nucleo.aprobarEstudiante);
+  // DP-006: abrir la ficha de un pendiente es leer datos de un menor -- nombre,
+  // documento y fecha de nacimiento -- asi que queda en la bitacora. Es la
+  // primera pantalla del proyecto que dispara `LEER_SENSIBLE` de verdad.
+  useLecturaSensible(alumno.estudianteId, "FICHA_ESTUDIANTE");
   const [nombres, setNombres] = useState(alumno.nombres);
   const [apellidos, setApellidos] = useState(alumno.apellidos);
   const [tipo, setTipo] = useState(alumno.tipoDocumento);
