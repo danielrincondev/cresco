@@ -14,7 +14,14 @@ import { ConvexError, v } from "convex/values";
 
 import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
-import { action, internalMutation, mutation, query, type MutationCtx, type QueryCtx } from "./_generated/server";
+import {
+  action,
+  internalMutation,
+  mutation,
+  query,
+  type MutationCtx,
+  type QueryCtx,
+} from "./_generated/server";
 import { verificarReautenticacion } from "./lib/reautenticacion";
 import {
   ALCANCE_ALERTA,

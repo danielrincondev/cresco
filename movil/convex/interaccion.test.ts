@@ -520,24 +520,6 @@ describe("interaccion — dispositivos y notificaciones", () => {
   });
 });
 
-describe("interaccion — enganche con el envio push", () => {
-  it("crear una notificacion programa su entrega al telefono", async () => {
-    const t = convexTest(schema, modules);
-    const e = await sembrarEscenario(t);
-    const accionId = await sembrarAccion(t, e);
-
-    await e.representante.mutation(api.interaccion.abrirInconformidad, {
-      accionRegistradaId: accionId, motivo: "NO_OCURRIO", mensaje: "No ocurrio",
-    });
-
-    const programadas = await t.run(async (ctx) =>
-      await ctx.db.system.query("_scheduled_functions").collect(),
-    );
-    expect(programadas).toHaveLength(1);
-    expect(programadas[0].name).toContain("push");
-  });
-});
-
 describe("interaccion — los errores llegan utiles a la pantalla", () => {
   /**
    * Sin envolverlos, un `ErrorDominio` cruza la frontera de Convex como un
@@ -694,5 +676,23 @@ describe("interaccion — frontera pública de alertas", () => {
     await expect(rep.action(api.interaccion.activarAlerta, { ...datos, cursoId: e.cursoId, tokenReautenticacion: await prueba(0, "rep_1", "sesion_rep") }))
       .rejects.toThrow();
     expect(await t.run(ctx => ctx.db.query("alertaEmergencia").collect())).toEqual([]);
+  });
+});
+
+describe("interaccion — enganche con el envio push", () => {
+  it("crear una notificacion programa su entrega al telefono", async () => {
+    const t = convexTest(schema, modules);
+    const e = await sembrarEscenario(t);
+    const accionId = await sembrarAccion(t, e);
+
+    await e.representante.mutation(api.interaccion.abrirInconformidad, {
+      accionRegistradaId: accionId, motivo: "NO_OCURRIO", mensaje: "No ocurrio",
+    });
+
+    const programadas = await t.run(async (ctx) =>
+      await ctx.db.system.query("_scheduled_functions").collect(),
+    );
+    expect(programadas).toHaveLength(1);
+    expect(programadas[0].name).toContain("push");
   });
 });
