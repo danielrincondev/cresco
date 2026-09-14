@@ -40,7 +40,7 @@ assert(invitaciones.every((i) => i.invitacionId === invitaciones[0].invitacionId
 const solicitud = {
   credencial: { codigo: invitaciones[0].codigo }, solicitudId: randomUUID(),
   estudiante: { tipoDocumento: "SIN_DOCUMENTO", numeroDocumento: "", nombres: "Estudiante", apellidos: "Sintético" },
-  parentesco: "TUTOR_LEGAL", aceptaTratamiento: true, declaraRepresentanteLegal: true, versionDocumento: "2026-09-v1",
+  parentesco: "TUTOR_LEGAL", aceptaTratamiento: true, declaraRepresentanteLegal: true, versionDocumento: "2026-09-v2",
 };
 const registros = await Promise.all(Array.from({ length: 5 }, () => cliente(representante).mutation(anyApi.nucleo.canjearInvitacion, solicitud)));
 assert(registros.every((r) => r.estudianteId === registros[0].estudianteId));

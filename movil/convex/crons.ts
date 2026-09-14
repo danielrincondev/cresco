@@ -1,0 +1,15 @@
+import { cronJobs } from "convex/server";
+
+import { internal } from "./_generated/api";
+
+const crons = cronJobs();
+
+/** 22:00 Guayaquil (UTC-5): publica borradores y completa reportes del día. */
+crons.cron(
+  "conducta: cierre nocturno",
+  "0 3 * * *",
+  internal.conducta.cierreNocturno,
+  {},
+);
+
+export default crons;
