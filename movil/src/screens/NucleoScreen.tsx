@@ -22,6 +22,7 @@ import {
   Espacio,
   Marca,
   Radio,
+  Semantico,
   Superficie,
   Tamano,
   Texto,
@@ -109,6 +110,19 @@ export function NucleoScreen() {
   useAuditoriaSesion(perfil === null ? null : perfil?.perfilUsuarioId);
   const { user } = useUser();
   const { signOut } = useClerk();
+  /**
+   * Cuantas novedades no ha abierto la persona.
+   *
+   * Sin esto la campana no distingue "nada nuevo" de "tres respuestas a tus
+   * reclamos", y el representante tiene que acordarse de mirar. En una
+   * aplicacion que existe para avisar, eso es dejar el aviso a medias.
+   *
+   * No cuesta una consulta de mas: `misNotificaciones` ya esta acotada a las
+   * cien mas recientes y Convex la mantiene viva por suscripcion, asi que
+   * abrir la bandeja no vuelve a pedir nada.
+   */
+  const novedades = useQuery(api.interaccion.misNotificaciones);
+  const sinLeer = (novedades ?? []).filter((n) => n.leidaEn === undefined).length;
   const [ruta, setRuta] = useState<Ruta>({ tipo: "inicio" });
   const [rolElegido, setRol] = useState<Rol>();
   const salida = useOperacion();
@@ -161,11 +175,25 @@ export function NucleoScreen() {
           <>
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="Novedades"
+              accessibilityLabel={
+                sinLeer === 0
+                  ? "Novedades"
+                  : `Novedades, ${sinLeer} sin leer`
+              }
               onPress={() => setRuta({ tipo: "notificaciones" })}
               style={styles.iconButton}
             >
-              <Icono nombre="bell" decorativo />
+              {/* La campana suena distinto cuando hay algo: el icono relleno
+                  es el mismo recurso que ya usa la navegacion para "estas
+                  aqui", asi que no hace falta un glifo nuevo. */}
+              <Icono nombre={sinLeer > 0 ? "bell-ring" : "bell"} activo={sinLeer > 0} decorativo />
+              {sinLeer > 0 && (
+                <View style={styles.contador}>
+                  <Text style={styles.contadorTexto}>
+                    {sinLeer > 9 ? "9+" : sinLeer}
+                  </Text>
+                </View>
+              )}
             </Pressable>
             <Pressable
               accessibilityRole="button"
@@ -1359,6 +1387,24 @@ const styles = StyleSheet.create({
     fontFamily: "Inter",
     fontSize: Tamano.sm,
     marginTop: Espacio.xs,
+  },
+  contador: {
+    position: "absolute",
+    top: 2,
+    right: 2,
+    minWidth: 18,
+    height: 18,
+    paddingHorizontal: 4,
+    borderRadius: 9,
+    backgroundColor: Semantico.error,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  contadorTexto: {
+    color: Texto.sobreColor,
+    fontFamily: "Inter-Semibold",
+    fontSize: 11,
+    lineHeight: 14,
   },
   iconButton: {
     width: 44,
