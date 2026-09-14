@@ -194,6 +194,60 @@ export const publicarDisponibilidad = mutation({
  * vínculo real. Si recibiera `docenteId`, cualquier usuario autenticado
  * podría listar el horario de cualquier docente del sistema.
  */
+/**
+ * P9: quien es el docente a cargo del hijo, con nombre y datos de contacto.
+ *
+ * Recorre el mismo camino que `bloquesDisponibles` -- estudiante, matricula
+ * CURSANDO, asignacion TITULAR vigente -- y por la misma razon empieza por
+ * `exigirVinculo`: sin eso, cualquier representante podria consultar los datos
+ * de contacto de cualquier docente del sistema pasando un `estudianteId` ajeno.
+ *
+ * Devuelve `null` cuando no hay titular asignado, que es un estado normal al
+ * principio del año lectivo y no un error que valga la pena mostrarle a nadie.
+ */
+export const docenteACargo = query({
+  args: { estudianteId: v.id("estudiante") },
+  handler: (ctx, args) => conErroresPublicos(async () => {
+    await exigirVinculo(ctx, args.estudianteId);
+
+    const matricula = await ctx.db
+      .query("matricula")
+      .withIndex("por_estudiante_estado", (q) =>
+        q.eq("estudianteId", args.estudianteId).eq("estado", "CURSANDO"),
+      )
+      .unique();
+    if (matricula === null) return null;
+
+    const titulares = await ctx.db
+      .query("asignacionDocente")
+      .withIndex("por_curso_rol", (q) => q.eq("cursoId", matricula.cursoId).eq("rol", "TITULAR"))
+      .collect();
+    const titular = titulares.find((t) => t.vigenteHasta === undefined);
+    if (titular === undefined) return null;
+
+    const docente = await ctx.db.get(titular.docenteId);
+    if (docente === null) return null;
+    const perfil = await ctx.db.get(docente.perfilUsuarioId);
+    const curso = await ctx.db.get(matricula.cursoId);
+
+    return {
+      docenteId: docente._id,
+      // Se entrega el nombre ya compuesto: la pantalla no tiene por que saber
+      // en que orden se escriben los apellidos aqui, y un perfil anterior a
+      // #52 todavia puede no tener ninguno de los dos.
+      nombre:
+        perfil && (perfil.nombres || perfil.apellidos)
+          ? `${perfil.nombres ?? ""} ${perfil.apellidos ?? ""}`.trim()
+          : null,
+      curso: curso?.nombre ?? null,
+      tituloProfesional: docente.tituloProfesional ?? null,
+      correoContacto: docente.correoContacto ?? null,
+      telefonoContacto: docente.telefonoContacto ?? null,
+      horarioAtencion: docente.horarioAtencion ?? null,
+    };
+  }),
+});
+
 export const bloquesDisponibles = query({
   args: { estudianteId: v.id("estudiante"), desde: v.string() },
   handler: (ctx, args) => conErroresPublicos(async () => {
@@ -440,6 +494,9 @@ export const abrirInconformidad = mutation({
     const inconformidadId = await ctx.db.insert("inconformidad", {
       accionRegistradaId: args.accionRegistradaId,
       representanteId: representante._id,
+      // Se copia del la accion que se reclama: es lo que hace que la bandeja
+      // del docente sea una lectura indexada y no un barrido de la tabla.
+      docenteId: accion.registradaPorDocenteId,
       motivo: args.motivo,
       mensaje: exigirTexto(args.mensaje, "El mensaje del reclamo"),
       estado: "ABIERTA",
@@ -481,11 +538,17 @@ export const inconformidadesDelDocente = query({
   handler: (ctx) => conErroresPublicos(async () => {
     const docente = await exigirDocente(ctx);
 
+    // Antes esto recorria **todos** los reclamos abiertos del sistema y se
+    // quedaba con los suyos en memoria: el trabajo de cada docente crecia con
+    // los reclamos de todos los demas (#48). Ahora el indice entrega
+    // directamente los de este docente.
     const enCurso: Doc<"inconformidad">[] = [];
     for (const estado of ["ABIERTA", "EN_REVISION"] as const) {
       const lote = await ctx.db
         .query("inconformidad")
-        .withIndex("por_estado_vence", (q) => q.eq("estado", estado))
+        .withIndex("por_docente_estado", (q) =>
+          q.eq("docenteId", docente._id).eq("estado", estado),
+        )
         .collect();
       enCurso.push(...lote);
     }
@@ -494,12 +557,31 @@ export const inconformidadesDelDocente = query({
     for (const i of enCurso) {
       const accion = await ctx.db.get(i.accionRegistradaId);
       if (accion === null || accion.registradaPorDocenteId !== docente._id) continue;
+
+      // De quien se habla y quien reclama. Hasta que #52 guardo los nombres
+      // esto no se podia decir, y la bandeja pedia al docente que decidiera
+      // si anula una sancion **sin saber de que estudiante es**: con dos
+      // reclamos abiertos, anular el equivocado era cuestion de suerte.
+      const matricula = await ctx.db.get(accion.matriculaId);
+      const estudiante = matricula ? await ctx.db.get(matricula.estudianteId) : null;
+      const representante = await ctx.db.get(i.representanteId);
+      const perfil = representante ? await ctx.db.get(representante.perfilUsuarioId) : null;
+
       mias.push({
         id: i._id,
         motivo: i.motivo,
         mensaje: i.mensaje,
         estado: i.estado,
         venceEn: i.venceEn,
+        estudiante: estudiante
+          ? { id: estudiante._id, nombre: `${estudiante.nombres} ${estudiante.apellidos}` }
+          : null,
+        // `null` cuando el perfil es anterior a los nombres. La pantalla lo
+        // dice con palabras en vez de enseñar un hueco.
+        representante:
+          perfil && (perfil.nombres || perfil.apellidos)
+            ? `${perfil.nombres ?? ""} ${perfil.apellidos ?? ""}`.trim()
+            : null,
         accion: {
           id: accion._id,
           descripcion: accion.descripcion,
@@ -867,16 +949,35 @@ export const registrarDispositivo = mutation({
   }),
 });
 
-/** Bandeja de notificaciones del usuario autenticado. */
+/**
+ * Las ultimas notificaciones del usuario autenticado.
+ *
+ * Antes leia **todas** las suyas desde siempre y las ordenaba en memoria. Una
+ * bandeja no encoge nunca: un representante recibe el reporte diario de su
+ * hijo, y a lo largo de un año lectivo eso son unas doscientas, mas las
+ * respuestas a reclamos y el estado de sus citas. Cada apertura de la campana
+ * leia la pila entera para pintar las diez de arriba.
+ *
+ * Convex añade `_creationTime` al final de todo indice, asi que `por_usuario`
+ * ya sabe ordenar por fecha: `.order("desc").take(...)` trae las mas recientes
+ * sin leer el resto y sin ordenar nada a mano.
+ *
+ * El tope es generoso a proposito. La pantalla no tiene paginacion todavia, y
+ * un tope corto convertiria una mejora de lectura en perdida de informacion
+ * visible. El dia que la bandeja necesite historial, esto pasa a
+ * `paginationOpts` como `listarMisEstudiantes`.
+ */
+const NOTIFICACIONES_EN_BANDEJA = 100;
+
 export const misNotificaciones = query({
   args: {},
   handler: (ctx) => conErroresPublicos(async () => {
     const perfil = await exigirPerfil(ctx);
-    const notificaciones = await ctx.db
+    return await ctx.db
       .query("notificacion")
       .withIndex("por_usuario", (q) => q.eq("perfilUsuarioId", perfil._id))
-      .collect();
-    return notificaciones.sort((a, b) => b._creationTime - a._creationTime);
+      .order("desc")
+      .take(NOTIFICACIONES_EN_BANDEJA);
   }),
 });
 
