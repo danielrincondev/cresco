@@ -18,6 +18,7 @@ const estado = vi.hoisted(() => ({
   fallosRegistro: 0,
   fallosAuditoria: 0,
   consentimientoDesactualizado: false,
+  novedades: [] as { leidaEn?: number }[],
   funciones: new Map<string, (args: unknown) => Promise<unknown>>(),
 }));
 vi.mock("react-native", () => ({
@@ -42,7 +43,13 @@ vi.mock("../lib/registroPendiente", () => ({
 }));
 vi.mock("convex/react", () => ({
   useConvexAuth: () => ({ isAuthenticated: estado.autenticado }),
-  useQuery: () => estado.perfil,
+  // El mock tiene que distinguir que se le pregunta: la pantalla consulta el
+  // perfil **y** las novedades, y devolver el perfil para las dos hacia que
+  // `sinLeer` operara sobre algo que no es una lista.
+  useQuery: (ref: Parameters<typeof getFunctionName>[0]) =>
+    getFunctionName(ref) === "interaccion:misNotificaciones"
+      ? estado.novedades
+      : estado.perfil,
   usePaginatedQuery: () => ({ results: [], status: "Exhausted", loadMore: vi.fn() }),
   useMutation: (ref: Parameters<typeof getFunctionName>[0]) => {
     const nombre = getFunctionName(ref);
@@ -91,6 +98,7 @@ beforeEach(() => {
   estado.fallosRegistro = 0;
   estado.fallosAuditoria = 0;
   estado.consentimientoDesactualizado = false;
+  estado.novedades = [];
 });
 afterEach(async () => {
   if (vista) await act(async () => vista!.unmount());
@@ -226,4 +234,37 @@ it("conserva solicitud y versión aceptada al reabrir tras un fallo de red", asy
   expect(solicitudes).toHaveLength(2);
   expect(solicitudes[1].args).toEqual(solicitudes[0].args);
   expect(estado.guardada).toBeNull();
+});
+
+/**
+ * Sin insignia, la campana no distingue "nada nuevo" de "tres respuestas a tus
+ * reclamos", y el representante tiene que acordarse de mirar. En una
+ * aplicacion que existe para avisar, eso es dejar el aviso a medias.
+ */
+it("la campana dice cuantas novedades hay sin leer", async () => {
+  estado.novedades = [{ leidaEn: 1 }, {}, {}];
+  await montar();
+
+  expect(
+    vista!.root.findByProps({ accessibilityLabel: "Novedades, 2 sin leer" }),
+  ).toBeTruthy();
+  // El numero tambien a la vista, no solo para el lector de pantalla.
+  expect(JSON.stringify(vista!.toJSON())).toContain("2");
+});
+
+it("con todo leido la campana no grita", async () => {
+  estado.novedades = [{ leidaEn: 1 }];
+  await montar();
+
+  expect(
+    vista!.root.findAllByProps({ accessibilityLabel: "Novedades" }).length,
+  ).toBeGreaterThan(0);
+});
+
+/** Mas de nueve se resume: un numero de tres cifras no cabe en el icono. */
+it("resume el contador a partir de diez", async () => {
+  estado.novedades = Array.from({ length: 14 }, () => ({}));
+  await montar();
+
+  expect(JSON.stringify(vista!.toJSON())).toContain("9+");
 });
