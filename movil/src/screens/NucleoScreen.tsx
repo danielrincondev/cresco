@@ -42,6 +42,7 @@ import {
   useOperacion,
 } from "../components/NucleoUI";
 import { PaywallDocente, PaywallRepresentante } from "./PaywallScreen";
+import { AnotarConducta } from "./ConductaScreen";
 import {
   AgendaDocente,
   Ajustes,
@@ -79,7 +80,7 @@ type Ruta =
   // Interaccion (#33). Las de familia no llevan curso: el permiso sale del
   // vinculo del representante, no de un curso que la pantalla elija.
   | { tipo: "notificaciones" | "citas" | "alertas" | "ajustes" | "plan" }
-  | { tipo: "curso" | "periodos" | "reclamos" | "agenda" | "alerta"; curso: Curso }
+  | { tipo: "curso" | "periodos" | "reclamos" | "agenda" | "alerta" | "anotar"; curso: Curso }
   | { tipo: "invitacion"; invitacion: Invitacion; curso: Curso }
   | { tipo: "aprobar"; curso: Curso; alumno: Alumno };
 
@@ -220,6 +221,11 @@ export function NucleoScreen() {
           <AgendaDocente curso={ruta.curso} />
         ) : ruta.tipo === "alerta" ? (
           <AlertaDocente curso={ruta.curso} />
+        ) : ruta.tipo === "anotar" ? (
+          <AnotarConducta
+            cursoId={ruta.curso.id}
+            onVolver={() => setRuta({ tipo: "curso", curso: ruta.curso })}
+          />
         ) : ruta.tipo === "citas" ? (
           <CitasFamilia />
         ) : ruta.tipo === "alertas" ? (
@@ -571,6 +577,9 @@ function DetalleCurso({
         Invitar representantes
       </Boton>
       <ErrorMensaje mensaje={op.error} />
+      <Boton onPress={() => navegar({ tipo: "anotar", curso })}>
+        Anotar conducta
+      </Boton>
       <Boton secundario onPress={() => navegar({ tipo: "reclamos", curso })}>
         Reclamos de las familias
       </Boton>
