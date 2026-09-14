@@ -107,7 +107,15 @@ export function ReclamosDocente() {
               <Chip etiqueta={etiquetaReclamo(reclamo.estado)} />
               <Text style={i.plazo}>{plazoLegible(reclamo.venceEn)}</Text>
             </Chips>
-            <Subtitulo>{textoMotivo(reclamo.motivo)}</Subtitulo>
+            <Subtitulo>
+              {reclamo.estudiante ? reclamo.estudiante.nombre : textoMotivo(reclamo.motivo)}
+            </Subtitulo>
+            {reclamo.estudiante && <Cuerpo>{textoMotivo(reclamo.motivo)}</Cuerpo>}
+            <Text style={i.etiqueta}>
+              {reclamo.representante
+                ? `Lo abrió ${reclamo.representante}`
+                : "Lo abrió su representante"}
+            </Text>
             <Cuerpo>{reclamo.mensaje}</Cuerpo>
             <View style={i.citado}>
               <Text style={i.etiqueta}>Sobre esta anotación</Text>
@@ -135,6 +143,11 @@ const DESENLACES = [
   { valor: "ANULADA", texto: "Se anula" },
 ] as const;
 
+/**
+ * Aqui es donde el docente puede **anular una sancion**, asi que el nombre del
+ * estudiante encabeza la pantalla. Con dos reclamos abiertos a la vez, decidir
+ * sin ese dato era cuestion de suerte.
+ */
 function ResponderReclamo({
   reclamo,
   onCerrar,
@@ -161,7 +174,12 @@ function ResponderReclamo({
   }
 
   return (
-    <Pagina titulo="Responder el reclamo" descripcion={textoMotivo(reclamo.motivo)}>
+    <Pagina
+      titulo={
+        reclamo.estudiante ? `Reclamo sobre ${reclamo.estudiante.nombre}` : "Responder el reclamo"
+      }
+      descripcion={textoMotivo(reclamo.motivo)}
+    >
       <Tarjeta>
         <Text style={i.etiqueta}>Lo que escribió la familia</Text>
         <Cuerpo>{reclamo.mensaje}</Cuerpo>

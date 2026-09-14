@@ -38,9 +38,21 @@ import { fechaHoraLegible } from "../lib/fechas";
 
 type Audiencia = "DOCENTE" | "REPRESENTANTE";
 
-/** Lo que cada límite significa dicho en palabras, no como campo de base de datos. */
+/**
+ * Lo que cada límite significa dicho en palabras, no como campo de base de
+ * datos.
+ *
+ * ⚠️ Las claves tienen que coincidir **exactamente** con las que siembra
+ * `convex/semillas.ts`, que es la unica fuente. La primera version de esta
+ * pantalla leia `limites.cursos` y la semilla escribe `cursosActivos`: el
+ * resultado no fue un error visible sino algo peor -- el plan del docente se
+ * pintaba sin un solo limite, como si no tuviera ninguno. Un fallo asi no se
+ * ve en una captura, se ve cuando alguien pregunta por que su plan no dice
+ * nada.
+ */
 function limitesLegibles(limites: Record<string, unknown>): string[] {
   const frases: string[] = [];
+
   const previos = limites.reportesPrevios;
   if (typeof previos === "number") {
     frases.push(
@@ -49,12 +61,20 @@ function limitesLegibles(limites: Record<string, unknown>): string[] {
         : `Los últimos ${previos} reportes`,
     );
   }
-  const cursos = limites.cursos;
+
+  const cursos = limites.cursosActivos;
   if (typeof cursos === "number") {
-    frases.push(cursos === 1 ? "Un curso" : `Hasta ${cursos} cursos`);
+    frases.push(cursos === 1 ? "Un curso a la vez" : `Hasta ${cursos} cursos`);
   }
+
+  const porCurso = limites.estudiantesPorCurso;
+  if (typeof porCurso === "number") {
+    frases.push(`Hasta ${porCurso} estudiantes por curso`);
+  }
+
   if (limites.exportarPdf === "LIBRE") frases.push("Informe imprimible cuando llegue");
   if (limites.exportarPdf === "CON_ANUNCIO") frases.push("Informe imprimible viendo un anuncio");
+
   return frases;
 }
 
