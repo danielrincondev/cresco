@@ -1,6 +1,6 @@
 # Aviso de privacidad — Cresco
 
-> **Estado:** Borrador · **Dueño:** Persona C · **Versión del documento:** `2026-09-v1` · **Última revisión:** 2026-09-07
+> **Estado:** Borrador · **Dueño:** Persona C · **Versión del documento:** `2026-09-v2` · **Última revisión:** 2026-09-11
 
 > ⚠️ **Antes de usarlo con datos reales.** Este texto describe con exactitud lo
 > que la aplicación hace hoy, pero **no ha sido revisado por un profesional del
@@ -10,7 +10,7 @@
 > este documento debe pasar por revisión jurídica y ser aceptado por la
 > institución educativa.
 >
-> **La versión de este documento (`2026-09-v1`) es la que se guarda** en el
+> **La versión de este documento (`2026-09-v2`) es la que se guarda** en el
 > campo `versionDocumento` de la tabla `consentimiento` cuando alguien lo
 > acepta. Si el texto cambia, cambia la versión: los consentimientos ya dados
 > quedan atados a la versión que la persona realmente leyó.
@@ -74,8 +74,8 @@ alertas de emergencia recibidas y confirmadas.
 ### Técnicos
 
 El identificador del dispositivo para enviar notificaciones, la plataforma y la
-versión de la aplicación, y un **registro de auditoría** de quién accedió a la
-información de un estudiante y cuándo.
+versión de la aplicación, y un **registro de auditoría** de determinadas
+acciones sensibles, con quién las realizó y cuándo, según el alcance de la sección 5.
 
 ## 4. Qué NO recogemos
 
@@ -99,9 +99,11 @@ información de un estudiante y cuándo.
 En esta primera versión **cada estudiante tiene un solo representante legal
 registrado**, que es quien canjea el código de invitación del curso.
 
-Cada acceso a información de un estudiante queda registrado en una bitácora de
-auditoría, para poder demostrar ante la institución que nadie vio lo que no le
-correspondía.
+La bitácora de auditoría registra el inicio de sesión, la creación de acciones
+de conducta, la aprobación de matrículas y la resolución de reclamos, con quién
+realizó cada operación y cuándo. En esta primera versión la bitácora cubre esas
+acciones, no toda consulta de pantalla. El registro de lecturas de fichas se
+incorpora de forma progresiva y no acredita todas las lecturas.
 
 ## 6. Terceros que participan en el servicio
 
@@ -133,7 +135,7 @@ no:
 
 | Derecho | Estado en esta versión |
 |---|---|
-| **Acceso** — saber qué datos tenemos y consultarlos | ✅ Disponible. Puede ver toda la información de su representado en la aplicación y descargarla en PDF |
+| **Acceso** — saber qué datos tenemos y consultarlos | ✅ Disponible en la aplicación. La **descarga en PDF** todavía no existe: llega en una versión posterior |
 | **Rectificación** — corregir datos inexactos | ⚠️ Parcial. El docente puede corregir los datos del estudiante. Para otras correcciones, escríbanos |
 | **Oposición** — dejar de usar el servicio | ✅ Disponible. Puede revocar su consentimiento en cualquier momento |
 | **Eliminación** — que borremos los datos | ⚠️ **No disponible todavía.** Ver abajo |
@@ -170,8 +172,8 @@ la carta de acuerdo del piloto**, no lo decidimos unilateralmente.
   consulta, no solo en la aplicación del teléfono.
 - Las contraseñas nunca se almacenan en texto plano: la autenticación la maneja
   un proveedor especializado.
-- Cada acceso a información sensible de un estudiante queda registrado en una
-  bitácora de auditoría.
+- Registramos en una bitácora de auditoría las operaciones enumeradas en la
+  sección 5, con quién las hizo y cuándo.
 - Activar una alerta de emergencia exige que el docente vuelva a confirmar su
   identidad, para que no se dispare por accidente.
 

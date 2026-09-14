@@ -34,7 +34,7 @@ async function escenario() {
   const periodoIds = await docente.mutation(api.nucleo.definirPeriodos, { cursoId: curso.id, periodos });
   const invitacion = await docente.mutation(api.nucleo.crearInvitacion, { cursoId: curso.id });
   const solicitud = { credencial: { codigo: invitacion.codigo }, solicitudId: "solicitud-prueba-0001", estudiante: hijo,
-    parentesco: "MADRE" as const, aceptaTratamiento: true, declaraRepresentanteLegal: true, versionDocumento: "2026-09-v1" };
+    parentesco: "MADRE" as const, aceptaTratamiento: true, declaraRepresentanteLegal: true, versionDocumento: "2026-09-v2" };
   return { t, docente, representante, otro, cursoId: curso.id, periodoIds, invitacion, solicitud, perfilDocente, perfilRepresentante };
 }
 
@@ -61,7 +61,7 @@ describe("núcleo — invitaciones", () => {
     expect(s.invitacion.codigo).toHaveLength(12);
     expect(s.invitacion.token).toHaveLength(52);
     const preview = await s.representante.mutation(api.nucleo.consultarInvitacion, { credencial: { token: s.invitacion.token } });
-    expect(preview).toMatchObject({ cursoId: s.cursoId, versionDocumento: "2026-09-v1", nombreCurso: "Quinto A" });
+    expect(preview).toMatchObject({ cursoId: s.cursoId, versionDocumento: "2026-09-v2", nombreCurso: "Quinto A" });
     expect(preview).not.toHaveProperty("token");
     expect(preview).not.toHaveProperty("estudiantes");
     const primera = await canjear(s);
@@ -122,13 +122,13 @@ describe("núcleo — registro y consentimiento", () => {
     expect(estado.estudiantes).toHaveLength(1);
     expect(estado.estudiantes[0]).toMatchObject({ nombres: "Ana", estadoVerificacion: "PENDIENTE", origenRegistro: "REPRESENTANTE" });
     expect(estado.vinculos[0]).toMatchObject({ estado: "ACTIVO", invitacionCursoId: s.invitacion.invitacionId });
-    expect(estado.consentimientos[0]).toMatchObject({ estudianteId: registro.estudianteId, perfilUsuarioId: s.perfilRepresentante.perfilUsuarioId, versionDocumento: "2026-09-v1", otorgado: true, otorgadoEn: AHORA });
+    expect(estado.consentimientos[0]).toMatchObject({ estudianteId: registro.estudianteId, perfilUsuarioId: s.perfilRepresentante.perfilUsuarioId, versionDocumento: "2026-09-v2", otorgado: true, otorgadoEn: AHORA });
     expect(estado.matriculas).toHaveLength(0);
     expect(estado.puntajes).toHaveLength(0);
   });
 
   it.each([
-    { aceptaTratamiento: false }, { declaraRepresentanteLegal: false }, { versionDocumento: "anterior" },
+    { aceptaTratamiento: false }, { declaraRepresentanteLegal: false }, { versionDocumento: "2026-09-v1" },
   ])("exige ambas declaraciones y versión vigente (%j)", async (cambio) => {
     const s = await escenario();
     await expect(s.representante.mutation(api.nucleo.canjearInvitacion, { ...s.solicitud, ...cambio })).rejects.toThrow("CONSENTIMIENTO_");
