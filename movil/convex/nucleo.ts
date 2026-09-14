@@ -901,6 +901,83 @@ export const listarMisEstudiantes = query({
 });
 
 /** Calendario del curso para mostrar parciales definidos aunque aún estén planificados. */
+/**
+ * El catalogo de acciones que el docente puede aplicar en su curso (D11).
+ *
+ * ## Por que esto no existia
+ *
+ * `conducta.registrarAccion` recibe un `tipoAccionId`, y **ninguna consulta
+ * decia que ids existen**. La pantalla central del producto -- el docente
+ * anota la conducta de un estudiante -- no se podia construir: habia como
+ * escribir la accion y ninguna forma de elegir cual.
+ *
+ * ## Por que vive en `nucleo.ts` y no en `conducta.ts`
+ *
+ * El catalogo es **configuracion de la institucion**, como los cursos y los
+ * periodos, no un registro de conducta: se siembra una vez y solo se lee. Y
+ * ponerlo aqui evita chocar con la rama de conducta que esta en revision
+ * (#77). Si el dueño de `conducta.ts` lo prefiere alli, mudarlo es mover una
+ * funcion sin tocar su contenido.
+ *
+ * ## Lo que devuelve y lo que no
+ *
+ * Solo lo **activo**, y solo lo de la institucion del curso o lo global
+ * (`institucionId` ausente = catalogo base para todas). Un tipo desactivado no
+ * se ofrece: `registrarAccion` lo rechazaria despues, y ofrecer algo que el
+ * servidor va a rechazar es peor que no ofrecerlo.
+ *
+ * Viene agrupado por categoria y ya ordenado, porque el orden es un dato del
+ * catalogo (`orden`) y no una preferencia de la pantalla.
+ */
+export const catalogoDeAcciones = query({
+  args: { cursoId: v.id("curso") },
+  handler: (ctx, args) => conErroresPublicos(async () => {
+    await exigirTitularDelCurso(ctx, args.cursoId);
+    const { anio } = await contextoCurso(ctx, args.cursoId);
+    const institucionId = anio.institucionId;
+
+    const suyas = (documento: { institucionId?: Id<"institucion"> }) =>
+      documento.institucionId === undefined || documento.institucionId === institucionId;
+
+    const categorias = (await ctx.db.query("categoriaAccion").collect())
+      .filter((c) => c.activa && suyas(c))
+      .sort((a, b) => a.orden - b.orden);
+
+    const tipos = (await ctx.db.query("tipoAccion").collect()).filter(
+      (t) => t.activa && suyas(t),
+    );
+
+    return categorias
+      .map((categoria) => ({
+        id: categoria._id,
+        codigo: categoria.codigo,
+        nombre: categoria.nombre,
+        descripcion: categoria.descripcion ?? null,
+        tipos: tipos
+          .filter((t) => t.categoriaAccionId === categoria._id)
+          .sort((a, b) => a.nombre.localeCompare(b.nombre, "es"))
+          .map((t) => ({
+            id: t._id,
+            nombre: t.nombre,
+            descripcion: t.descripcion ?? null,
+            signo: t.signo,
+            // Los tres puntajes viajan juntos: la pantalla necesita el rango
+            // para no dejar elegir algo que el servidor rechazaria, y el
+            // defecto para no obligar al docente a decidir un numero cuando
+            // no quiere pensarlo.
+            puntosDefecto: t.puntosDefecto,
+            puntosMin: t.puntosMin,
+            puntosMax: t.puntosMax,
+            requiereDescripcion: t.requiereDescripcion,
+            admiteInconformidad: t.admiteInconformidad,
+          })),
+      }))
+      // Una categoria sin tipos activos no se enseña: seria una seccion vacia
+      // que el docente abre para nada.
+      .filter((categoria) => categoria.tipos.length > 0);
+  }),
+});
+
 export const obtenerCalendarioCurso = query({
   args: { cursoId: v.id("curso") },
   handler: (ctx, args) => conErroresPublicos(async () => {
