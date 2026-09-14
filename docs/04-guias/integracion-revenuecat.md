@@ -105,6 +105,32 @@ Lo único que falta es conectarlos:
 Con `.cloud` el webhook responde 404, RevenueCat reintenta 5 veces y **pierde
 el evento**. Las `httpAction` de Convex se sirven en el dominio `.site`.
 
+### Revisar los pagos que no se aplicaron
+
+El webhook responde **200 aunque el evento no se pueda aplicar**, y lo hace a
+propósito: el evento ya está guardado, reintentarlo no lo arreglaría, y que
+RevenueCat lo dé por perdido sí duele. El fallo queda en
+`eventoRevenuecat.errorProcesamiento`.
+
+Pero una fila ahí es **alguien que pagó y puede no tener su plan**. Hay dos
+formas de verlo, y conviene usar las dos:
+
+- En el log de Convex sale al instante como
+  `[revenuecat] evento <id> (<tipo>) guardado sin aplicar: <motivo>`.
+- Para revisar en bloque —por ejemplo al cerrar un día de cobros—:
+
+  ```
+  npx convex run suscripciones:eventosSinAplicar
+  ```
+
+  Devuelve `{ total, sinAplicar, eventos }`, con el más reciente primero y el
+  motivo de cada uno.
+
+Los dos motivos que más van a salir son el producto que no coincide (`No hay
+ningún plan con productoGooglePlay = "..."`, casi siempre un identificador mal
+escrito en el panel) y el usuario que no existe. Los dos se arreglan y el
+evento se puede reaplicar a mano.
+
 ### Una regla de negocio que el código ya respeta
 
 `CANCELLATION` **no** significa que el acceso terminó: la suscripción sigue
