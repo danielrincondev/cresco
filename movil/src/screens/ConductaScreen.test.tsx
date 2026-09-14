@@ -40,6 +40,12 @@ const TIPO_NEGATIVO = {
   puntosDefecto: -1, puntosMin: -3, puntosMax: -1,
   requiereDescripcion: true, admiteInconformidad: true,
 };
+/** Como "Irresponsabilidad" en el catalogo sembrado: un unico valor posible. */
+const TIPO_FIJO = {
+  id: "t3", nombre: "Irresponsabilidad", descripcion: null, signo: "NEGATIVA",
+  puntosDefecto: -1, puntosMin: -1, puntosMax: -1,
+  requiereDescripcion: true, admiteInconformidad: true,
+};
 const TIPO_POSITIVO = {
   id: "t2", nombre: "Tarea entregada", descripcion: null, signo: "POSITIVA",
   puntosDefecto: 1, puntosMin: 1, puntosMax: 2,
@@ -156,4 +162,21 @@ it("tras registrar, confirma y no deja el formulario abierto", async () => {
   const t = texto(v);
   expect(t).toContain("Anotación registrada");
   expect(t).not.toContain("¿Qué pasó?");
+});
+
+/**
+ * Varios tipos del catalogo real tienen minimo y maximo iguales. Un selector
+ * de una sola opcion pide al docente una decision que no existe: se le dice
+ * cuanto vale y ya.
+ */
+it("con un solo valor posible no pinta selector, lo dice", () => {
+  estado.catalogo = [
+    { id: "c1", codigo: "DISCIPLINA", nombre: "Disciplina", descripcion: null,
+      tipos: [TIPO_FIJO] },
+  ];
+  const v = abrirFormulario();
+  act(() => { v.root.findAllByType(Boton)[0].props.onPress(); });
+
+  expect(v.root.findAllByType(Opciones)).toHaveLength(0);
+  expect(texto(v)).toContain("vale -1 punto");
 });
