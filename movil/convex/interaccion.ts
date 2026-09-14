@@ -578,12 +578,30 @@ export const inconformidadesDelDocente = query({
       for (const i of lote) {
         const accion = await ctx.db.get(i.accionRegistradaId);
         if (accion === null || accion.registradaPorDocenteId !== docente._id) continue;
+
+        // De quien se habla y quien reclama (#71). Hasta que #52 guardo los
+        // nombres esto no se podia decir, y la bandeja pedia al docente que
+        // decidiera si anula una sancion **sin saber de que estudiante es**.
+        const matricula = await ctx.db.get(accion.matriculaId);
+        const estudiante = matricula ? await ctx.db.get(matricula.estudianteId) : null;
+        const representante = await ctx.db.get(i.representanteId);
+        const perfil = representante ? await ctx.db.get(representante.perfilUsuarioId) : null;
+
         mias.push({
           id: i._id,
           motivo: i.motivo,
           mensaje: i.mensaje,
           estado: i.estado,
           venceEn: i.venceEn,
+          estudiante: estudiante
+            ? { id: estudiante._id, nombre: `${estudiante.nombres} ${estudiante.apellidos}` }
+            : null,
+          // `null` cuando el perfil es anterior a los nombres. La pantalla lo
+          // dice con palabras en vez de enseñar un hueco.
+          representante:
+            perfil && (perfil.nombres || perfil.apellidos)
+              ? `${perfil.nombres ?? ""} ${perfil.apellidos ?? ""}`.trim()
+              : null,
           accion: {
             id: accion._id,
             descripcion: accion.descripcion,
@@ -1062,16 +1080,35 @@ export const registrarDispositivo = mutation({
   }),
 });
 
-/** Bandeja de notificaciones del usuario autenticado. */
+/**
+ * Las ultimas notificaciones del usuario autenticado.
+ *
+ * Antes leia **todas** las suyas desde siempre y las ordenaba en memoria. Una
+ * bandeja no encoge nunca: un representante recibe el reporte diario de su
+ * hijo, y a lo largo de un año lectivo eso son unas doscientas, mas las
+ * respuestas a reclamos y el estado de sus citas. Cada apertura de la campana
+ * leia la pila entera para pintar las diez de arriba.
+ *
+ * Convex añade `_creationTime` al final de todo indice, asi que `por_usuario`
+ * ya sabe ordenar por fecha: `.order("desc").take(...)` trae las mas recientes
+ * sin leer el resto y sin ordenar nada a mano.
+ *
+ * El tope es generoso a proposito. La pantalla no tiene paginacion todavia, y
+ * un tope corto convertiria una mejora de lectura en perdida de informacion
+ * visible. El dia que la bandeja necesite historial, esto pasa a
+ * `paginationOpts` como `listarMisEstudiantes`.
+ */
+const NOTIFICACIONES_EN_BANDEJA = 100;
+
 export const misNotificaciones = query({
   args: {},
   handler: (ctx) => conErroresPublicos(async () => {
     const perfil = await exigirPerfil(ctx);
-    const notificaciones = await ctx.db
+    return await ctx.db
       .query("notificacion")
       .withIndex("por_usuario", (q) => q.eq("perfilUsuarioId", perfil._id))
-      .collect();
-    return notificaciones.sort((a, b) => b._creationTime - a._creationTime);
+      .order("desc")
+      .take(NOTIFICACIONES_EN_BANDEJA);
   }),
 });
 
