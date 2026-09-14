@@ -1040,3 +1040,58 @@ describe("interaccion — la bandeja dice de quien se habla (#52)", () => {
     expect(reclamo.estudiante?.nombre).toBe("Ana Pérez");
   });
 });
+
+describe("interaccion — la bandeja no crece sin freno", () => {
+  /** Siembra `cuantas` notificaciones para el perfil del representante. */
+  async function sembrarNotificaciones(
+    t: ReturnType<typeof convexTest>,
+    representanteId: Id<"representante">,
+    cuantas: number,
+  ) {
+    await t.run(async (ctx) => {
+      const representante = (await ctx.db.get(representanteId))!;
+      for (let n = 0; n < cuantas; n++) {
+        await ctx.db.insert("notificacion", {
+          perfilUsuarioId: representante.perfilUsuarioId,
+          tipo: "REPORTE_DIARIO",
+          titulo: `Reporte ${n}`,
+          cuerpo: "El reporte de hoy ya está disponible.",
+        });
+      }
+    });
+  }
+
+  /**
+   * Una bandeja no encoge nunca: el reporte diario son ~200 notificaciones por
+   * año lectivo. Antes se leian todas para pintar las diez de arriba.
+   */
+  it("devuelve como mucho las cien mas recientes", async () => {
+    const t = convexTest(schema, modules);
+    const e = await sembrarEscenario(t);
+    await sembrarNotificaciones(t, e.representanteId, 130);
+
+    const bandeja = await e.representante.query(api.interaccion.misNotificaciones);
+    expect(bandeja).toHaveLength(100);
+    // La mas nueva primero: la 129 es la ultima que se inserto.
+    expect(bandeja[0].titulo).toBe("Reporte 129");
+    expect(bandeja.at(-1)?.titulo).toBe("Reporte 30");
+  });
+
+  it("con pocas las devuelve todas, de la mas nueva a la mas vieja", async () => {
+    const t = convexTest(schema, modules);
+    const e = await sembrarEscenario(t);
+    await sembrarNotificaciones(t, e.representanteId, 3);
+
+    expect(
+      (await e.representante.query(api.interaccion.misNotificaciones)).map((n) => n.titulo),
+    ).toEqual(["Reporte 2", "Reporte 1", "Reporte 0"]);
+  });
+
+  it("no ensena las notificaciones de otra persona", async () => {
+    const t = convexTest(schema, modules);
+    const e = await sembrarEscenario(t);
+    await sembrarNotificaciones(t, e.representanteId, 2);
+
+    expect(await e.docente.query(api.interaccion.misNotificaciones)).toHaveLength(0);
+  });
+});
