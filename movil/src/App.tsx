@@ -19,6 +19,8 @@ import {
   Unauthenticated,
 } from "convex/react";
 import { ConvexProviderWithClerk } from "convex/react-clerk";
+
+import { Marca, Semantico, Superficie, Texto } from "./theme/Theme";
 // Se importa peso por peso, no desde `@expo-google-fonts/inter`. El paquete
 // barril arrastra sus 18 archivos .ttf al bundle -- 6 MB para usar dos de
 // ellos, mas que el codigo entero de la aplicacion. En un colegio fiscal
@@ -282,7 +284,7 @@ function WelcomeScreen() {
               ]}
             >
               {isGooglePending ? (
-                <ActivityIndicator color="#173f35" />
+                <ActivityIndicator color={Texto.primario} />
               ) : (
                 <Text style={styles.googleButtonText}>
                   Continuar con Google
@@ -404,7 +406,7 @@ function WelcomeScreen() {
               ]}
             >
               {isPending ? (
-                <ActivityIndicator color="#ffffff" />
+                <ActivityIndicator color={Superficie.tarjeta} />
               ) : (
                 <Text style={styles.primaryButtonText}>
                   {step === "credentials" ? "Continuar" : "Verificar"}
@@ -444,7 +446,7 @@ function HomeScreen() {
 function LoadingScreen({ message }: { message: string }) {
   return (
     <SafeAreaView style={[styles.screen, styles.loadingScreen]}>
-      <ActivityIndicator color="#2f7d68" size="large" />
+      <ActivityIndicator color={Marca.base} size="large" />
       <Text style={styles.loadingText}>{message}</Text>
     </SafeAreaView>
   );
@@ -465,8 +467,8 @@ const styles = StyleSheet.create({
     transform: [{ scale: 0.99 }],
   },
   card: {
-    backgroundColor: "#ffffff",
-    borderColor: "#dce7e2",
+    backgroundColor: Superficie.tarjeta,
+    borderColor: Superficie.borde,
     borderRadius: 24,
     borderWidth: 1,
     gap: 12,
@@ -476,12 +478,12 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   connectionDetail: {
-    color: "#597069",
+    color: Texto.secundario,
     fontSize: 14,
     marginTop: 3,
   },
   connectionDot: {
-    backgroundColor: "#2f7d68",
+    backgroundColor: Marca.base,
     borderRadius: 6,
     height: 12,
     width: 12,
@@ -493,12 +495,12 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   connectionTitle: {
-    color: "#173f35",
+    color: Texto.primario,
     fontSize: 16,
     fontWeight: "700",
   },
   dividerLine: {
-    backgroundColor: "#dce7e2",
+    backgroundColor: Superficie.borde,
     flex: 1,
     height: 1,
   },
@@ -509,17 +511,21 @@ const styles = StyleSheet.create({
     marginVertical: 4,
   },
   dividerText: {
-    color: "#597069",
+    color: Texto.secundario,
     fontSize: 13,
   },
   error: {
-    backgroundColor: "#fff0ee",
+    // Igual que `ErrorMensaje` en NucleoUI: fondo solido y texto blanco. El
+    // par anterior -- fondo rosa claro con texto rojo -- no aparecia en
+    // `Theme.ts` y ademas daba menos contraste que este, que es el unico
+    // par de error con razon AA anotada.
+    backgroundColor: Semantico.error,
     borderRadius: 12,
-    color: "#a33226",
+    color: Texto.sobreColor,
     padding: 12,
   },
   eyebrow: {
-    color: "#2f7d68",
+    color: Marca.base,
     fontSize: 13,
     fontWeight: "800",
     letterSpacing: 2.4,
@@ -528,28 +534,28 @@ const styles = StyleSheet.create({
     gap: 7,
   },
   fieldLabel: {
-    color: "#173f35",
+    color: Texto.primario,
     fontSize: 14,
     fontWeight: "700",
   },
   formHeading: {
-    color: "#173f35",
+    color: Texto.primario,
     fontSize: 22,
     fontWeight: "800",
     marginBottom: 4,
   },
   formHelp: {
-    color: "#597069",
+    color: Texto.secundario,
     fontSize: 14,
     lineHeight: 20,
   },
   googleButton: {
-    backgroundColor: "#ffffff",
-    borderColor: "#bfd8ce",
+    backgroundColor: Superficie.tarjeta,
+    borderColor: Superficie.borde,
     borderWidth: 1,
   },
   googleButtonText: {
-    color: "#173f35",
+    color: Texto.primario,
     fontSize: 16,
     fontWeight: "700",
   },
@@ -558,11 +564,11 @@ const styles = StyleSheet.create({
     marginBottom: 32,
   },
   input: {
-    backgroundColor: "#f8faf9",
-    borderColor: "#bfd8ce",
+    backgroundColor: Superficie.fondo,
+    borderColor: Superficie.borde,
     borderRadius: 12,
     borderWidth: 1,
-    color: "#173f35",
+    color: Texto.primario,
     fontSize: 16,
     minHeight: 50,
     paddingHorizontal: 14,
@@ -572,21 +578,21 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   loadingText: {
-    color: "#597069",
+    color: Texto.secundario,
     fontSize: 16,
     marginTop: 14,
   },
   primaryButton: {
-    backgroundColor: "#2f7d68",
+    backgroundColor: Marca.base,
   },
   primaryButtonText: {
-    color: "#ffffff",
+    color: Texto.sobreColor,
     fontSize: 16,
     fontWeight: "700",
   },
   refreshingBanner: {
     alignItems: "center",
-    backgroundColor: "#e4f0eb",
+    backgroundColor: Marca.claro,
     borderRadius: 12,
     flexDirection: "row",
     gap: 8,
@@ -598,33 +604,33 @@ const styles = StyleSheet.create({
     zIndex: 1,
   },
   refreshingText: {
-    color: "#173f35",
+    color: Texto.primario,
     fontSize: 14,
     fontWeight: "600",
   },
   screen: {
-    backgroundColor: "#f5f8f6",
+    backgroundColor: Superficie.fondo,
     flex: 1,
     justifyContent: "center",
     padding: 24,
   },
   secondaryButton: {
-    backgroundColor: "#e4f0eb",
-    borderColor: "#bfd8ce",
+    backgroundColor: Marca.claro,
+    borderColor: Superficie.borde,
     borderWidth: 1,
   },
   secondaryButtonText: {
-    color: "#173f35",
+    color: Texto.primario,
     fontSize: 16,
     fontWeight: "700",
   },
   subtitle: {
-    color: "#597069",
+    color: Texto.secundario,
     fontSize: 17,
     lineHeight: 25,
   },
   title: {
-    color: "#173f35",
+    color: Texto.primario,
     fontSize: 36,
     fontWeight: "800",
     letterSpacing: -1,

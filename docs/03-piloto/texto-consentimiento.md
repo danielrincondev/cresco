@@ -1,6 +1,6 @@
 # Texto de consentimiento — Cresco
 
-> **Estado:** Borrador · **Dueño:** Persona C · **Versión del documento:** `2026-09-v1` · **Última revisión:** 2026-09-07
+> **Estado:** Borrador · **Dueño:** Persona C · **Versión del documento:** `2026-09-v2` · **Última revisión:** 2026-09-11
 
 Este es el texto que se muestra en la pantalla **P3**, cuando el representante
 legal registra a su hijo. Es lo que la persona lee de verdad antes de tocar
@@ -18,7 +18,7 @@ Al aceptar se registra en la tabla `consentimiento`:
 | Campo | Valor |
 |---|---|
 | `tipo` | `TRATAMIENTO_DATOS_MENOR` |
-| `versionDocumento` | `2026-09-v1` |
+| `versionDocumento` | `2026-09-v2` |
 | `otorgado` | `true` |
 | `otorgadoEn` | el momento exacto |
 | `estudianteId` | el estudiante al que se refiere |

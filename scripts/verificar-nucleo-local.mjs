@@ -20,11 +20,11 @@ function cliente(subject) {
   client.setAdminAuth(config.adminKey, { subject, issuer: "https://clerk.test", tokenIdentifier: `https://clerk.test|${subject}` });
   return client;
 }
-const alta = { tipoDocumento: "PASAPORTE", numeroDocumento: `DOC-${sufijo}`, roles: ["DOCENTE"] };
+const alta = { nombres: "Docente", apellidos: "Sintético", tipoDocumento: "PASAPORTE", numeroDocumento: `DOC-${sufijo}`, roles: ["DOCENTE"] };
 const perfiles = await Promise.all(Array.from({ length: 3 }, () => cliente(docente).mutation(anyApi.nucleo.completarPerfil, alta)));
 assert(perfiles.every((p) => p.perfilUsuarioId === perfiles[0].perfilUsuarioId));
 for (const [subject, documento] of [[representante, `REP-${sufijo}`], [otro, `OTR-${sufijo}`]]) {
-  await cliente(subject).mutation(anyApi.nucleo.completarPerfil, { tipoDocumento: "PASAPORTE", numeroDocumento: documento, roles: ["REPRESENTANTE"] });
+  await cliente(subject).mutation(anyApi.nucleo.completarPerfil, { nombres: "Representante", apellidos: "Sintético", tipoDocumento: "PASAPORTE", numeroDocumento: documento, roles: ["REPRESENTANTE"] });
 }
 const anio = new Date().getUTCFullYear();
 const curso = await cliente(docente).mutation(anyApi.nucleo.crearCurso, {
@@ -40,7 +40,7 @@ assert(invitaciones.every((i) => i.invitacionId === invitaciones[0].invitacionId
 const solicitud = {
   credencial: { codigo: invitaciones[0].codigo }, solicitudId: randomUUID(),
   estudiante: { tipoDocumento: "SIN_DOCUMENTO", numeroDocumento: "", nombres: "Estudiante", apellidos: "Sintético" },
-  parentesco: "TUTOR_LEGAL", aceptaTratamiento: true, declaraRepresentanteLegal: true, versionDocumento: "2026-09-v1",
+  parentesco: "TUTOR_LEGAL", aceptaTratamiento: true, declaraRepresentanteLegal: true, versionDocumento: "2026-09-v2",
 };
 const registros = await Promise.all(Array.from({ length: 5 }, () => cliente(representante).mutation(anyApi.nucleo.canjearInvitacion, solicitud)));
 assert(registros.every((r) => r.estudianteId === registros[0].estudianteId));
