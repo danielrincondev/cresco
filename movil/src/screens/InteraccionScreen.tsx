@@ -91,7 +91,7 @@ export function ReclamosDocente() {
   return (
     <Pagina
       titulo="Reclamos"
-      descripcion="Lo que las familias no aceptaron de una anotación. Lo más urgente va primero."
+      descripcion="De todos tus cursos. Lo que las familias no aceptaron de una anotación, con lo más urgente primero."
     >
       {reclamos === undefined ? (
         <Cargando mensaje="Cargando reclamos..." />
@@ -107,7 +107,15 @@ export function ReclamosDocente() {
               <Chip etiqueta={etiquetaReclamo(reclamo.estado)} />
               <Text style={i.plazo}>{plazoLegible(reclamo.venceEn)}</Text>
             </Chips>
-            <Subtitulo>{textoMotivo(reclamo.motivo)}</Subtitulo>
+            <Subtitulo>
+              {reclamo.estudiante ? reclamo.estudiante.nombre : textoMotivo(reclamo.motivo)}
+            </Subtitulo>
+            {reclamo.estudiante && <Cuerpo>{textoMotivo(reclamo.motivo)}</Cuerpo>}
+            <Text style={i.etiqueta}>
+              {reclamo.representante
+                ? `Lo abrió ${reclamo.representante}`
+                : "Lo abrió su representante"}
+            </Text>
             <Cuerpo>{reclamo.mensaje}</Cuerpo>
             <View style={i.citado}>
               <Text style={i.etiqueta}>Sobre esta anotación</Text>
@@ -135,6 +143,11 @@ const DESENLACES = [
   { valor: "ANULADA", texto: "Se anula" },
 ] as const;
 
+/**
+ * Aqui es donde el docente puede **anular una sancion**, asi que el nombre del
+ * estudiante encabeza la pantalla. Con dos reclamos abiertos a la vez, decidir
+ * sin ese dato era cuestion de suerte.
+ */
 function ResponderReclamo({
   reclamo,
   onCerrar,
@@ -161,7 +174,12 @@ function ResponderReclamo({
   }
 
   return (
-    <Pagina titulo="Responder el reclamo" descripcion={textoMotivo(reclamo.motivo)}>
+    <Pagina
+      titulo={
+        reclamo.estudiante ? `Reclamo sobre ${reclamo.estudiante.nombre}` : "Responder el reclamo"
+      }
+      descripcion={textoMotivo(reclamo.motivo)}
+    >
       <Tarjeta>
         <Text style={i.etiqueta}>Lo que escribió la familia</Text>
         <Cuerpo>{reclamo.mensaje}</Cuerpo>
@@ -575,7 +593,10 @@ export function CitasFamilia() {
         </Boton>
       )}
 
-      <Subtitulo>Tus citas</Subtitulo>
+      {/* La franja se publica **para este curso** (`cursoId` va en la
+          mutation), pero la lista de abajo es tu agenda entera: una cita es
+          tuya, no de un curso. Se dice para que no parezca filtrada. */}
+      <Subtitulo>Tus citas, de todos tus cursos</Subtitulo>
       {citas === undefined ? (
         <Cargando />
       ) : citas.length === 0 ? (
