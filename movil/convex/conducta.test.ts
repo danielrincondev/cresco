@@ -3,7 +3,6 @@
 import { convexTest } from "convex-test";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api, internal } from "./_generated/api";
-import { ErrorPermiso } from "./lib/permisos";
 import schema from "./schema";
 
 const modules = import.meta.glob(["./conducta.ts", "./nucleo.ts", "./semillas.ts", "./_generated/*.js"]);
@@ -105,7 +104,11 @@ it("rechaza un docente ajeno con ErrorPermiso sin escribir acciones, puntajes ni
     });
     await ctx.db.insert("docente", { perfilUsuarioId, actualizadoEn: Date.now() });
   });
-  await expect(t.withIdentity({ subject: "docente_ajeno" }).mutation(api.conducta.registrarAccion, args)).rejects.toBeInstanceOf(ErrorPermiso);
+  // El codigo viaja en `.data`, no como clase cruda: `conErroresPublicos`
+  // envuelve en `ConvexError` y esa es la convencion del resto del proyecto
+  // (`interaccion`, `nucleo`). La version de #39 era la que se salia.
+  await expect(t.withIdentity({ subject: "docente_ajeno" }).mutation(api.conducta.registrarAccion, args))
+    .rejects.toMatchObject({ data: { codigo: "SIN_PERMISO" } });
   const estado = await t.run(async ctx => ({
     acciones: await ctx.db.query("accionRegistrada").collect(),
     puntajes: await ctx.db.query("puntajePeriodo").collect(),
@@ -213,9 +216,13 @@ async function sembrar(t: ReturnType<typeof convexTest>) {
   return { ...ids, docente: t.withIdentity({ subject: "docente_1" }) };
 }
 
-beforeEach(() => vi.useFakeTimers().setSystemTime(new Date("2026-09-15T15:00:00Z")));
+describe("conducta — asistencia, reportes y cierre nocturno (#10)", () => {
+  // Dentro del `describe` y no en el nivel superior: un `beforeEach` suelto se
+  // aplica a **todas** las pruebas del archivo, y este fijaba el reloj al 15
+  // de septiembre por encima del que usan las pruebas de #39, que esperan el
+  // 9. Al juntar los dos archivos eso rompia cinco pruebas ajenas.
+  beforeEach(() => vi.useFakeTimers().setSystemTime(new Date("2026-09-15T15:00:00Z")));
 
-describe("conducta", () => {
   it("rechaza a un docente ajeno", async () => {
     const t = convexTest(schema, modules); const e = await sembrar(t);
     await t.run(async (ctx) => { const p = await ctx.db.insert("perfilUsuario", { authSubject: "docente_2", tipoDocumento: "CEDULA", numeroDocumento: "9", actualizadoEn: Date.now() }); await ctx.db.insert("docente", { perfilUsuarioId: p, actualizadoEn: Date.now() }); });
