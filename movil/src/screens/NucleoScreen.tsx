@@ -78,8 +78,19 @@ type Ruta =
   | { tipo: "inicio" | "perfil" | "registro" | "crearCurso" }
   // Interaccion (#33). Las de familia no llevan curso: el permiso sale del
   // vinculo del representante, no de un curso que la pantalla elija.
-  | { tipo: "notificaciones" | "citas" | "alertas" | "ajustes" | "plan" }
-  | { tipo: "curso" | "periodos" | "reclamos" | "agenda" | "alerta"; curso: Curso }
+  | {
+      tipo:
+        | "notificaciones"
+        | "citas"
+        | "alertas"
+        | "ajustes"
+        | "plan"
+        // Los reclamos son de **todos** los cursos del docente, no de uno:
+        // `inconformidadesDelDocente` no recibe curso. Viajaba con uno que la
+        // pantalla nunca leyo, y eso hacia creer que estaba acotada.
+        | "reclamos";
+    }
+  | { tipo: "curso" | "periodos" | "agenda" | "alerta"; curso: Curso }
   | { tipo: "invitacion"; invitacion: Invitacion; curso: Curso }
   | { tipo: "aprobar"; curso: Curso; alumno: Alumno };
 
@@ -429,6 +440,11 @@ function Cursos({
           </Pressable>
         ))
       )}
+      {/* Vive aqui y no dentro de un curso porque cubre todos: con el plan
+          PRO son hasta cinco, y abrirla desde uno hacia creer lo contrario. */}
+      <Boton secundario onPress={() => navegar({ tipo: "reclamos" })}>
+        Reclamos de las familias
+      </Boton>
       {datos &&
         (datos.cursos.length < datos.limitePlan ? (
           <Boton onPress={() => navegar({ tipo: "crearCurso" })}>
@@ -571,9 +587,6 @@ function DetalleCurso({
         Invitar representantes
       </Boton>
       <ErrorMensaje mensaje={op.error} />
-      <Boton secundario onPress={() => navegar({ tipo: "reclamos", curso })}>
-        Reclamos de las familias
-      </Boton>
       <Boton secundario onPress={() => navegar({ tipo: "agenda", curso })}>
         Atención a familias
       </Boton>

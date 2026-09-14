@@ -91,7 +91,7 @@ export function ReclamosDocente() {
   return (
     <Pagina
       titulo="Reclamos"
-      descripcion="Lo que las familias no aceptaron de una anotación. Lo más urgente va primero."
+      descripcion="De todos tus cursos. Lo que las familias no aceptaron de una anotación, con lo más urgente primero."
     >
       {reclamos === undefined ? (
         <Cargando mensaje="Cargando reclamos..." />
@@ -575,7 +575,10 @@ export function CitasFamilia() {
         </Boton>
       )}
 
-      <Subtitulo>Tus citas</Subtitulo>
+      {/* La franja se publica **para este curso** (`cursoId` va en la
+          mutation), pero la lista de abajo es tu agenda entera: una cita es
+          tuya, no de un curso. Se dice para que no parezca filtrada. */}
+      <Subtitulo>Tus citas, de todos tus cursos</Subtitulo>
       {citas === undefined ? (
         <Cargando />
       ) : citas.length === 0 ? (
