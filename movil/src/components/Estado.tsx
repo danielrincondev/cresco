@@ -1,7 +1,8 @@
 /**
  * Los dos componentes base que faltaban del issue #5: **chip de estado** y
  * **estado vacío**. Los otros cuatro (tarjeta, botón, campo de texto y
- * encabezado) ya viven en `NucleoUI.tsx`.
+ * encabezado) viven en `NucleoUI.tsx`, y la barra para cambiar de hijo que
+ * completa el encabezado, en `SelectorDeHijo.tsx`.
  *
  * Aquí no hay ni un `#hex`: los cinco tonos del chip son `TonoEstado` en
  * `Theme.ts`, con su razón de contraste anotada al lado. La regla del issue no

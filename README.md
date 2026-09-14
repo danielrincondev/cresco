@@ -22,12 +22,16 @@ y backend de Convex:
 | Datos semilla (`convex/semillas.ts`) | Implementado y cargado en al menos un despliegue de desarrollo |
 | Webhook de RevenueCat (`convex/http.ts`) | Implementado, con pruebas (`npm test`) |
 | Sistema de diseño (`movil/src/theme/Theme.ts`) | Implementado: color, tipografía, espaciado, iconografía |
-| Integración continua (`.github/workflows/ci.yml`) | Implementado: tipos y 19 pruebas en cada PR |
-| Propiedad por módulo (`.github/CODEOWNERS`) | Implementado — falta activar branch protection en GitHub |
+| Integración continua (`.github/workflows/ci.yml`) | Implementado: tipos y 252 pruebas en cada PR |
+| Propiedad por módulo (`.github/CODEOWNERS`) | Implementado: protección de `main` activa; exige CI y revisión |
 | Banderas de activación (`convex/lib/flags.ts`) | Implementado |
 | Bitwarden Secrets Manager | Estructura lista en `.env.schema`, **sin vault compartido configurado todavía** — ver más abajo |
-| **Las 31 pantallas del producto** | **Sin construir — es el trabajo que queda** |
-| `convex/{nucleo,conducta,interaccion}.ts` | Sin construir — un módulo por persona |
+| `convex/nucleo.ts` | Implementado: perfiles, cursos, períodos, invitaciones, vinculación y aprobación |
+| `convex/interaccion.ts` | Implementado: citas, reclamos, alertas, dispositivos y bandeja. Push y recálculo tras resolver reclamos pendientes de integración |
+| `convex/conducta.ts` | Parcial: registrar acción con recálculo derivado. Asistencia, reportes y cierre nocturno en curso |
+| `convex/auditoria.ts` | Productores implementados: `LOGIN` conectado; conexión de `LEER_SENSIBLE` a las pantallas en PR #62 |
+| Reautenticación antes de una alerta (`convex/lib/reautenticacion.ts`) | Implementado: verifica la firma de Clerk contra el JWKS y exige verificación reciente |
+| **Las 31 pantallas del producto** | **En construcción.** Hechas: alta de perfil, cursos y parciales, invitación y vinculación, consentimiento, aprobación de estudiantes, reclamos, agenda de citas, alerta de emergencia, notificaciones y ajustes |
 
 No existe un servidor HTTP ni una base de datos SQL separados. `servidor/`,
 `db/`, Better Auth, Next.js, PostgreSQL y Drizzle fueron retirados al adoptar
@@ -35,10 +39,26 @@ Clerk + Convex.
 
 ## Arquitectura activa
 
-- `movil/src/App.tsx`: interfaz Expo y estado de autenticación.
+- `movil/src/App.tsx`: arranque de Expo, fuentes y estado de autenticación.
+- `movil/src/screens/`: las pantallas, agrupadas por módulo de backend.
+- `movil/src/components/`, `movil/src/theme/`: los componentes base y el sistema
+  de diseño. Los colores deben salir de `Theme.ts`.
 - `movil/convex/auth.config.ts`: valida en Convex los JWT emitidos por Clerk.
-- `movil/convex/viewer.ts`: ejemplo de función Convex autenticada.
+- `movil/convex/lib/`: reglas de dominio, guardas de integridad y permisos. Todo
+  acceso a datos de un estudiante pasa por aquí, nunca por la pantalla.
 - `movil/.env.schema`: contrato de configuración de Clerk y Convex.
+
+### Dos cosas que conviene saber antes de leer el código
+
+**El puntaje de conducta se deriva de las acciones vigentes** (ADR-005). Al
+registrar una acción se recalcula y se guarda el resultado en `puntajePeriodo`.
+La resolución de un reclamo ya cambia el estado y los puntos de la acción,
+pero **todavía falta conectar el recálculo del período en ese flujo** (#9): el
+total guardado puede quedar desactualizado hasta que se recalcule.
+
+**El estudiante nunca es usuario.** No tiene cuenta ni puede iniciar sesión. Sus
+datos los aporta su representante legal o su docente, y quién puede leerlos se
+decide en el servidor en cada consulta.
 
 ## Cómo trabaja el equipo
 
@@ -113,7 +133,7 @@ No se usa un archivo `.env` local para secretos.
 | `npm run env:check` | Valida y resuelve la configuración |
 | `npm run typecheck` | Comprueba TypeScript |
 | `npm test` | Ejecuta las pruebas de funciones Convex |
-| `npm run build` | Ejecuta la comprobación de compilación de la app |
+| `npm run build` | Comprueba tipos (no empaqueta; el bundle lo verifica el CI) |
 
 ## Comprobaciones antes de un PR
 

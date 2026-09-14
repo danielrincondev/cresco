@@ -4,7 +4,7 @@
 import { convexTest } from "convex-test";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { api } from "./_generated/api";
+import { api, internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import schema from "./schema";
 
@@ -262,5 +262,54 @@ describe("suscripciones — planesDisponibles", () => {
       entitlement: "premium",
     });
     expect(JSON.stringify(planes)).not.toMatch(/precio|price/i);
+  });
+});
+
+describe("suscripciones — los pagos que no se pudieron aplicar", () => {
+  /**
+   * Cada evento con `errorProcesamiento` es alguien que **pagó y puede no
+   * tener su plan**. El campo se escribia desde el principio y no habia
+   * consulta, panel ni aviso que lo mirara: el equipo se enteraba solo si esa
+   * persona se quejaba.
+   */
+  it("los encuentra y deja fuera los que sí se aplicaron", async () => {
+    const t = convexTest(schema, modules);
+
+    await t.run(async (ctx) => {
+      const ahora = Date.now();
+      await ctx.db.insert("eventoRevenuecat", {
+        eventoIdExterno: "ok-1", tipoEvento: "INITIAL_PURCHASE",
+        revenuecatAppUserId: "u1", payload: {}, recibidoEn: ahora,
+        procesadoEn: ahora,
+      });
+      await ctx.db.insert("eventoRevenuecat", {
+        eventoIdExterno: "roto-1", tipoEvento: "RENEWAL",
+        revenuecatAppUserId: "u2", payload: {}, recibidoEn: ahora + 1,
+        errorProcesamiento: 'No hay ningún plan con productoGooglePlay = "REP_X"',
+      });
+      await ctx.db.insert("eventoRevenuecat", {
+        eventoIdExterno: "roto-2", tipoEvento: "CANCELLATION",
+        revenuecatAppUserId: "u3", payload: {}, recibidoEn: ahora + 2,
+        errorProcesamiento: "No existe el perfilUsuario que envió RevenueCat.",
+      });
+    });
+
+    const informe = await t.query(internal.suscripciones.eventosSinAplicar, {});
+    expect(informe).toMatchObject({ total: 3, sinAplicar: 2 });
+    // El más reciente primero: si hay que revisar a mano, se empieza por ahí.
+    expect(informe.eventos.map((e) => e.eventoIdExterno)).toEqual(["roto-2", "roto-1"]);
+    expect(informe.eventos[1].error).toContain("productoGooglePlay");
+  });
+
+  it("con todo aplicado devuelve la lista vacía", async () => {
+    const t = convexTest(schema, modules);
+    await t.run(async (ctx) => {
+      await ctx.db.insert("eventoRevenuecat", {
+        eventoIdExterno: "ok-1", tipoEvento: "RENEWAL", revenuecatAppUserId: "u1",
+        payload: {}, recibidoEn: Date.now(), procesadoEn: Date.now(),
+      });
+    });
+    expect(await t.query(internal.suscripciones.eventosSinAplicar, {}))
+      .toMatchObject({ total: 1, sinAplicar: 0, eventos: [] });
   });
 });

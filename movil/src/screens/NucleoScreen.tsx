@@ -14,6 +14,7 @@ import { useClerk, useUser } from "@clerk/expo";
 import { useMutation, usePaginatedQuery, useQuery } from "convex/react";
 import { ConvexError } from "convex/values";
 import type { FunctionReturnType } from "convex/server";
+import type { Id } from "../../convex/_generated/dataModel";
 import { randomUUID } from "expo-crypto";
 import { api } from "../../convex/_generated/api";
 import { PARENTESCO } from "../../convex/lib/enums";
@@ -22,6 +23,7 @@ import {
   Espacio,
   Marca,
   Radio,
+  Semantico,
   Superficie,
   Tamano,
   Texto,
@@ -41,9 +43,13 @@ import {
   Tarjeta,
   useOperacion,
 } from "../components/NucleoUI";
+import { PaywallDocente, PaywallRepresentante } from "./PaywallScreen";
+import { AnotarConducta } from "./ConductaScreen";
 import {
   AgendaDocente,
   Ajustes,
+  PerfilDocente,
+  ProfesorACargo,
   AlertaDocente,
   AlertasFamilia,
   CitasFamilia,
@@ -57,6 +63,7 @@ import {
   versionConsentimiento,
 } from "../content/consentimiento";
 import { useAuditoriaSesion } from "../lib/useAuditoriaSesion";
+import { useLecturaSensible } from "../lib/useLecturaSensible";
 import {
   borrarRegistro,
   guardarRegistro,
@@ -77,8 +84,23 @@ type Ruta =
   | { tipo: "inicio" | "perfil" | "registro" | "crearCurso" }
   // Interaccion (#33). Las de familia no llevan curso: el permiso sale del
   // vinculo del representante, no de un curso que la pantalla elija.
-  | { tipo: "notificaciones" | "citas" | "alertas" | "ajustes" }
-  | { tipo: "curso" | "periodos" | "reclamos" | "agenda" | "alerta"; curso: Curso }
+  | {
+      tipo:
+        | "notificaciones"
+        | "citas"
+        | "alertas"
+        | "ajustes"
+        | "plan"
+        | "perfilDocente"
+        // Los reclamos son de **todos** los cursos del docente, no de uno:
+        // `inconformidadesDelDocente` no recibe curso. Viajaba con uno que la
+        // pantalla nunca leyo, y eso hacia creer que estaba acotada.
+        | "reclamos";
+    }
+  // P9 necesita saber de que hijo se pregunta: un representante con dos hijos
+  // en cursos distintos tiene dos docentes a cargo, no uno.
+  | { tipo: "docenteACargo"; estudianteId: Id<"estudiante">; nombre: string }
+  | { tipo: "curso" | "periodos" | "agenda" | "alerta" | "anotar"; curso: Curso }
   | { tipo: "invitacion"; invitacion: Invitacion; curso: Curso }
   | { tipo: "aprobar"; curso: Curso; alumno: Alumno };
 
@@ -96,6 +118,19 @@ export function NucleoScreen() {
   useAuditoriaSesion(perfil === null ? null : perfil?.perfilUsuarioId);
   const { user } = useUser();
   const { signOut } = useClerk();
+  /**
+   * Cuantas novedades no ha abierto la persona.
+   *
+   * Sin esto la campana no distingue "nada nuevo" de "tres respuestas a tus
+   * reclamos", y el representante tiene que acordarse de mirar. En una
+   * aplicacion que existe para avisar, eso es dejar el aviso a medias.
+   *
+   * No cuesta una consulta de mas: `misNotificaciones` ya esta acotada a las
+   * cien mas recientes y Convex la mantiene viva por suscripcion, asi que
+   * abrir la bandeja no vuelve a pedir nada.
+   */
+  const novedades = useQuery(api.interaccion.misNotificaciones);
+  const sinLeer = (novedades ?? []).filter((n) => n.leidaEn === undefined).length;
   const [ruta, setRuta] = useState<Ruta>({ tipo: "inicio" });
   const [rolElegido, setRol] = useState<Rol>();
   const salida = useOperacion();
@@ -148,11 +183,25 @@ export function NucleoScreen() {
           <>
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="Novedades"
+              accessibilityLabel={
+                sinLeer === 0
+                  ? "Novedades"
+                  : `Novedades, ${sinLeer} sin leer`
+              }
               onPress={() => setRuta({ tipo: "notificaciones" })}
               style={styles.iconButton}
             >
-              <Icono nombre="bell" decorativo />
+              {/* La campana suena distinto cuando hay algo: el icono relleno
+                  es el mismo recurso que ya usa la navegacion para "estas
+                  aqui", asi que no hace falta un glifo nuevo. */}
+              <Icono nombre={sinLeer > 0 ? "bell-ring" : "bell"} activo={sinLeer > 0} decorativo />
+              {sinLeer > 0 && (
+                <View style={styles.contador}>
+                  <Text style={styles.contadorTexto}>
+                    {sinLeer > 9 ? "9+" : sinLeer}
+                  </Text>
+                </View>
+              )}
             </Pressable>
             <Pressable
               accessibilityRole="button"
@@ -219,10 +268,24 @@ export function NucleoScreen() {
           <AgendaDocente curso={ruta.curso} />
         ) : ruta.tipo === "alerta" ? (
           <AlertaDocente curso={ruta.curso} />
+        ) : ruta.tipo === "anotar" ? (
+          <AnotarConducta
+            cursoId={ruta.curso.id}
+            onVolver={() => setRuta({ tipo: "curso", curso: ruta.curso })}
+          />
         ) : ruta.tipo === "citas" ? (
           <CitasFamilia />
         ) : ruta.tipo === "alertas" ? (
           <AlertasFamilia />
+        ) : ruta.tipo === "perfilDocente" ? (
+          <PerfilDocente />
+        ) : ruta.tipo === "docenteACargo" ? (
+          <ProfesorACargo estudianteId={ruta.estudianteId} nombre={ruta.nombre} />
+        ) : ruta.tipo === "plan" ? (
+          // Un solo destino para los dos muros: cual se pinta lo decide el rol
+          // activo, y `miSuscripcion` devuelve null en la rama que la persona
+          // no tiene, asi que nadie ve el plan de un rol que no usa.
+          rol === "DOCENTE" ? <PaywallDocente /> : <PaywallRepresentante />
         ) : (
           <>
             {perfil.docenteId && perfil.representanteId && (
@@ -261,6 +324,13 @@ function PerfilForm({
   onGuardar: () => void;
 }) {
   const completar = useMutation(api.nucleo.completarPerfil);
+  const { user } = useUser();
+  // Clerk ya sabe como se llama la persona si se registro con Google o si lo
+  // escribio al crear la cuenta. Se propone, no se impone: el nombre legal que
+  // el docente firma no siempre es el que puso en su correo, y es un campo
+  // editable, no de solo lectura.
+  const [nombres, setNombres] = useState(perfil?.nombres ?? user?.firstName ?? "");
+  const [apellidos, setApellidos] = useState(perfil?.apellidos ?? user?.lastName ?? "");
   const [documento, setDocumento] = useState<"CEDULA" | "PASAPORTE">("CEDULA");
   const [numero, setNumero] = useState("");
   const [telefono, setTelefono] = useState("");
@@ -274,6 +344,8 @@ function PerfilForm({
     ];
     const r = await op.ejecutar(() =>
       completar({
+        nombres,
+        apellidos,
         tipoDocumento: documento,
         numeroDocumento: numero,
         telefono: telefono.trim() || undefined,
@@ -308,6 +380,22 @@ function PerfilForm({
       </Tarjeta>
       <Tarjeta>
         <Subtitulo>Tu identificación</Subtitulo>
+        <Campo
+          etiqueta="Nombres"
+          value={nombres}
+          onChangeText={setNombres}
+          autoCapitalize="words"
+          maxLength={60}
+          editable={!op.pendiente}
+        />
+        <Campo
+          etiqueta="Apellidos"
+          value={apellidos}
+          onChangeText={setApellidos}
+          autoCapitalize="words"
+          maxLength={60}
+          editable={!op.pendiente}
+        />
         <Opciones
           valor={documento}
           opciones={documentosAdulto}
@@ -336,7 +424,9 @@ function PerfilForm({
       <Boton
         onPress={() => void guardar()}
         pendiente={op.pendiente}
-        disabled={!numero.trim() || (!docente && !representante)}
+        disabled={
+          !nombres.trim() || !apellidos.trim() || !numero.trim() || (!docente && !representante)
+        }
       >
         Guardar y continuar
       </Boton>
@@ -396,6 +486,11 @@ function Cursos({
           </Pressable>
         ))
       )}
+      {/* Vive aqui y no dentro de un curso porque cubre todos: con el plan
+          PRO son hasta cinco, y abrirla desde uno hacia creer lo contrario. */}
+      <Boton secundario onPress={() => navegar({ tipo: "reclamos" })}>
+        Reclamos de las familias
+      </Boton>
       {datos &&
         (datos.cursos.length < datos.limitePlan ? (
           <Boton onPress={() => navegar({ tipo: "crearCurso" })}>
@@ -538,14 +633,20 @@ function DetalleCurso({
         Invitar representantes
       </Boton>
       <ErrorMensaje mensaje={op.error} />
-      <Boton secundario onPress={() => navegar({ tipo: "reclamos", curso })}>
-        Reclamos de las familias
+      <Boton onPress={() => navegar({ tipo: "anotar", curso })}>
+        Anotar conducta
       </Boton>
       <Boton secundario onPress={() => navegar({ tipo: "agenda", curso })}>
         Atención a familias
       </Boton>
       <Boton secundario onPress={() => navegar({ tipo: "alerta", curso })}>
         Alerta de emergencia
+      </Boton>
+      <Boton secundario onPress={() => navegar({ tipo: "perfilDocente" })}>
+        Tu perfil profesional
+      </Boton>
+      <Boton secundario onPress={() => navegar({ tipo: "plan" })}>
+        Tu plan
       </Boton>
       <Opciones
         valor={pestana}
@@ -810,6 +911,10 @@ function AprobarForm({
   onGuardar: () => void;
 }) {
   const aprobar = useMutation(api.nucleo.aprobarEstudiante);
+  // DP-006: abrir la ficha de un pendiente es leer datos de un menor -- nombre,
+  // documento y fecha de nacimiento -- asi que queda en la bitacora. Es la
+  // primera pantalla del proyecto que dispara `LEER_SENSIBLE` de verdad.
+  useLecturaSensible(alumno.estudianteId, "FICHA_ESTUDIANTE");
   const [nombres, setNombres] = useState(alumno.nombres);
   const [apellidos, setApellidos] = useState(alumno.apellidos);
   const [tipo, setTipo] = useState(alumno.tipoDocumento);
@@ -947,6 +1052,22 @@ function MisHijos({
                   ? "Tu hijo ya forma parte del curso."
                   : "Consulta con el docente para revisar el registro."}
             </Cuerpo>
+            {a.estadoVerificacion === "APROBADO" && (
+              // Solo con la matricula aprobada: antes de eso no hay curso y
+              // por tanto no hay titular del que hablar.
+              <Boton
+                secundario
+                onPress={() =>
+                  navegar({
+                    tipo: "docenteACargo",
+                    estudianteId: a.estudianteId,
+                    nombre: a.nombres,
+                  })
+                }
+              >
+                Ver al docente a cargo
+              </Boton>
+            )}
           </Tarjeta>
         ))
       )}
@@ -957,6 +1078,9 @@ function MisHijos({
       </Boton>
       <Boton secundario onPress={() => navegar({ tipo: "alertas" })}>
         Alertas del curso
+      </Boton>
+      <Boton secundario onPress={() => navegar({ tipo: "plan" })}>
+        Tu plan
       </Boton>
     </Pagina>
   );
@@ -1298,6 +1422,24 @@ const styles = StyleSheet.create({
     fontFamily: "Inter",
     fontSize: Tamano.sm,
     marginTop: Espacio.xs,
+  },
+  contador: {
+    position: "absolute",
+    top: 2,
+    right: 2,
+    minWidth: 18,
+    height: 18,
+    paddingHorizontal: 4,
+    borderRadius: 9,
+    backgroundColor: Semantico.error,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  contadorTexto: {
+    color: Texto.sobreColor,
+    fontFamily: "Inter-Semibold",
+    fontSize: 11,
+    lineHeight: 14,
   },
   iconButton: {
     width: 44,

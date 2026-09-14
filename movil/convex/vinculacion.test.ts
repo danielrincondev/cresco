@@ -25,9 +25,9 @@ async function escenario() {
   const docente = t.withIdentity({ subject: "docente" });
   const representante = t.withIdentity({ subject: "representante" });
   const otro = t.withIdentity({ subject: "otro" });
-  const perfilDocente = await docente.mutation(api.nucleo.completarPerfil, { tipoDocumento: "CEDULA", numeroDocumento: "0900000001", roles: ["DOCENTE"] });
-  const perfilRepresentante = await representante.mutation(api.nucleo.completarPerfil, { tipoDocumento: "CEDULA", numeroDocumento: "0900000002", roles: ["REPRESENTANTE"] });
-  await otro.mutation(api.nucleo.completarPerfil, { tipoDocumento: "CEDULA", numeroDocumento: "0900000003", roles: ["DOCENTE", "REPRESENTANTE"] });
+  const perfilDocente = await docente.mutation(api.nucleo.completarPerfil, { nombres: "Jeremias", apellidos: "Poveda", tipoDocumento: "CEDULA", numeroDocumento: "0900000001", roles: ["DOCENTE"] });
+  const perfilRepresentante = await representante.mutation(api.nucleo.completarPerfil, { nombres: "Daniel", apellidos: "Rincon", tipoDocumento: "CEDULA", numeroDocumento: "0900000002", roles: ["REPRESENTANTE"] });
+  await otro.mutation(api.nucleo.completarPerfil, { nombres: "Kamila", apellidos: "Rivera", tipoDocumento: "CEDULA", numeroDocumento: "0900000003", roles: ["DOCENTE", "REPRESENTANTE"] });
   const curso = await docente.mutation(api.nucleo.crearCurso, {
     nombreInstitucion: "Escuela de prueba", nombreCurso: "Quinto A", nivel: "5", paralelo: "A", anioInicio: "2026-05-01", anioFin: "2027-02-28",
   });
@@ -422,5 +422,109 @@ describe("núcleo — límites de acceso y calendario", () => {
     })).rejects.toThrow("CURSO_INACTIVO");
     expect((await registros(s.t)).estudiantes).toHaveLength(0);
     expect((await s.t.run((ctx) => ctx.db.get("invitacionCurso", invitacion.invitacionId)))?.usosRealizados).toBe(0);
+  });
+});
+
+describe("núcleo — el catálogo de acciones (D11)", () => {
+  /** Siembra dos categorías con tipos, incluidos los que no deben ofrecerse. */
+  async function sembrarCatalogo(
+    t: ReturnType<typeof convexTest>,
+    institucionId: Id<"institucion">,
+    otraInstitucionId: Id<"institucion">,
+  ) {
+    await t.run(async (ctx) => {
+      const ahora = Date.now();
+      const disciplina = await ctx.db.insert("categoriaAccion", {
+        institucionId, codigo: "DISCIPLINA", nombre: "Disciplina",
+        aplicaA: "ESTUDIANTE", orden: 2, activa: true, actualizadoEn: ahora,
+      });
+      // Sin institucionId: catálogo base, comun a todas.
+      const desempeno = await ctx.db.insert("categoriaAccion", {
+        codigo: "DESEMPENIO", nombre: "Desempeño",
+        aplicaA: "ESTUDIANTE", orden: 1, activa: true, actualizadoEn: ahora,
+      });
+      const vacia = await ctx.db.insert("categoriaAccion", {
+        institucionId, codigo: "CONVIVENCIA", nombre: "Valores",
+        aplicaA: "ESTUDIANTE", orden: 3, activa: true, actualizadoEn: ahora,
+      });
+      const tipo = (
+        categoriaAccionId: Id<"categoriaAccion">,
+        nombre: string,
+        extra: Record<string, unknown> = {},
+      ) => ({
+        categoriaAccionId, codigo: nombre.toUpperCase(), nombre,
+        signo: "NEGATIVA" as const, puntosDefecto: -1, puntosMin: -3, puntosMax: -1,
+        requiereDescripcion: true, admiteInconformidad: true,
+        cuentaEnBitacora: true, activa: true, actualizadoEn: ahora, ...extra,
+      });
+      await ctx.db.insert("tipoAccion", tipo(disciplina, "Indisciplina", { institucionId }));
+      await ctx.db.insert("tipoAccion", tipo(disciplina, "Agresión", { institucionId }));
+      await ctx.db.insert("tipoAccion", tipo(desempeno, "Tarea entregada", {
+        signo: "POSITIVA", puntosDefecto: 1, puntosMin: 1, puntosMax: 2,
+      }));
+      // Los tres que NO deben salir.
+      await ctx.db.insert("tipoAccion", tipo(disciplina, "Retirado", { institucionId, activa: false }));
+      await ctx.db.insert("tipoAccion", tipo(disciplina, "De otro plantel", { institucionId: otraInstitucionId }));
+      void vacia;
+    });
+  }
+
+  async function conCatalogo() {
+    const s = await escenario();
+    const { institucionId, otraId } = await s.t.run(async (ctx) => {
+      const curso = (await ctx.db.get(s.cursoId))!;
+      const anio = (await ctx.db.get(curso.anioLectivoId))!;
+      const otraId = await ctx.db.insert("institucion", {
+        nombreDeclarado: "Otro plantel", verificada: false, regimen: "COSTA_INSULAR",
+        ciudad: "Guayaquil", zonaHoraria: "America/Guayaquil",
+        puntajeBase: 60, puntajeMinimo: 0, puntajeMaximo: 100,
+        topeDiarioPositivo: 4, topeDiarioNegativo: 5, estado: "ACTIVA", actualizadoEn: Date.now(),
+      });
+      return { institucionId: anio.institucionId, otraId };
+    });
+    await sembrarCatalogo(s.t, institucionId, otraId);
+    return s;
+  }
+
+  /**
+   * Sin esto D11 no existe: `conducta.registrarAccion` pide un `tipoAccionId`
+   * y no habia ninguna consulta que dijera cuales existen.
+   */
+  it("agrupa por categoría, en el orden del catálogo", async () => {
+    const s = await conCatalogo();
+    const catalogo = await s.docente.query(api.nucleo.catalogoDeAcciones, { cursoId: s.cursoId });
+
+    expect(catalogo.map((c) => c.nombre)).toEqual(["Desempeño", "Disciplina"]);
+    expect(catalogo[1].tipos.map((t) => t.nombre)).toEqual(["Agresión", "Indisciplina"]);
+    expect(catalogo[0].tipos[0]).toMatchObject({
+      nombre: "Tarea entregada", signo: "POSITIVA",
+      puntosDefecto: 1, puntosMin: 1, puntosMax: 2,
+    });
+  });
+
+  /**
+   * Ofrecer algo que `registrarAccion` va a rechazar es peor que no
+   * ofrecerlo: el docente escribe el mensaje entero y se lo tumban al enviar.
+   */
+  it("no ofrece lo inactivo ni el catálogo de otro plantel", async () => {
+    const s = await conCatalogo();
+    const nombres = (await s.docente.query(api.nucleo.catalogoDeAcciones, { cursoId: s.cursoId }))
+      .flatMap((c) => c.tipos.map((t) => t.nombre));
+
+    expect(nombres).not.toContain("Retirado");
+    expect(nombres).not.toContain("De otro plantel");
+  });
+
+  it("omite las categorías que se quedaron sin tipos activos", async () => {
+    const s = await conCatalogo();
+    const catalogo = await s.docente.query(api.nucleo.catalogoDeAcciones, { cursoId: s.cursoId });
+    expect(catalogo.map((c) => c.codigo)).not.toContain("CONVIVENCIA");
+  });
+
+  it("solo el titular del curso ve su catálogo", async () => {
+    const s = await conCatalogo();
+    await expect(
+      s.otro.query(api.nucleo.catalogoDeAcciones, { cursoId: s.cursoId }),
+    ).rejects.toThrow();
   });
 });
