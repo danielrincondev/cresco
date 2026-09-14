@@ -1,7 +1,7 @@
 # CI de Cresco — dueño: Persona C (infraestructura).
 #
-# Comprueba tipos y pruebas en cada PR. Un solo job porque ahora hay un solo
-# proyecto: Expo en la raíz con `convex/` dentro, un `package.json` por
+# Comprueba tipos, pruebas y que la app siga empaquetando, en cada PR. Un
+# solo job porque ahora hay un solo proyecto: Expo en la raíz con `convex/` dentro, un `package.json` por
 # workspace y nada más que orquestar.
 #
 # ⚠️ Este archivo es solo la mitad del trabajo. Para que un PR en rojo **no se
@@ -49,3 +49,27 @@ jobs:
 
       - name: Pruebas
         run: npm test
+
+      # ── Por qué esto no lo cubre `typecheck` ────────────────────────────
+      #
+      # `npm run build` es `tsc --noEmit`: comprueba tipos, no empaqueta. Metro
+      # falla por cosas que TypeScript acepta sin pestañear -- un import que
+      # solo existe en web, un `require` de un archivo que no se versionó, un
+      # modulo nativo que no esta en el autolinking, una fuente que se
+      # renombro. Nada de eso se ve hasta que alguien construye el APK, y en
+      # este proyecto eso pasa una vez por semana y a ultima hora.
+      #
+      # El bundle real tarda unos segundos y se tira a la basura: lo unico que
+      # interesa es que Metro no reviente. Es la diferencia entre enterarse en
+      # un PR y enterarse la noche del 28.
+      - name: Empaquetado de Android
+        working-directory: movil
+        # Valores de relleno a proposito. `App.tsx` exige estas dos variables,
+        # pero lo hace **al ejecutarse**, no al empaquetarse: Metro no corre el
+        # modulo. Se pasan igual para que el paso no dependa de ese detalle ni
+        # de que alguien añada manana una lectura en tiempo de compilacion. No
+        # son secretos y no sirven para conectarse a nada.
+        env:
+          EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_ci-sin-valor-real
+          EXPO_PUBLIC_CONVEX_URL: https://ci-sin-despliegue.convex.cloud
+        run: npx expo export --platform android --output-dir "${{ runner.temp }}/export"
