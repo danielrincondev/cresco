@@ -14,6 +14,7 @@ import { useClerk, useUser } from "@clerk/expo";
 import { useMutation, usePaginatedQuery, useQuery } from "convex/react";
 import { ConvexError } from "convex/values";
 import type { FunctionReturnType } from "convex/server";
+import type { Id } from "../../convex/_generated/dataModel";
 import { randomUUID } from "expo-crypto";
 import { api } from "../../convex/_generated/api";
 import { PARENTESCO } from "../../convex/lib/enums";
@@ -42,6 +43,11 @@ import {
   useOperacion,
 } from "../components/NucleoUI";
 import { PaywallDocente, PaywallRepresentante } from "./PaywallScreen";
+import {
+  ReporteAcumulado,
+  ReporteDeHoy,
+  ReportesAnteriores,
+} from "./ReporteScreen";
 import {
   AgendaDocente,
   Ajustes,
@@ -79,6 +85,13 @@ type Ruta =
   // Interaccion (#33). Las de familia no llevan curso: el permiso sale del
   // vinculo del representante, no de un curso que la pantalla elija.
   | { tipo: "notificaciones" | "citas" | "alertas" | "ajustes" | "plan" }
+  // P4, P5 y P6 llevan el hijo consigo: un representante con dos hijos tiene
+  // dos reportes distintos, y la pantalla no puede adivinar cual mira.
+  | {
+      tipo: "reporteHoy" | "reportesAnteriores" | "acumulado";
+      estudianteId: Id<"estudiante">;
+      nombre: string;
+    }
   | { tipo: "curso" | "periodos" | "reclamos" | "agenda" | "alerta"; curso: Curso }
   | { tipo: "invitacion"; invitacion: Invitacion; curso: Curso }
   | { tipo: "aprobar"; curso: Curso; alumno: Alumno };
@@ -224,6 +237,26 @@ export function NucleoScreen() {
           <CitasFamilia />
         ) : ruta.tipo === "alertas" ? (
           <AlertasFamilia />
+        ) : ruta.tipo === "reporteHoy" ? (
+          <ReporteDeHoy
+            estudianteId={ruta.estudianteId}
+            nombre={ruta.nombre}
+            onVerAnteriores={() => setRuta({ ...ruta, tipo: "reportesAnteriores" })}
+            onVerAcumulado={() => setRuta({ ...ruta, tipo: "acumulado" })}
+          />
+        ) : ruta.tipo === "reportesAnteriores" ? (
+          <ReportesAnteriores
+            estudianteId={ruta.estudianteId}
+            nombre={ruta.nombre}
+            onVolver={() => setRuta({ ...ruta, tipo: "reporteHoy" })}
+            onVerPlan={() => setRuta({ tipo: "plan" })}
+          />
+        ) : ruta.tipo === "acumulado" ? (
+          <ReporteAcumulado
+            estudianteId={ruta.estudianteId}
+            nombre={ruta.nombre}
+            onVolver={() => setRuta({ ...ruta, tipo: "reporteHoy" })}
+          />
         ) : ruta.tipo === "plan" ? (
           // Un solo destino para los dos muros: cual se pinta lo decide el rol
           // activo, y `miSuscripcion` devuelve null en la rama que la persona
@@ -983,6 +1016,19 @@ function MisHijos({
                   ? "Tu hijo ya forma parte del curso."
                   : "Consulta con el docente para revisar el registro."}
             </Cuerpo>
+            {a.estadoVerificacion === "APROBADO" && (
+              <Boton
+                onPress={() =>
+                  navegar({
+                    tipo: "reporteHoy",
+                    estudianteId: a.estudianteId,
+                    nombre: `${a.nombres} ${a.apellidos}`,
+                  })
+                }
+              >
+                Ver su reporte de hoy
+              </Boton>
+            )}
           </Tarjeta>
         ))
       )}
