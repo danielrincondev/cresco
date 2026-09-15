@@ -46,6 +46,11 @@ import {
 import { PaywallDocente, PaywallRepresentante } from "./PaywallScreen";
 import { AnotarConducta } from "./ConductaScreen";
 import {
+  PublicarComunicado,
+  ReporteGeneral,
+  TomarAsistencia,
+} from "./JornadaScreen";
+import {
   ReporteAcumulado,
   ReporteDeHoy,
   ReportesAnteriores,
@@ -110,7 +115,14 @@ type Ruta =
       estudianteId: Id<"estudiante">;
       nombre: string;
     }
-  | { tipo: "curso" | "periodos" | "agenda" | "alerta" | "anotar"; curso: Curso }
+  | {
+      tipo:
+        | "curso" | "periodos" | "agenda" | "alerta" | "anotar"
+        // El cierre de jornada (D12, D13, D14): las tres son de un curso
+        // concreto, a diferencia de los reclamos.
+        | "asistencia" | "reporteDia" | "comunicado";
+      curso: Curso;
+    }
   | { tipo: "invitacion"; invitacion: Invitacion; curso: Curso }
   | { tipo: "aprobar"; curso: Curso; alumno: Alumno };
 
@@ -280,6 +292,21 @@ export function NucleoScreen() {
           <AlertaDocente curso={ruta.curso} />
         ) : ruta.tipo === "anotar" ? (
           <AnotarConducta
+            cursoId={ruta.curso.id}
+            onVolver={() => setRuta({ tipo: "curso", curso: ruta.curso })}
+          />
+        ) : ruta.tipo === "asistencia" ? (
+          <TomarAsistencia
+            cursoId={ruta.curso.id}
+            onVolver={() => setRuta({ tipo: "curso", curso: ruta.curso })}
+          />
+        ) : ruta.tipo === "reporteDia" ? (
+          <ReporteGeneral
+            cursoId={ruta.curso.id}
+            onVolver={() => setRuta({ tipo: "curso", curso: ruta.curso })}
+          />
+        ) : ruta.tipo === "comunicado" ? (
+          <PublicarComunicado
             cursoId={ruta.curso.id}
             onVolver={() => setRuta({ tipo: "curso", curso: ruta.curso })}
           />
@@ -665,6 +692,15 @@ function DetalleCurso({
       <ErrorMensaje mensaje={op.error} />
       <Boton onPress={() => navegar({ tipo: "anotar", curso })}>
         Anotar conducta
+      </Boton>
+      <Boton secundario onPress={() => navegar({ tipo: "asistencia", curso })}>
+        Pasar lista
+      </Boton>
+      <Boton secundario onPress={() => navegar({ tipo: "reporteDia", curso })}>
+        Reporte del día
+      </Boton>
+      <Boton secundario onPress={() => navegar({ tipo: "comunicado", curso })}>
+        Avisar al curso
       </Boton>
       <Boton secundario onPress={() => navegar({ tipo: "agenda", curso })}>
         Atención a familias
