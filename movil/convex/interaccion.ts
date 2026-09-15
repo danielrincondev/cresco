@@ -456,7 +456,7 @@ export const misCitasDocente = query({
       .query("cita")
       .withIndex("por_docente", (q) => q.eq("docenteId", docente._id))
       .collect();
-    return citas.sort((a, b) => a.fechaHoraInicio - b.fechaHoraInicio);
+    return citas.sort((a, b) => b.fechaHoraInicio - a.fechaHoraInicio);
   }),
 });
 

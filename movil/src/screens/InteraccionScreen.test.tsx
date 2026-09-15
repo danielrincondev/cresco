@@ -12,6 +12,7 @@ const estado = vi.hoisted(() => ({
   status: "CanLoadMore",
   hijos: [] as { estudianteId: string; nombres: string; apellidos: string }[],
   loadMore: vi.fn(),
+  citas: [] as any[],
 }));
 vi.mock("react-native", () => ({
   ActivityIndicator: "ActivityIndicator", KeyboardAvoidingView: "KeyboardAvoidingView",
@@ -26,7 +27,7 @@ vi.mock("@clerk/expo", () => ({
 }));
 vi.mock("../theme/Icono", () => ({ Icono: "Icono" }));
 vi.mock("convex/react", () => ({
-  useQuery: () => [],
+  useQuery: () => estado.citas,
   usePaginatedQuery: () => ({ results: estado.hijos, status: estado.status, loadMore: estado.loadMore }),
   useMutation: () => vi.fn(),
   useAction: (ref: Parameters<typeof getFunctionName>[0]) => {
@@ -34,7 +35,7 @@ vi.mock("convex/react", () => ({
     return vi.fn();
   },
 }));
-import { AlertaDocente, CitasFamilia } from "./InteraccionScreen";
+import { AgendaDocente, AlertaDocente, CitasFamilia } from "./InteraccionScreen";
 import { Boton, Campo, Casilla, Opciones } from "../components/NucleoUI";
 
 let vista: ReactTestRenderer;
@@ -46,6 +47,7 @@ beforeEach(() => {
   estado.passwordEnabled = true;
   estado.status = "CanLoadMore";
   estado.hijos = [];
+  estado.citas = [];
   estado.startVerification.mockResolvedValue({ supportedFirstFactors: [{ strategy: "password" }] });
   estado.attemptFirstFactorVerification.mockResolvedValue({ status: "complete" });
   estado.getToken.mockResolvedValue("existing-session-token");
@@ -147,4 +149,104 @@ it("muestra el estado vacío solo al agotar todas las páginas", async () => {
   estado.status = "Exhausted";
   await act(async () => { vista = create(<CitasFamilia />); });
   expect(JSON.stringify(vista.toJSON())).toContain("Todavía no tienes hijos registrados");
+});
+
+it("organiza las citas del docente en pendientes, próximas ascendentes e historial descendente", async () => {
+  const ahora = Date.now();
+  estado.citas = [
+    {
+      _id: "pasada-antigua",
+      estado: "CONFIRMADA",
+      fechaHoraInicio: ahora - 10 * 86400000,
+      fechaHoraFin: ahora - 10 * 86400000 + 1800000,
+      modalidad: "PRESENCIAL",
+      motivo: "Reunión antigua",
+    },
+    {
+      _id: "pasada-reciente",
+      estado: "CONFIRMADA",
+      fechaHoraInicio: ahora - 86400000,
+      fechaHoraFin: ahora - 86400000 + 1800000,
+      modalidad: "PRESENCIAL",
+      motivo: "Reunión de ayer",
+    },
+    {
+      _id: "proxima-lejana",
+      estado: "CONFIRMADA",
+      fechaHoraInicio: ahora + 3 * 86400000,
+      fechaHoraFin: ahora + 3 * 86400000 + 1800000,
+      modalidad: "PRESENCIAL",
+      motivo: "Cita en 3 días",
+    },
+    {
+      _id: "proxima-cercana",
+      estado: "CONFIRMADA",
+      fechaHoraInicio: ahora + 86400000,
+      fechaHoraFin: ahora + 86400000 + 1800000,
+      modalidad: "PRESENCIAL",
+      motivo: "Cita de mañana",
+    },
+    {
+      _id: "pendiente-1",
+      estado: "SOLICITADA",
+      fechaHoraInicio: ahora + 2 * 86400000,
+      fechaHoraFin: ahora + 2 * 86400000 + 1800000,
+      modalidad: "PRESENCIAL",
+      motivo: "Por confirmar",
+    },
+  ];
+
+  await act(async () => {
+    vista = create(<AgendaDocente curso={curso} />);
+  });
+
+  const texto = JSON.stringify(vista.toJSON());
+  expect(texto).toContain("Por confirmar");
+  expect(texto).toContain("Próximas citas");
+  expect(texto).toContain("Historial de citas");
+
+  // Verificar orden en próximas citas: mañana antes que en 3 días
+  const idxManana = texto.indexOf("Cita de mañana");
+  const idxTresDias = texto.indexOf("Cita en 3 días");
+  expect(idxManana).toBeLessThan(idxTresDias);
+
+  // Verificar orden en historial: ayer antes que hace 10 días
+  const idxAyer = texto.indexOf("Reunión de ayer");
+  const idxAntigua = texto.indexOf("Reunión antigua");
+  expect(idxAyer).toBeLessThan(idxAntigua);
+});
+
+it("acota el historial a 5 citas y permite expandirlo", async () => {
+  const ahora = Date.now();
+  estado.citas = Array.from({ length: 7 }, (_, i) => ({
+    _id: `pasada-${i}`,
+    estado: "CONFIRMADA",
+    fechaHoraInicio: ahora - (i + 1) * 86400000,
+    fechaHoraFin: ahora - (i + 1) * 86400000 + 1800000,
+    modalidad: "PRESENCIAL",
+    motivo: `Motivo ${i + 1}`,
+  }));
+
+  await act(async () => {
+    vista = create(<AgendaDocente curso={curso} />);
+  });
+
+  let texto = JSON.stringify(vista.toJSON());
+  expect(texto).toContain("Motivo 1");
+  expect(texto).toContain("Motivo 5");
+  expect(texto).not.toContain("Motivo 6");
+  expect(texto).toContain("Ver anteriores (2 más)");
+
+  // Expandir
+  const botonExpandir = vista.root
+    .findAllByType(Boton)
+    .find((b) => b.props.children === "Ver anteriores (2 más)")!;
+  await act(async () => {
+    botonExpandir.props.onPress();
+  });
+
+  texto = JSON.stringify(vista.toJSON());
+  expect(texto).toContain("Motivo 6");
+  expect(texto).toContain("Motivo 7");
+  expect(texto).toContain("Ver menos citas");
 });

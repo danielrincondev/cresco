@@ -258,8 +258,26 @@ export function AgendaDocente({ curso }: { curso: Curso }) {
     if (r.ok) setLugar("");
   }
 
-  const pendientes = (citas ?? []).filter((c) => c.estado === "SOLICITADA");
-  const resto = (citas ?? []).filter((c) => c.estado !== "SOLICITADA");
+  const ahora = Date.now();
+  const [mostrarTodasPasadas, setMostrarTodasPasadas] = useState(false);
+
+  const pendientes = (citas ?? [])
+    .filter((c) => c.estado === "SOLICITADA")
+    .sort((a, b) => a.fechaHoraInicio - b.fechaHoraInicio);
+
+  const proximas = (citas ?? [])
+    .filter((c) => c.estado === "CONFIRMADA" && c.fechaHoraFin >= ahora)
+    .sort((a, b) => a.fechaHoraInicio - b.fechaHoraInicio);
+
+  const pasadas = (citas ?? [])
+    .filter(
+      (c) =>
+        c.estado !== "SOLICITADA" &&
+        !(c.estado === "CONFIRMADA" && c.fechaHoraFin >= ahora),
+    )
+    .sort((a, b) => b.fechaHoraInicio - a.fechaHoraInicio);
+
+  const pasadasVisibles = mostrarTodasPasadas ? pasadas : pasadas.slice(0, 5);
 
   return (
     <Pagina
@@ -353,15 +371,41 @@ export function AgendaDocente({ curso }: { curso: Curso }) {
         ))
       )}
 
-      {resto.length > 0 && (
+      {proximas.length > 0 && (
         <>
-          <Subtitulo>Resto de tus citas</Subtitulo>
-          {resto.map((cita) => (
+          <Subtitulo>Próximas citas</Subtitulo>
+          {proximas.map((cita) => (
+            <Tarjeta key={cita._id}>
+              <Chip etiqueta={etiquetaCita(cita.estado)} />
+              <Subtitulo>{fechaHoraLegible(cita.fechaHoraInicio)}</Subtitulo>
+              <Cuerpo>{textoModalidad(cita.modalidad)}</Cuerpo>
+              {cita.motivo && <Cuerpo>{cita.motivo}</Cuerpo>}
+              {cita.notasDocente && <Cuerpo>{cita.notasDocente}</Cuerpo>}
+            </Tarjeta>
+          ))}
+        </>
+      )}
+
+      {pasadas.length > 0 && (
+        <>
+          <Subtitulo>Historial de citas</Subtitulo>
+          {pasadasVisibles.map((cita) => (
             <Tarjeta key={cita._id}>
               <Chip etiqueta={etiquetaCita(cita.estado)} />
               <Cuerpo>{fechaHoraLegible(cita.fechaHoraInicio)}</Cuerpo>
+              {cita.motivo && <Cuerpo>{cita.motivo}</Cuerpo>}
             </Tarjeta>
           ))}
+          {pasadas.length > 5 && (
+            <Boton
+              secundario
+              onPress={() => setMostrarTodasPasadas((v) => !v)}
+            >
+              {mostrarTodasPasadas
+                ? "Ver menos citas"
+                : `Ver anteriores (${pasadas.length - 5} más)`}
+            </Boton>
+          )}
         </>
       )}
     </Pagina>
