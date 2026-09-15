@@ -162,7 +162,7 @@ it("aclara que el puntaje no es una calificación", () => {
  */
 it("abrir el acumulado registra la lectura de la bitácora", async () => {
   pintar(
-    <ReporteAcumulado estudianteId={"e1" as never} nombre="Ana Pérez" onVolver={() => {}} onVerAccion={() => {}} />,
+    <ReporteAcumulado estudianteId={"e1" as never} nombre="Ana Pérez" onVolver={() => {}} />,
   );
   await act(async () => {});
   expect(estado.lecturas).toContainEqual({ estudianteId: "e1", recurso: "BITACORA_ACCIONES" });
