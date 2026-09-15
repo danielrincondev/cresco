@@ -83,8 +83,9 @@ anteriores a este cambio se conservan como contexto histórico en
 
 ## Arranque en una máquina limpia
 
-Requiere Node.js 24, una aplicación de Clerk, un despliegue de Convex y una
-cuenta de Bitwarden Secrets Manager.
+Requiere Node.js 24 (npm viene incluido), una aplicación de Clerk y un
+despliegue de Convex. No hace falta instalar `mise`, Docker ni un devcontainer;
+las herramientas del proyecto se instalan con `npm ci`.
 
 ```bash
 git clone <repo> && cd cresco
@@ -107,11 +108,11 @@ datos local.
 > Clerk) y puede pegarse directo en `movil/.env.local` con
 > `npx convex env set CLERK_JWT_ISSUER_DOMAIN <valor>`.
 
-En Clerk activa la Native API y la integración de Convex. La integración debe
-añadir `aud: "convex"` a los claims de sesión. Mientras la app no implemente un
-selector de organizaciones, `Force organization selection` debe permanecer
-desactivado; si se activa, Clerk deja la sesión en la tarea
-`choose-organization` y Convex no puede autenticarla.
+En Clerk activa la Native API, Google como conexión social y la integración de
+Convex. La integración debe añadir `aud: "convex"` a los claims de sesión.
+Mientras la app no implemente un selector de organizaciones, `Force organization
+selection` debe permanecer desactivado; si se activa, Clerk deja la sesión en la
+tarea `choose-organization` y Convex no puede autenticarla.
 
 ```bash
 npm run env:check
@@ -142,6 +143,44 @@ npm run env:check
 npm run typecheck
 npm test
 ```
+
+## Desarrollo diario
+
+Desde la raíz del repositorio, abre dos terminales:
+
+```bash
+# Terminal 1: sincroniza Convex y observa cambios del backend
+npm run convex:dev
+```
+
+```bash
+# Terminal 2: inicia Expo; pulsa w para web o escanea el QR desde Android
+npm run dev
+```
+
+Si la red local no permite que el teléfono alcance tu computadora, usa el
+túnel incluido en las dependencias del proyecto:
+
+```bash
+npm run dev --workspace @cresco/movil -- --tunnel
+```
+
+No hace falta instalar `@expo/ngrok` globalmente.
+
+Para iniciar solo la vista web sin abrir el navegador automáticamente:
+
+```bash
+BROWSER=none npm run dev --workspace @cresco/movil -- --web --localhost
+```
+
+Para comprobar el backend con una sola sincronización:
+
+```bash
+npm run convex:dev --workspace @cresco/movil -- --once
+```
+
+Los argumentos adicionales se pasan directamente al workspace, como en los
+ejemplos anteriores.
 
 ## Licencia
 
