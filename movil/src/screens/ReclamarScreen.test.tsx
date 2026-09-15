@@ -15,6 +15,7 @@ vi.mock("convex/react", () => ({
 }));
 
 const { DetalleAccion } = await import("./ReclamarScreen");
+type Accion = Parameters<typeof DetalleAccion>[0]["accion"];
 const { Boton, Campo, Opciones } = await import("../components/NucleoUI");
 
 const pintar = (e: React.ReactElement) => {
@@ -31,7 +32,9 @@ const NEGATIVA_VIGENTE = {
   descripcion: "Se levantó varias veces durante la clase.", estado: "VIGENTE" as const,
 };
 
-const ver = (accion: typeof NEGATIVA_VIGENTE) =>
+// El tipo del componente, no el de la constante: las variantes de la
+// prueba cambian `signo` y `estado`, que ahi estan fijados como literales.
+const ver = (accion: Accion) =>
   pintar(<DetalleAccion accion={accion} nombre="Ana" onVolver={() => {}} />);
 
 beforeEach(() => { estado.llamadas = []; });
