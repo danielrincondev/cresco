@@ -665,6 +665,25 @@ export const resolverInconformidad = mutation({
         actualizadoEn: ahora,
       });
       await recalcularPuntaje(ctx, accion.matriculaId, accion.periodoAcademicoId);
+
+      // DP-006 audita ANULAR sobre la **accion**, y este es el camino de
+      // anulacion mas importante del producto: un docente retira una sancion
+      // despues de que la familia la reclamo. Hasta aqui solo quedaba un
+      // ACTUALIZAR sobre el reclamo, asi que quien auditara "que sanciones se
+      // anularon" no veia ninguna de estas. Se registra con el mismo formato
+      // que `conducta.anularAccion`, para que las dos vias se lean igual.
+      await auditar(ctx, {
+        accion: args.desenlace === "ANULADA" ? "ANULAR" : "ACTUALIZAR",
+        entidadTipo: "accionRegistrada",
+        entidadId: accion._id,
+        datosAntes: { estado: accion.estado, puntosAplicados: accion.puntosAplicados },
+        datosDespues: {
+          estado: args.desenlace === "ANULADA" ? "ANULADA" : "MODIFICADA",
+          puntosAplicados: 0,
+          motivo: respuesta,
+          porReclamo: inconformidad._id,
+        },
+      });
     }
 
     await auditar(ctx, {

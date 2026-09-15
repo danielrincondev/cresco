@@ -349,7 +349,41 @@ describe("interaccion — inconformidades", () => {
     expect(estado.accion?.estado).toBe("MODIFICADA");
     expect(estado.accion?.puntosAplicados).toBe(0);
     expect(estado.inconformidad?.estado).toBe("RESUELTA_MODIFICADA");
-    expect(estado.auditoria).toHaveLength(1);
+    // Dos filas y no una: la del reclamo y la de la **accion**. Esta prueba
+    // afirmaba antes una sola, o sea que fijaba como correcto justo el hueco
+    // -- la accion cambiaba y nadie lo registraba sobre ella.
+    expect(estado.auditoria).toHaveLength(2);
+    expect(estado.auditoria).toContainEqual(expect.objectContaining({
+      accion: "ACTUALIZAR", entidadTipo: "accionRegistrada", entidadId: accionId,
+    }));
+  });
+
+  /**
+   * El camino de anulacion mas importante del producto: un docente retira una
+   * sancion despues de que la familia la reclamo. DP-006 audita ANULAR sobre
+   * la accion, y por esta via no quedaba ninguno.
+   */
+  it("resolver como ANULADA registra ANULAR sobre la accion, no solo sobre el reclamo", async () => {
+    const t = convexTest(schema, modules);
+    const e = await sembrarEscenario(t);
+    const accionId = await sembrarAccion(t, e);
+    const inconformidadId = await e.representante.mutation(api.interaccion.abrirInconformidad, {
+      accionRegistradaId: accionId, motivo: "NO_OCURRIO", mensaje: "No estuvo ese día",
+    });
+
+    await e.docente.mutation(api.interaccion.resolverInconformidad, {
+      inconformidadId, desenlace: "ANULADA",
+      respuestaDocente: "Revisé la lista y tiene razón",
+    });
+
+    const auditoria = await t.run((ctx) => ctx.db.query("auditoria").collect());
+    const anular = auditoria.find((a) => a.accion === "ANULAR");
+    expect(anular).toMatchObject({
+      entidadTipo: "accionRegistrada",
+      entidadId: accionId,
+      datosAntes: { estado: "VIGENTE" },
+      datosDespues: { estado: "ANULADA", puntosAplicados: 0, porReclamo: inconformidadId },
+    });
   });
 
   it("resolver como MANTENIDA no toca la accion", async () => {
