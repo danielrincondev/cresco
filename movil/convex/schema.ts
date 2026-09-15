@@ -649,7 +649,7 @@ export default defineSchema({
     .index("por_bloque_estado", ["disponibilidadDocenteId", "estado"]),
 
   /**
-   * F3: el docente tiene 30 días; vencido pasa a VENCIDA por cron y sube de
+   * F3: el docente tiene 30 días; una tarea programada lo pasa a VENCIDA y sube de
    * prioridad. F4: RESUELTA_MODIFICADA lleva la acción a 0 y devuelve puntos.
    * ck_inconformidad_resolucion → guardas.ts
    */
@@ -667,20 +667,38 @@ export default defineSchema({
      * siempre lo llevan. `migraciones.rellenarDocenteEnInconformidades` lo
      * completa, y despues de correrla no deberia quedar ninguno sin el.
      */
-    docenteId: v.optional(v.id("docente")),
     motivo: enumDe(MOTIVO_INCONFORMIDAD),
     mensaje: v.string(),
     estado: enumDe(ESTADO_INCONFORMIDAD),
+    /**
+     * El docente titular de la accion reclamada, copiado al abrir el reclamo.
+     *
+     * Es denormalizacion a proposito. Sin este campo, la bandeja del docente
+     * (D15) tiene que leer **todos** los reclamos abiertos del sistema y
+     * filtrar en memoria: el vinculo con el docente va por
+     * `accionRegistrada.registradaPorDocenteId`, a un salto de distancia, y
+     * ningun indice de esta tabla llega hasta alli. Ver issue #48.
+     *
+     * Opcional solo por los reclamos que ya existan en un despliegue de
+     * desarrollo; todo reclamo nuevo lo trae.
+     */
+    docenteId: v.optional(v.id("docente")),
     respuestaDocente: v.optional(v.string()),
     resueltaPorDocenteId: v.optional(v.id("docente")),
     resueltaEn: v.optional(v.number()),
     venceEn: v.number(),
+    /** Ausente en reclamos previos: la migración inicial programa su vencimiento. */
+    vencimientoProgramadoId: v.optional(v.id("_scheduled_functions")),
     citaId: v.optional(v.id("cita")),
     ...actualizadoEn,
   })
     .index("por_accion_representante", ["accionRegistradaId", "representanteId"])
     .index("por_estado_vence", ["estado", "venceEn"])
-    .index("por_docente_estado", ["docenteId", "estado"]),
+    // La bandeja del docente: acota por docente antes que por estado, que es
+    // lo unico que la hace no crecer con los reclamos de todo el sistema
+    // (#48). `venceEn` va al final para que el orden por plazo salga del
+    // indice y no de ordenar en memoria.
+    .index("por_docente_estado", ["docenteId", "estado", "venceEn"]),
 
   /**
    * G1: exige reautenticación; `reautenticadoEn` deja constancia.

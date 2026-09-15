@@ -10,12 +10,21 @@
  * cada función pública empieza llamando a `permisos.ts`, sin excepción.
  */
 
+import { paginationOptsValidator } from "convex/server";
 import { ConvexError, v } from "convex/values";
 
 import { recalcularPuntaje } from "./conducta";
-import type { Doc, Id } from "./_generated/dataModel";
-import { action, internalMutation, mutation, query, type MutationCtx, type QueryCtx } from "./_generated/server";
 import { internal } from "./_generated/api";
+
+import type { Doc, Id } from "./_generated/dataModel";
+import {
+  action,
+  internalMutation,
+  mutation,
+  query,
+  type MutationCtx,
+  type QueryCtx,
+} from "./_generated/server";
 import { verificarReautenticacion } from "./lib/reautenticacion";
 import {
   ALCANCE_ALERTA,
@@ -492,20 +501,24 @@ export const abrirInconformidad = mutation({
     }
 
     const ahora = Date.now();
+    const venceEn = ahora + REGLAS.INCONFORMIDAD_DIAS_PLAZO * DIA;
     const inconformidadId = await ctx.db.insert("inconformidad", {
       accionRegistradaId: args.accionRegistradaId,
       representanteId: representante._id,
-      // Se copia del la accion que se reclama: es lo que hace que la bandeja
-      // del docente sea una lectura indexada y no un barrido de la tabla.
-      docenteId: accion.registradaPorDocenteId,
       motivo: args.motivo,
       mensaje: exigirTexto(args.mensaje, "El mensaje del reclamo"),
       estado: "ABIERTA",
+      // Se copia el docente de la accion reclamada: es lo que permite que su
+      // bandeja lea solo lo suyo. La accion ya esta leida aqui arriba, asi que
+      // no cuesta una lectura de mas (#48).
+      docenteId: accion.registradaPorDocenteId,
       // F3: el docente tiene 30 días. El plazo sale de REGLAS, no de un
       // número escrito aquí.
-      venceEn: ahora + REGLAS.INCONFORMIDAD_DIAS_PLAZO * DIA,
+      venceEn,
       actualizadoEn: ahora,
     });
+
+    await programarVencimiento(ctx, inconformidadId, venceEn);
 
     const docente = await ctx.db.get(accion.registradaPorDocenteId);
     if (docente !== null) {
@@ -526,13 +539,21 @@ export const abrirInconformidad = mutation({
 /**
  * Bandeja del docente (D15), con lo más próximo a vencer primero.
  *
- * Recorre desde los estados abiertos usando el índice `por_estado_vence`, no
- * con un `collect()` de toda la tabla: una lectura completa crece con cada
- * reclamo que abra cualquier docente del sistema.
+ * Lee **solo los reclamos de este docente**, por el índice `por_docente_estado`
+ * que empieza por `docenteId`. Antes filtraba por estado y descartaba en
+ * memoria, lo que significaba leer todos los reclamos abiertos de todas las
+ * instituciones para pintar la bandeja de una persona — y una `query` de
+ * Convex que llega a su límite de lectura no se degrada: falla (#48).
  *
  * No calcula "vencida" aquí: `Date.now()` dentro de un `query` rompe la
  * reactividad de Convex, porque el resultado dejaría de depender solo de los
- * datos. Se devuelve `venceEn` y la pantalla decide.
+ * datos. Por eso el estado lo escribe la tarea `vencerInconformidad`.
+ *
+ * `VENCIDA` sigue en la lista a propósito: el esquema dice que al vencer "sube
+ * de prioridad", no que desaparezca. Como se ordena por `venceEn` ascendente y
+ * las vencidas son las más antiguas, quedan primeras solas. Y
+ * `resolverInconformidad` las sigue aceptando: responder tarde es mejor que no
+ * responder.
  */
 export const inconformidadesDelDocente = query({
   args: {},
@@ -543,54 +564,54 @@ export const inconformidadesDelDocente = query({
     // quedaba con los suyos en memoria: el trabajo de cada docente crecia con
     // los reclamos de todos los demas (#48). Ahora el indice entrega
     // directamente los de este docente.
-    const enCurso: Doc<"inconformidad">[] = [];
-    for (const estado of ["ABIERTA", "EN_REVISION"] as const) {
+    //
+    // `VENCIDA` entra en la lista porque un reclamo que se le paso al docente
+    // no deja de existir: esconderlo seria dejar de responderle a la familia.
+    const mias = [];
+    for (const estado of ["ABIERTA", "EN_REVISION", "VENCIDA"] as const) {
       const lote = await ctx.db
         .query("inconformidad")
         .withIndex("por_docente_estado", (q) =>
           q.eq("docenteId", docente._id).eq("estado", estado),
         )
         .collect();
-      enCurso.push(...lote);
-    }
 
-    const mias = [];
-    for (const i of enCurso) {
-      const accion = await ctx.db.get(i.accionRegistradaId);
-      if (accion === null || accion.registradaPorDocenteId !== docente._id) continue;
+      for (const i of lote) {
+        const accion = await ctx.db.get(i.accionRegistradaId);
+        if (accion === null || accion.registradaPorDocenteId !== docente._id) continue;
 
-      // De quien se habla y quien reclama. Hasta que #52 guardo los nombres
-      // esto no se podia decir, y la bandeja pedia al docente que decidiera
-      // si anula una sancion **sin saber de que estudiante es**: con dos
-      // reclamos abiertos, anular el equivocado era cuestion de suerte.
-      const matricula = await ctx.db.get(accion.matriculaId);
-      const estudiante = matricula ? await ctx.db.get(matricula.estudianteId) : null;
-      const representante = await ctx.db.get(i.representanteId);
-      const perfil = representante ? await ctx.db.get(representante.perfilUsuarioId) : null;
+        // De quien se habla y quien reclama (#71). Hasta que #52 guardo los
+        // nombres esto no se podia decir, y la bandeja pedia al docente que
+        // decidiera si anula una sancion **sin saber de que estudiante es**.
+        const matricula = await ctx.db.get(accion.matriculaId);
+        const estudiante = matricula ? await ctx.db.get(matricula.estudianteId) : null;
+        const representante = await ctx.db.get(i.representanteId);
+        const perfil = representante ? await ctx.db.get(representante.perfilUsuarioId) : null;
 
-      mias.push({
-        id: i._id,
-        motivo: i.motivo,
-        mensaje: i.mensaje,
-        estado: i.estado,
-        venceEn: i.venceEn,
-        estudiante: estudiante
-          ? { id: estudiante._id, nombre: `${estudiante.nombres} ${estudiante.apellidos}` }
-          : null,
-        // `null` cuando el perfil es anterior a los nombres. La pantalla lo
-        // dice con palabras en vez de enseñar un hueco.
-        representante:
-          perfil && (perfil.nombres || perfil.apellidos)
-            ? `${perfil.nombres ?? ""} ${perfil.apellidos ?? ""}`.trim()
+        mias.push({
+          id: i._id,
+          motivo: i.motivo,
+          mensaje: i.mensaje,
+          estado: i.estado,
+          venceEn: i.venceEn,
+          estudiante: estudiante
+            ? { id: estudiante._id, nombre: `${estudiante.nombres} ${estudiante.apellidos}` }
             : null,
-        accion: {
-          id: accion._id,
-          descripcion: accion.descripcion,
-          puntosAplicados: accion.puntosAplicados,
-          fechaOcurrencia: accion.fechaOcurrencia,
-          estado: accion.estado,
-        },
-      });
+          // `null` cuando el perfil es anterior a los nombres. La pantalla lo
+          // dice con palabras en vez de enseñar un hueco.
+          representante:
+            perfil && (perfil.nombres || perfil.apellidos)
+              ? `${perfil.nombres ?? ""} ${perfil.apellidos ?? ""}`.trim()
+              : null,
+          accion: {
+            id: accion._id,
+            descripcion: accion.descripcion,
+            puntosAplicados: accion.puntosAplicados,
+            fechaOcurrencia: accion.fechaOcurrencia,
+            estado: accion.estado,
+          },
+        });
+      }
     }
     return mias.sort((a, b) => a.venceEn - b.venceEn);
   }),
@@ -707,6 +728,116 @@ export const resolverInconformidad = mutation({
     }
     return inconformidad._id;
   }),
+});
+
+/** Programa el vencimiento y guarda su id en la misma transacción. */
+async function programarVencimiento(
+  ctx: MutationCtx,
+  inconformidadId: Id<"inconformidad">,
+  venceEn: number,
+): Promise<void> {
+  const vencimientoProgramadoId = await ctx.scheduler.runAt(
+    venceEn,
+    internal.interaccion.vencerInconformidad,
+    { inconformidadId },
+  );
+  await ctx.db.patch(inconformidadId, { vencimientoProgramadoId });
+}
+
+/**
+ * F3: tarea individual programada para `venceEn` al abrir el reclamo.
+ * Relee el estado: resolver antes del plazo deja esta tarea sin efecto.
+ * La transición y las notificaciones son atómicas e idempotentes.
+ */
+export const vencerInconformidad = internalMutation({
+  args: { inconformidadId: v.id("inconformidad") },
+  returns: v.boolean(),
+  handler: async (ctx, args): Promise<boolean> => {
+    const inconformidad = await ctx.db.get(args.inconformidadId);
+    const ahora = Date.now();
+    if (inconformidad === null ||
+        (inconformidad.estado !== "ABIERTA" && inconformidad.estado !== "EN_REVISION") ||
+        inconformidad.venceEn > ahora) {
+      return false;
+    }
+
+    await ctx.db.patch(inconformidad._id, { estado: "VENCIDA", actualizadoEn: ahora });
+
+    const representante = await ctx.db.get(inconformidad.representanteId);
+    if (representante !== null) {
+      await notificar(
+        ctx,
+        representante.perfilUsuarioId,
+        "RESPUESTA_INCONFORMIDAD",
+        "Tu reclamo venció sin respuesta",
+        "Pasó el plazo para que el docente respondiera. El reclamo sigue " +
+          "registrado y el docente todavía puede responderlo.",
+        "inconformidad",
+        inconformidad._id,
+      );
+    }
+
+    const accion = await ctx.db.get(inconformidad.accionRegistradaId);
+    const docente = accion === null ? null : await ctx.db.get(accion.registradaPorDocenteId);
+    if (docente !== null) {
+      await notificar(
+        ctx,
+        docente.perfilUsuarioId,
+        "RESPUESTA_INCONFORMIDAD",
+        "Un reclamo venció sin tu respuesta",
+        "Se cumplió el plazo. Sigue en tu bandeja y aún puedes responderlo.",
+        "inconformidad",
+        inconformidad._id,
+      );
+    }
+    return true;
+  },
+});
+
+/**
+ * Migración inicial tras desplegar: programa los reclamos anteriores al cambio.
+ * Recorre ABIERTA y EN_REVISION en páginas, encadenadas sin esperar al otro día.
+ * El id guardado evita duplicar tareas al repetir o ejecutar en paralelo la migración.
+ * Si `venceEn` quedó en el pasado, runAt deja la tarea lista para ejecutarse.
+ */
+export const programarVencimientosExistentes = internalMutation({
+  args: {
+    estado: v.optional(v.union(v.literal("ABIERTA"), v.literal("EN_REVISION"))),
+    paginationOpts: v.optional(paginationOptsValidator),
+  },
+  returns: v.object({ programadas: v.number(), continuacion: v.boolean() }),
+  handler: async (ctx, args): Promise<{ programadas: number; continuacion: boolean }> => {
+    const estado = args.estado ?? "ABIERTA";
+    const paginationOpts = args.paginationOpts ?? { numItems: 100, cursor: null };
+    if (!Number.isInteger(paginationOpts.numItems) ||
+        paginationOpts.numItems < 1 || paginationOpts.numItems > 100) {
+      throw new ErrorDominio("VALIDACION", "El lote debe tener entre 1 y 100 reclamos.");
+    }
+    const lote = await ctx.db
+      .query("inconformidad")
+      .withIndex("por_estado_vence", (q) => q.eq("estado", estado))
+      .paginate(paginationOpts);
+
+    let programadas = 0;
+    for (const inconformidad of lote.page) {
+      if (inconformidad.vencimientoProgramadoId !== undefined) continue;
+      await programarVencimiento(ctx, inconformidad._id, inconformidad.venceEn);
+      programadas++;
+    }
+
+    if (!lote.isDone) {
+      await ctx.scheduler.runAfter(0, internal.interaccion.programarVencimientosExistentes, {
+        estado,
+        paginationOpts: { ...paginationOpts, cursor: lote.continueCursor },
+      });
+    } else if (estado === "ABIERTA") {
+      await ctx.scheduler.runAfter(0, internal.interaccion.programarVencimientosExistentes, {
+        estado: "EN_REVISION",
+        paginationOpts: { numItems: paginationOpts.numItems, cursor: null },
+      });
+    }
+    return { programadas, continuacion: !lote.isDone || estado === "ABIERTA" };
+  },
 });
 
 /* ------------------------------------------------------------------ *
