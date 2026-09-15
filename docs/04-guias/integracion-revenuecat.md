@@ -105,6 +105,34 @@ Lo único que falta es conectarlos:
 Con `.cloud` el webhook responde 404, RevenueCat reintenta 5 veces y **pierde
 el evento**. Las `httpAction` de Convex se sirven en el dominio `.site`.
 
+### El SDK en el teléfono
+
+Desde el PR del SDK, la aplicación **puede cobrar**. Lo que falta para que
+funcione de verdad:
+
+1. **La clave pública de Android** del panel: *Project settings → API keys*,
+   la que empieza por `goog_`. Se pone en `movil/.env.local`:
+
+   ```
+   EXPO_PUBLIC_REVENUECAT_API_KEY=goog_xxx
+   ```
+
+   Es pública por diseño —viaja dentro del APK— y no autoriza nada por sí sola.
+
+2. **Una build nueva.** `react-native-purchases` es un módulo **nativo**: no
+   existe en Expo Go ni en una build anterior a su instalación. Hace falta una
+   `development` o `preview` recién construida.
+
+**El `appUserID` es el `perfilUsuarioId` de Convex**, y eso no es un detalle:
+el webhook resuelve a quién pertenece un cobro con
+`ctx.db.get(evento.app_user_id)`. Si el SDK usara su identificador anónimo,
+ningún pago se aplicaría jamás — el evento llegaría, se guardaría, y fallaría
+al buscar el perfil. Es el contrato entre las dos mitades.
+
+**Sin la clave la aplicación funciona igual que antes**: los planes se ven, no
+aparece ningún botón de compra, y el aviso dice que todavía no está disponible.
+Nadie se encuentra la app rota por una variable que falta.
+
 ### Revisar los pagos que no se aplicaron
 
 El webhook responde **200 aunque el evento no se pueda aplicar**, y lo hace a
