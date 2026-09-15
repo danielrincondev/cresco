@@ -45,6 +45,17 @@ import {
 } from "../components/NucleoUI";
 import { PaywallDocente, PaywallRepresentante } from "./PaywallScreen";
 import { AnotarConducta } from "./ConductaScreen";
+import { DetalleAccion, type AccionDeLaBitacora } from "./ReclamarScreen";
+import {
+  PublicarComunicado,
+  ReporteGeneral,
+  TomarAsistencia,
+} from "./JornadaScreen";
+import {
+  ReporteAcumulado,
+  ReporteDeHoy,
+  ReportesAnteriores,
+} from "./ReporteScreen";
 import {
   AgendaDocente,
   Ajustes,
@@ -97,10 +108,30 @@ type Ruta =
         // pantalla nunca leyo, y eso hacia creer que estaba acotada.
         | "reclamos";
     }
-  // P9 necesita saber de que hijo se pregunta: un representante con dos hijos
-  // en cursos distintos tiene dos docentes a cargo, no uno.
-  | { tipo: "docenteACargo"; estudianteId: Id<"estudiante">; nombre: string }
-  | { tipo: "curso" | "periodos" | "agenda" | "alerta" | "anotar"; curso: Curso }
+  // Las cuatro que hablan de un hijo concreto viajan con el: un representante
+  // con dos hijos tiene dos docentes a cargo y dos reportes distintos, y la
+  // pantalla no puede adivinar cual mira.
+  | {
+      tipo: "docenteACargo" | "reporteHoy" | "reportesAnteriores" | "acumulado";
+      estudianteId: Id<"estudiante">;
+      nombre: string;
+    }
+  // P7 lleva la anotacion entera y no solo su id: la bitacora ya la trajo, y
+  // volver a pedirla al servidor para pintar lo mismo seria trabajo de mas.
+  | {
+      tipo: "detalleAccion";
+      estudianteId: Id<"estudiante">;
+      nombre: string;
+      accion: AccionDeLaBitacora;
+    }
+  | {
+      tipo:
+        | "curso" | "periodos" | "agenda" | "alerta" | "anotar"
+        // El cierre de jornada (D12, D13, D14): las tres son de un curso
+        // concreto, a diferencia de los reclamos.
+        | "asistencia" | "reporteDia" | "comunicado";
+      curso: Curso;
+    }
   | { tipo: "invitacion"; invitacion: Invitacion; curso: Curso }
   | { tipo: "aprobar"; curso: Curso; alumno: Alumno };
 
@@ -273,10 +304,58 @@ export function NucleoScreen() {
             cursoId={ruta.curso.id}
             onVolver={() => setRuta({ tipo: "curso", curso: ruta.curso })}
           />
+        ) : ruta.tipo === "asistencia" ? (
+          <TomarAsistencia
+            cursoId={ruta.curso.id}
+            onVolver={() => setRuta({ tipo: "curso", curso: ruta.curso })}
+          />
+        ) : ruta.tipo === "reporteDia" ? (
+          <ReporteGeneral
+            cursoId={ruta.curso.id}
+            onVolver={() => setRuta({ tipo: "curso", curso: ruta.curso })}
+          />
+        ) : ruta.tipo === "comunicado" ? (
+          <PublicarComunicado
+            cursoId={ruta.curso.id}
+            onVolver={() => setRuta({ tipo: "curso", curso: ruta.curso })}
+          />
         ) : ruta.tipo === "citas" ? (
           <CitasFamilia />
         ) : ruta.tipo === "alertas" ? (
           <AlertasFamilia />
+        ) : ruta.tipo === "reporteHoy" ? (
+          <ReporteDeHoy
+            estudianteId={ruta.estudianteId}
+            nombre={ruta.nombre}
+            onVerAnteriores={() => setRuta({ ...ruta, tipo: "reportesAnteriores" })}
+            onVerAcumulado={() => setRuta({ ...ruta, tipo: "acumulado" })}
+          />
+        ) : ruta.tipo === "reportesAnteriores" ? (
+          <ReportesAnteriores
+            estudianteId={ruta.estudianteId}
+            nombre={ruta.nombre}
+            onVolver={() => setRuta({ ...ruta, tipo: "reporteHoy" })}
+            onVerPlan={() => setRuta({ tipo: "plan" })}
+          />
+        ) : ruta.tipo === "acumulado" ? (
+          <ReporteAcumulado
+            estudianteId={ruta.estudianteId}
+            nombre={ruta.nombre}
+            onVolver={() => setRuta({ ...ruta, tipo: "reporteHoy" })}
+            onVerAccion={(accion) => setRuta({ ...ruta, tipo: "detalleAccion", accion })}
+          />
+        ) : ruta.tipo === "detalleAccion" ? (
+          <DetalleAccion
+            accion={ruta.accion}
+            nombre={ruta.nombre}
+            onVolver={() =>
+              setRuta({
+                tipo: "acumulado",
+                estudianteId: ruta.estudianteId,
+                nombre: ruta.nombre,
+              })
+            }
+          />
         ) : ruta.tipo === "perfilDocente" ? (
           <PerfilDocente />
         ) : ruta.tipo === "docenteACargo" ? (
@@ -635,6 +714,15 @@ function DetalleCurso({
       <ErrorMensaje mensaje={op.error} />
       <Boton onPress={() => navegar({ tipo: "anotar", curso })}>
         Anotar conducta
+      </Boton>
+      <Boton secundario onPress={() => navegar({ tipo: "asistencia", curso })}>
+        Pasar lista
+      </Boton>
+      <Boton secundario onPress={() => navegar({ tipo: "reporteDia", curso })}>
+        Reporte del día
+      </Boton>
+      <Boton secundario onPress={() => navegar({ tipo: "comunicado", curso })}>
+        Avisar al curso
       </Boton>
       <Boton secundario onPress={() => navegar({ tipo: "agenda", curso })}>
         Atención a familias
@@ -1053,8 +1141,21 @@ function MisHijos({
                   : "Consulta con el docente para revisar el registro."}
             </Cuerpo>
             {a.estadoVerificacion === "APROBADO" && (
-              // Solo con la matricula aprobada: antes de eso no hay curso y
-              // por tanto no hay titular del que hablar.
+              <Boton
+                onPress={() =>
+                  navegar({
+                    tipo: "reporteHoy",
+                    estudianteId: a.estudianteId,
+                    nombre: `${a.nombres} ${a.apellidos}`,
+                  })
+                }
+              >
+                Ver su reporte de hoy
+              </Boton>
+            )}
+            {/* Solo con la matricula aprobada: antes de eso no hay curso y
+                por tanto no hay titular del que hablar. */}
+            {a.estadoVerificacion === "APROBADO" && (
               <Boton
                 secundario
                 onPress={() =>
