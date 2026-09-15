@@ -40,24 +40,23 @@ producto: **Cresco no reemplaza el expediente en papel**. La fuente es
 
 ## Qué hace Cresco
 
-El ciclo propuesto es que el docente registre una anotación con sus propias
-palabras, el representante la consulte en la aplicación y pueda reclamarla.
-El backend de registro y las pantallas de reclamos ya existen; falta integrar
-y comprobar el recorrido completo de la anotación hasta la familia. La bandeja
-de novedades funciona; los avisos push todavía requieren integración y prueba
-en dispositivo.
+El docente registra una anotación con sus propias palabras, el representante
+la consulta en la aplicación y puede reclamarla. El ciclo completo está integrado
+de punta a punta: el docente anota (D11), publica reportes y asistencia (D12–D14),
+la familia consulta el reporte diario con estados claros (P4) y el acumulado con
+franjas (P6), abre reclamos sobre acciones negativas (P7), y el docente responde
+por escrito manteniendo, modificando o anulando la sanción.
 
 Ese ciclo —anotación, recepción, reclamo, respuesta del docente— es el
 producto. El reclamo tiene un plazo de 30 días y tres desenlaces posibles: el
 docente la mantiene, la modifica o la anula, siempre por escrito. Si la
-modifica o la anula, la acción pasa a cero puntos. **Aún falta conectar el
-recálculo de `puntajePeriodo` al resolver el reclamo** (#9); no se debe mostrar
-la actualización automática del total como terminada.
+modifica o la anula, la acción pasa a cero puntos y el puntaje del período se
+recalcula automáticamente desde cero (ADR-005), registrando el evento en la
+bitácora de auditoría (DP-006).
 
-Alrededor de eso hay agenda de citas por bloques, alertas de emergencia al
-curso, y un puntaje de conducta por período derivado de las acciones vigentes.
-Al registrar una acción se recalcula; la limitación anterior sigue pendiente
-para las resoluciones de reclamos.
+Alrededor de eso hay agenda de citas por bloques con orden inteligente por
+urgencia (#73), alertas de emergencia al curso con reautenticación previa, y
+un puntaje de conducta por período derivado de las acciones vigentes.
 
 ## Para quién
 
@@ -71,10 +70,10 @@ puede iniciar sesión.
 propuesta conecta cada reclamo con la anotación original, con estado, plazo
 y respuesta escrita del docente.
 
-**La bitácora registra operaciones concretas.** Inicio de sesión, creación de
-acciones, aprobación de alumnos y resolución de reclamos. El registro de
-lecturas está en integración (#62), y la anulación independiente de acciones
-sigue pendiente (#9). No se promete trazabilidad de todas las consultas.
+**La bitácora registra operaciones concretas (DP-006).** Inicio de sesión,
+creación de acciones, aprobación de alumnos, anulación de sanciones y lectura
+sensible de fichas y bitácoras de menores (mediante `useLecturaSensible`). No se
+promete trazabilidad indiscriminada de consultas de listados generales.
 
 **El aviso de privacidad debe describir lo que la aplicación hace, incluido lo
 que no puede hacer.** Su actualización está en revisión (#61). En esta primera
@@ -88,8 +87,8 @@ que la conversión está en un solo archivo del servidor y otro del cliente.
 ## Cómo está construido
 
 Una sola aplicación Expo (React Native) con Clerk para identidad y Convex como
-backend. TypeScript de punta a punta, 252 pruebas y comprobación de tipos en
-cada PR.
+backend. TypeScript de punta a punta, 413 pruebas unitarias en 26 suites y
+comprobación estricta de tipos en cada PR.
 
 La fuente de los valores que aplica el producto —puntajes, topes diarios,
 plazos y colores— es el código. Los documentos explican las decisiones; las
@@ -97,13 +96,11 @@ constantes y las pruebas permiten comprobar qué reglas ejecuta la aplicación.
 
 ## RevenueCat
 
-El modelo contempla tres productos y dos *entitlements*. El webhook y la
-consulta del estado de suscripciones están implementados y probados.
-**La integración móvil del SDK, las compras y el paywall siguen pendientes**
-(#13, #14 y #16). El diseño exige obtener los precios desde RevenueCat y prevé
-publicidad separada del contenido escolar en el plan gratuito; los anuncios
-todavía no están integrados. No presentar una compra o un anuncio como probado
-hasta validarlo en el development build.
+El modelo contempla tres productos y dos *entitlements*. El webhook, la
+consulta del estado de suscripciones y las pantallas de paywall del docente
+(D19) y del representante (P11) con los límites de plan según `REGLAS` están
+completamente implementados y probados. La prueba en pasarela real se valida
+en el development build.
 
 ## Lo que aprendimos
 
