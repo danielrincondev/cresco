@@ -21,6 +21,7 @@ import type * as lib_reautenticacion from "../lib/reautenticacion.js";
 import type * as lib_revenuecat from "../lib/revenuecat.js";
 import type * as migraciones from "../migraciones.js";
 import type * as nucleo from "../nucleo.js";
+import type * as push from "../push.js";
 import type * as semillas from "../semillas.js";
 import type * as suscripciones from "../suscripciones.js";
 import type * as viewer from "../viewer.js";
@@ -45,6 +46,7 @@ declare const fullApi: ApiFromModules<{
   "lib/revenuecat": typeof lib_revenuecat;
   migraciones: typeof migraciones;
   nucleo: typeof nucleo;
+  push: typeof push;
   semillas: typeof semillas;
   suscripciones: typeof suscripciones;
   viewer: typeof viewer;

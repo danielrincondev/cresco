@@ -10,7 +10,7 @@ import type { Id } from "./_generated/dataModel";
 import schema from "./schema";
 import { exportJWK, generateKeyPair, SignJWT } from "jose";
 
-const modules = import.meta.glob(["./interaccion.ts", "./migraciones.ts", "./_generated/*.js"]);
+const modules = import.meta.glob(["./interaccion.ts", "./migraciones.ts", "./push.ts", "./_generated/*.js"]);
 
 const AHORA = new Date("2026-09-07T15:00:00Z");
 
@@ -555,6 +555,24 @@ describe("interaccion — dispositivos y notificaciones", () => {
         notificacionId: delDocente[0]._id,
       }),
     ).rejects.toThrow("no es tuya");
+  });
+});
+
+describe("interaccion — enganche con el envio push", () => {
+  it("crear una notificacion programa su entrega al telefono", async () => {
+    const t = convexTest(schema, modules);
+    const e = await sembrarEscenario(t);
+    const accionId = await sembrarAccion(t, e);
+
+    await e.representante.mutation(api.interaccion.abrirInconformidad, {
+      accionRegistradaId: accionId, motivo: "NO_OCURRIO", mensaje: "No ocurrio",
+    });
+
+    const programadas = await t.run(async (ctx) =>
+      await ctx.db.system.query("_scheduled_functions").collect(),
+    );
+    // abrirInconformidad programa tanto el vencimiento (F3) como el push (F8)
+    expect(programadas.some((p) => p.name.includes("push"))).toBe(true);
   });
 });
 
