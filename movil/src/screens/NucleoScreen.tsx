@@ -51,6 +51,11 @@ import {
   TomarAsistencia,
 } from "./JornadaScreen";
 import {
+  ReporteAcumulado,
+  ReporteDeHoy,
+  ReportesAnteriores,
+} from "./ReporteScreen";
+import {
   AgendaDocente,
   Ajustes,
   PerfilDocente,
@@ -102,9 +107,14 @@ type Ruta =
         // pantalla nunca leyo, y eso hacia creer que estaba acotada.
         | "reclamos";
     }
-  // P9 necesita saber de que hijo se pregunta: un representante con dos hijos
-  // en cursos distintos tiene dos docentes a cargo, no uno.
-  | { tipo: "docenteACargo"; estudianteId: Id<"estudiante">; nombre: string }
+  // Las cuatro que hablan de un hijo concreto viajan con el: un representante
+  // con dos hijos tiene dos docentes a cargo y dos reportes distintos, y la
+  // pantalla no puede adivinar cual mira.
+  | {
+      tipo: "docenteACargo" | "reporteHoy" | "reportesAnteriores" | "acumulado";
+      estudianteId: Id<"estudiante">;
+      nombre: string;
+    }
   | {
       tipo:
         | "curso" | "periodos" | "agenda" | "alerta" | "anotar"
@@ -304,6 +314,26 @@ export function NucleoScreen() {
           <CitasFamilia />
         ) : ruta.tipo === "alertas" ? (
           <AlertasFamilia />
+        ) : ruta.tipo === "reporteHoy" ? (
+          <ReporteDeHoy
+            estudianteId={ruta.estudianteId}
+            nombre={ruta.nombre}
+            onVerAnteriores={() => setRuta({ ...ruta, tipo: "reportesAnteriores" })}
+            onVerAcumulado={() => setRuta({ ...ruta, tipo: "acumulado" })}
+          />
+        ) : ruta.tipo === "reportesAnteriores" ? (
+          <ReportesAnteriores
+            estudianteId={ruta.estudianteId}
+            nombre={ruta.nombre}
+            onVolver={() => setRuta({ ...ruta, tipo: "reporteHoy" })}
+            onVerPlan={() => setRuta({ tipo: "plan" })}
+          />
+        ) : ruta.tipo === "acumulado" ? (
+          <ReporteAcumulado
+            estudianteId={ruta.estudianteId}
+            nombre={ruta.nombre}
+            onVolver={() => setRuta({ ...ruta, tipo: "reporteHoy" })}
+          />
         ) : ruta.tipo === "perfilDocente" ? (
           <PerfilDocente />
         ) : ruta.tipo === "docenteACargo" ? (
@@ -1089,8 +1119,21 @@ function MisHijos({
                   : "Consulta con el docente para revisar el registro."}
             </Cuerpo>
             {a.estadoVerificacion === "APROBADO" && (
-              // Solo con la matricula aprobada: antes de eso no hay curso y
-              // por tanto no hay titular del que hablar.
+              <Boton
+                onPress={() =>
+                  navegar({
+                    tipo: "reporteHoy",
+                    estudianteId: a.estudianteId,
+                    nombre: `${a.nombres} ${a.apellidos}`,
+                  })
+                }
+              >
+                Ver su reporte de hoy
+              </Boton>
+            )}
+            {/* Solo con la matricula aprobada: antes de eso no hay curso y
+                por tanto no hay titular del que hablar. */}
+            {a.estadoVerificacion === "APROBADO" && (
               <Boton
                 secundario
                 onPress={() =>
