@@ -132,8 +132,12 @@ function WelcomeScreen() {
     setCode("");
 
     if (nextMode !== mode) {
-      await signIn.reset();
-      await signUp.reset();
+      try {
+        await signIn.reset();
+        await signUp.reset();
+      } catch {
+        // Ignorar errores al limpiar estado previo.
+      }
     }
 
     setMode(nextMode);
@@ -144,9 +148,17 @@ function WelcomeScreen() {
     setIsGooglePending(true);
 
     try {
-      await signIn.reset();
-      await signUp.reset();
-      await startSSOFlow({ strategy: "oauth_google" });
+      try {
+        await signIn.reset();
+        await signUp.reset();
+      } catch {
+        // Ignora si no había un flujo previo para reiniciar.
+      }
+      const result = await startSSOFlow({ strategy: "oauth_google" });
+      if (!result.createdSessionId) {
+        // Cancelado por el usuario o sin sesión creada; no es un error.
+        return;
+      }
     } catch (error) {
       setErrorMessage(getAuthErrorMessage(error));
     } finally {
