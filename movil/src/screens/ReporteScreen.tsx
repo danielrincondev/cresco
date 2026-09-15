@@ -42,6 +42,7 @@ import {
 } from "../components/NucleoUI";
 import { etiquetaAccion, etiquetaFranja } from "../lib/estados";
 import { fechaLegible } from "../lib/fechas";
+import { useLecturaSensible } from "../lib/useLecturaSensible";
 import { Espacio, Tamano, Texto } from "../theme/Theme";
 
 type Reporte = NonNullable<
@@ -106,6 +107,8 @@ export function ReporteDeHoy({
   onVerAcumulado: () => void;
 }) {
   const hoy = useQuery(api.conducta.reporteDeHoy, { estudianteId });
+  // DP-006: abrir el reporte de un menor es una lectura sensible.
+  useLecturaSensible(estudianteId, "REPORTE_ESTUDIANTE");
 
   if (hoy === undefined) return <Cargando mensaje="Cargando el reporte..." />;
 
@@ -145,6 +148,7 @@ export function ReportesAnteriores({
   onVerPlan: () => void;
 }) {
   const datos = useQuery(api.conducta.reportesAnteriores, { estudianteId });
+  useLecturaSensible(estudianteId, "REPORTE_ESTUDIANTE");
 
   if (datos === undefined) return <Cargando mensaje="Cargando el historial..." />;
 
@@ -190,6 +194,11 @@ export function ReporteAcumulado({
   onVolver: () => void;
 }) {
   const datos = useQuery(api.conducta.reporteAcumulado, { estudianteId });
+  // La lectura mas sensible de toda la app del representante: cada anotacion
+  // del parcial, con lo que escribio el docente y cuanto resto. La bitacora
+  // la agrupa en ventanas de cinco minutos, asi que abrir y cerrar no la
+  // llena de filas repetidas.
+  useLecturaSensible(estudianteId, "BITACORA_ACCIONES");
 
   if (datos === undefined) return <Cargando mensaje="Cargando el acumulado..." />;
 

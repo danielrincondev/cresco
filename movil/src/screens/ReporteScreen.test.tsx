@@ -7,6 +7,7 @@ const estado = vi.hoisted(() => ({
   hoy: undefined as unknown,
   anteriores: undefined as unknown,
   acumulado: undefined as unknown,
+  lecturas: [] as unknown[],
 }));
 
 vi.mock("react-native", () => ({
@@ -22,6 +23,8 @@ vi.mock("convex/react", () => ({
     if (nombre === "conducta:reportesAnteriores") return estado.anteriores;
     return estado.acumulado;
   },
+  // `useLecturaSensible` registra la lectura con una mutation al montar.
+  useMutation: () => async (args: unknown) => { estado.lecturas.push(args); return null; },
 }));
 
 const { ReporteAcumulado, ReporteDeHoy, ReportesAnteriores } =
@@ -47,6 +50,7 @@ const REPORTE = {
 };
 
 beforeEach(() => {
+  estado.lecturas = [];
   estado.hoy = { fecha: "2026-09-09", hay: true, reporte: REPORTE };
   estado.anteriores = { limite: 2, premium: false, reportes: [REPORTE] };
   estado.acumulado = {
@@ -149,4 +153,23 @@ it("aclara que el puntaje no es una calificación", () => {
     <ReporteAcumulado estudianteId={"e1" as never} nombre="Ana Pérez" onVolver={() => {}} />,
   ));
   expect(t).toContain("no es una calificación");
+});
+
+/**
+ * DP-006. P6 es la lectura mas sensible de toda la app del representante:
+ * cada anotacion del parcial con lo que escribio el docente. Tiene que quedar
+ * en la bitacora, y con el recurso que la describe.
+ */
+it("abrir el acumulado registra la lectura de la bitácora", async () => {
+  pintar(
+    <ReporteAcumulado estudianteId={"e1" as never} nombre="Ana Pérez" onVolver={() => {}} onVerAccion={() => {}} />,
+  );
+  await act(async () => {});
+  expect(estado.lecturas).toContainEqual({ estudianteId: "e1", recurso: "BITACORA_ACCIONES" });
+});
+
+it("abrir el reporte del día registra la lectura del reporte", async () => {
+  hoy();
+  await act(async () => {});
+  expect(estado.lecturas).toContainEqual({ estudianteId: "e1", recurso: "REPORTE_ESTUDIANTE" });
 });
