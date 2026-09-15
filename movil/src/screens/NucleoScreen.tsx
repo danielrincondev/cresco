@@ -44,7 +44,7 @@ import {
   useOperacion,
 } from "../components/NucleoUI";
 import { PaywallDocente, PaywallRepresentante } from "./PaywallScreen";
-import { AnotarConducta } from "./ConductaScreen";
+import { AnotacionesRecientes, AnotarConducta } from "./ConductaScreen";
 import { DetalleAccion, type AccionDeLaBitacora } from "./ReclamarScreen";
 import {
   PublicarComunicado,
@@ -129,7 +129,8 @@ type Ruta =
         | "curso" | "periodos" | "agenda" | "alerta" | "anotar"
         // El cierre de jornada (D12, D13, D14): las tres son de un curso
         // concreto, a diferencia de los reclamos.
-        | "asistencia" | "reporteDia" | "comunicado";
+        | "asistencia" | "reporteDia" | "comunicado"
+        | "recientes";
       curso: Curso;
     }
   | { tipo: "invitacion"; invitacion: Invitacion; curso: Curso }
@@ -301,6 +302,11 @@ export function NucleoScreen() {
           <AlertaDocente curso={ruta.curso} />
         ) : ruta.tipo === "anotar" ? (
           <AnotarConducta
+            cursoId={ruta.curso.id}
+            onVolver={() => setRuta({ tipo: "curso", curso: ruta.curso })}
+          />
+        ) : ruta.tipo === "recientes" ? (
+          <AnotacionesRecientes
             cursoId={ruta.curso.id}
             onVolver={() => setRuta({ tipo: "curso", curso: ruta.curso })}
           />
@@ -714,6 +720,9 @@ function DetalleCurso({
       <ErrorMensaje mensaje={op.error} />
       <Boton onPress={() => navegar({ tipo: "anotar", curso })}>
         Anotar conducta
+      </Boton>
+      <Boton secundario onPress={() => navegar({ tipo: "recientes", curso })}>
+        Anotaciones recientes
       </Boton>
       <Boton secundario onPress={() => navegar({ tipo: "asistencia", curso })}>
         Pasar lista

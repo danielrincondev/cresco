@@ -8,6 +8,7 @@ const estado = vi.hoisted(() => ({
   estudiantes: [] as unknown[],
   status: "Exhausted",
   registrar: vi.fn(),
+  recientes: [] as unknown[],
 }));
 
 vi.mock("react-native", () => ({
@@ -18,14 +19,18 @@ vi.mock("react-native", () => ({
 vi.mock("../theme/Icono", () => ({ Icono: "Icono" }));
 vi.mock("convex/react", () => ({
   useQuery: (ref: Parameters<typeof getFunctionName>[0]) =>
-    getFunctionName(ref) === "nucleo:catalogoDeAcciones" ? estado.catalogo : undefined,
+    getFunctionName(ref) === "nucleo:catalogoDeAcciones"
+      ? estado.catalogo
+      : getFunctionName(ref) === "conducta:anotacionesRecientesDelCurso"
+        ? estado.recientes
+        : undefined,
   usePaginatedQuery: () => ({
     results: estado.estudiantes, status: estado.status, loadMore: vi.fn(),
   }),
   useMutation: () => estado.registrar,
 }));
 
-const { AnotarConducta } = await import("./ConductaScreen");
+const { AnotacionesRecientes, AnotarConducta } = await import("./ConductaScreen");
 const { Boton, Campo, Opciones } = await import("../components/NucleoUI");
 
 const pintar = (e: React.ReactElement) => {
@@ -179,4 +184,56 @@ it("con un solo valor posible no pinta selector, lo dice", () => {
 
   expect(v.root.findAllByType(Opciones)).toHaveLength(0);
   expect(texto(v)).toContain("vale -1 punto");
+});
+
+/* ---------- Deshacer ---------- */
+
+const RECIENTE_NEGATIVA = {
+  id: "a1", estudiante: "Ana Pérez", tipo: "Indisciplina", signo: "NEGATIVA",
+  puntos: -1, descripcion: "Se levantó en clase", fecha: "2026-09-09",
+  estado: "VIGENTE", anulable: true, creadaEn: 2,
+};
+const RECIENTE_POSITIVA = {
+  ...RECIENTE_NEGATIVA, id: "a2", tipo: "Tarea", signo: "POSITIVA", puntos: 1,
+  anulable: false, creadaEn: 1,
+};
+
+const recientes = () =>
+  pintar(<AnotacionesRecientes cursoId={"curso" as never} onVolver={() => {}} />);
+
+/**
+ * El motivo queda en la bitacora como ANULAR: es lo que se le enseña a una
+ * institucion que pregunte por que desaparecio una sancion. Un campo vacio no
+ * sirve.
+ */
+it("no deja anular sin motivo", () => {
+  estado.recientes = [RECIENTE_NEGATIVA];
+  const v = recientes();
+  act(() => { v.root.findAllByType(Boton).find((b) => b.props.children === "Anular")!.props.onPress(); });
+  const anular = v.root.findAllByType(Boton).find((b) => b.props.children === "Anular la anotación")!;
+  expect(anular.props.disabled).toBe(true);
+});
+
+it("anula con el motivo escrito, sin espacios de sobra", async () => {
+  estado.recientes = [RECIENTE_NEGATIVA];
+  const v = recientes();
+  act(() => { v.root.findAllByType(Boton).find((b) => b.props.children === "Anular")!.props.onPress(); });
+  act(() => { v.root.findAllByType(Campo)[0].props.onChangeText("  Me equivoqué de alumno  "); });
+  await act(async () => {
+    v.root.findAllByType(Boton).find((b) => b.props.children === "Anular la anotación")!.props.onPress();
+  });
+  expect(estado.registrar).toHaveBeenCalledWith({
+    accionRegistradaId: "a1", motivo: "Me equivoqué de alumno",
+  });
+});
+
+/**
+ * `anulable` viene del servidor. Una positiva no ofrece boton, y se dice por
+ * que, en vez de dejar al docente buscando una opcion que no existe.
+ */
+it("una positiva no ofrece anular, y lo explica", () => {
+  estado.recientes = [RECIENTE_POSITIVA];
+  const v = recientes();
+  expect(v.root.findAllByType(Boton).find((b) => b.props.children === "Anular")).toBeUndefined();
+  expect(texto(v)).toContain("Las positivas no se anulan desde aquí");
 });

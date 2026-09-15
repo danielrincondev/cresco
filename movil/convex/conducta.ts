@@ -165,6 +165,70 @@ export const registrarAccion = mutation({
   }),
 });
 
+/** Cuantos dias hacia atras enseña la lista de anotaciones recientes. */
+const DIAS_ANOTACIONES_RECIENTES = 7;
+
+/**
+ * Las anotaciones del curso de los ultimos dias, para que el docente pueda
+ * revisarlas y deshacer las que puso por error.
+ *
+ * ## Por que existe
+ *
+ * `anularAccion` estaba escrita, probada y auditando ANULAR, y **ninguna
+ * pantalla la llamaba**: no habia ninguna consulta con la que un docente
+ * viera las anotaciones que ya puso. Un docente que anotaba al estudiante
+ * equivocado no tenia forma de verlo ni de corregirlo. El error se quedaba en
+ * el expediente de un menor hasta que la familia reclamara.
+ *
+ * ## Por que no hace falta un indice nuevo
+ *
+ * `accionRegistrada` solo esta indexada por matricula. En vez de añadir un
+ * indice por docente -- que tocaria `schema.ts` y pediria tres firmas -- se
+ * recorren las matriculas vigentes del curso con `por_matricula_fecha` y una
+ * ventana de siete dias. Con un curso de cuarenta son cuarenta lecturas
+ * acotadas por fecha, que es lo mismo que ya hace `asistenciaDelDia`.
+ */
+export const anotacionesRecientesDelCurso = query({
+  args: { cursoId: v.id("curso") },
+  handler: (ctx, args) => conErroresPublicos(async () => {
+    await exigirTitularDelCurso(ctx, args.cursoId);
+    const desde = sumarDias(hoyEnGuayaquil(), -DIAS_ANOTACIONES_RECIENTES);
+
+    const matriculas = await ctx.db.query("matricula")
+      .withIndex("por_curso_estado", (q) => q.eq("cursoId", args.cursoId).eq("estado", "CURSANDO"))
+      .collect();
+
+    const filas = [];
+    for (const matricula of matriculas) {
+      const acciones = await ctx.db.query("accionRegistrada")
+        .withIndex("por_matricula_fecha", (q) => q.eq("matriculaId", matricula._id).gte("fechaOcurrencia", desde))
+        .collect();
+      if (acciones.length === 0) continue;
+      const estudiante = await ctx.db.get(matricula.estudianteId);
+      for (const accion of acciones) {
+        const tipo = await ctx.db.get(accion.tipoAccionId);
+        filas.push({
+          id: accion._id,
+          estudiante: estudiante ? `${estudiante.nombres} ${estudiante.apellidos}` : "Estudiante",
+          tipo: tipo?.nombre ?? "Anotación",
+          signo: accion.signo,
+          puntos: accion.puntosAplicados,
+          descripcion: accion.descripcion,
+          fecha: accion.fechaOcurrencia,
+          estado: accion.estado,
+          // Lo decide el servidor con la misma regla que `anularAccion`, para
+          // que la pantalla no ofrezca un boton que despues se rechaza.
+          anulable: accion.signo === "NEGATIVA" && accion.estado === "VIGENTE",
+          creadaEn: accion._creationTime,
+        });
+      }
+    }
+    // Lo ultimo que se anoto primero: es lo que un docente revisa justo
+    // despues de equivocarse.
+    return filas.sort((a, b) => b.creadaEn - a.creadaEn);
+  }),
+});
+
 export const anularAccion = mutation({
   args: { accionRegistradaId: v.id("accionRegistrada"), motivo: v.string() },
   handler: (ctx, args) => conErroresPublicos(async () => {
