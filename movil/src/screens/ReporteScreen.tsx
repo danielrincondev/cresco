@@ -41,6 +41,7 @@ import {
   Tarjeta,
 } from "../components/NucleoUI";
 import { etiquetaAccion, etiquetaFranja } from "../lib/estados";
+import type { AccionDeLaBitacora } from "./ReclamarScreen";
 import { fechaLegible } from "../lib/fechas";
 import { useLecturaSensible } from "../lib/useLecturaSensible";
 import { Espacio, Tamano, Texto } from "../theme/Theme";
@@ -188,10 +189,12 @@ export function ReporteAcumulado({
   estudianteId,
   nombre,
   onVolver,
+  onVerAccion,
 }: {
   estudianteId: Id<"estudiante">;
   nombre: string;
   onVolver: () => void;
+  onVerAccion: (accion: AccionDeLaBitacora) => void;
 }) {
   const datos = useQuery(api.conducta.reporteAcumulado, { estudianteId });
   // La lectura mas sensible de toda la app del representante: cada anotacion
@@ -231,6 +234,8 @@ export function ReporteAcumulado({
       ) : (
         datos.bitacora.map((accion) => (
           <Tarjeta key={accion.id}>
+            {/* Cada anotacion abre su detalle, que es donde vive el derecho a
+                reclamar (P7). Enterrarlo en un submenu seria no darlo. */}
             <Chips>
               <Chip etiqueta={etiquetaAccion(accion.estado)} />
               <Text style={r.dato}>
@@ -239,6 +244,9 @@ export function ReporteAcumulado({
               </Text>
             </Chips>
             <Cuerpo>{accion.descripcion}</Cuerpo>
+            <Boton secundario onPress={() => onVerAccion(accion)}>
+              Ver y reclamar
+            </Boton>
           </Tarjeta>
         ))
       )}

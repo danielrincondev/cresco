@@ -136,7 +136,7 @@ it("dice el límite del plan gratuito, y no lo dice en premium", () => {
 it("avisa cuando el parcial ya cerró y el puntaje no se mueve", () => {
   const ver = () =>
     texto(pintar(
-      <ReporteAcumulado estudianteId={"e1" as never} nombre="Ana Pérez" onVolver={() => {}} />,
+      <ReporteAcumulado estudianteId={"e1" as never} nombre="Ana Pérez" onVolver={() => {}} onVerAccion={() => {}} />,
     ));
   expect(ver()).not.toContain("ya cerró");
 
@@ -150,7 +150,7 @@ it("avisa cuando el parcial ya cerró y el puntaje no se mueve", () => {
  */
 it("aclara que el puntaje no es una calificación", () => {
   const t = texto(pintar(
-    <ReporteAcumulado estudianteId={"e1" as never} nombre="Ana Pérez" onVolver={() => {}} />,
+    <ReporteAcumulado estudianteId={"e1" as never} nombre="Ana Pérez" onVolver={() => {}} onVerAccion={() => {}} />,
   ));
   expect(t).toContain("no es una calificación");
 });
@@ -162,7 +162,7 @@ it("aclara que el puntaje no es una calificación", () => {
  */
 it("abrir el acumulado registra la lectura de la bitácora", async () => {
   pintar(
-    <ReporteAcumulado estudianteId={"e1" as never} nombre="Ana Pérez" onVolver={() => {}} />,
+    <ReporteAcumulado estudianteId={"e1" as never} nombre="Ana Pérez" onVolver={() => {}} onVerAccion={() => {}} />,
   );
   await act(async () => {});
   expect(estado.lecturas).toContainEqual({ estudianteId: "e1", recurso: "BITACORA_ACCIONES" });
