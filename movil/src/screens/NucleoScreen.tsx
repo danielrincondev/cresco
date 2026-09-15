@@ -45,6 +45,7 @@ import {
 } from "../components/NucleoUI";
 import { PaywallDocente, PaywallRepresentante } from "./PaywallScreen";
 import { AnotarConducta } from "./ConductaScreen";
+import { DetalleAccion, type AccionDeLaBitacora } from "./ReclamarScreen";
 import {
   PublicarComunicado,
   ReporteGeneral,
@@ -114,6 +115,14 @@ type Ruta =
       tipo: "docenteACargo" | "reporteHoy" | "reportesAnteriores" | "acumulado";
       estudianteId: Id<"estudiante">;
       nombre: string;
+    }
+  // P7 lleva la anotacion entera y no solo su id: la bitacora ya la trajo, y
+  // volver a pedirla al servidor para pintar lo mismo seria trabajo de mas.
+  | {
+      tipo: "detalleAccion";
+      estudianteId: Id<"estudiante">;
+      nombre: string;
+      accion: AccionDeLaBitacora;
     }
   | {
       tipo:
@@ -333,6 +342,19 @@ export function NucleoScreen() {
             estudianteId={ruta.estudianteId}
             nombre={ruta.nombre}
             onVolver={() => setRuta({ ...ruta, tipo: "reporteHoy" })}
+            onVerAccion={(accion) => setRuta({ ...ruta, tipo: "detalleAccion", accion })}
+          />
+        ) : ruta.tipo === "detalleAccion" ? (
+          <DetalleAccion
+            accion={ruta.accion}
+            nombre={ruta.nombre}
+            onVolver={() =>
+              setRuta({
+                tipo: "acumulado",
+                estudianteId: ruta.estudianteId,
+                nombre: ruta.nombre,
+              })
+            }
           />
         ) : ruta.tipo === "perfilDocente" ? (
           <PerfilDocente />
