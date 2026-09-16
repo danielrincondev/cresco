@@ -30,6 +30,8 @@ import type { FunctionReturnType } from "convex/server";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import { Chip, EstadoVacio } from "../components/Estado";
+import { etiquetaAccion } from "../lib/estados";
+import { fechaLegible } from "../lib/fechas";
 import {
   Aviso,
   Boton,
@@ -175,6 +177,10 @@ function FormularioAccion({
             Su representante la va a ver en la aplicación. El puntaje del período
             se recalcula solo.
           </Cuerpo>
+          <Cuerpo>
+            ¿Te equivocaste de estudiante? Se corrige desde "Anotaciones
+            recientes", en el menú del curso.
+          </Cuerpo>
         </Tarjeta>
         <Boton onPress={onCerrar}>Anotar a otro estudiante</Boton>
       </Pagina>
@@ -272,6 +278,122 @@ function FormularioAccion({
       </Boton>
       <Boton secundario onPress={onCerrar} disabled={op.pendiente}>
         Elegir otro estudiante
+      </Boton>
+    </Pagina>
+  );
+}
+
+
+/* =======================================================================
+ * Deshacer una anotacion puesta por error
+ * ======================================================================= */
+
+type Reciente = FunctionReturnType<typeof api.conducta.anotacionesRecientesDelCurso>[number];
+
+/**
+ * Las anotaciones de la ultima semana, para revisarlas y anular las erroneas.
+ *
+ * **Anular pide motivo, y lo pide aqui.** Queda en la bitacora como ANULAR y
+ * es lo que despues se le enseña a una institucion que pregunte por que
+ * desaparecio una sancion. "Me equivoque de alumno" es un motivo perfecto; un
+ * campo vacio no lo es.
+ *
+ * **Una positiva no se anula desde aqui**, y se dice. Es la regla del
+ * servidor (`anularAccion`), no una decision de la pantalla: `anulable` viene
+ * calculado de alla para que nunca se ofrezca un boton que despues se rechaza.
+ */
+export function AnotacionesRecientes({
+  cursoId,
+  onVolver,
+}: {
+  cursoId: Id<"curso">;
+  onVolver: () => void;
+}) {
+  const lista = useQuery(api.conducta.anotacionesRecientesDelCurso, { cursoId });
+  const anular = useMutation(api.conducta.anularAccion);
+  const [abierta, setAbierta] = useState<Reciente>();
+  const [motivo, setMotivo] = useState("");
+  const op = useOperacion();
+
+  async function confirmar() {
+    if (!abierta) return;
+    const r = await op.ejecutar(() =>
+      anular({ accionRegistradaId: abierta.id, motivo: motivo.trim() }),
+    );
+    if (r.ok) {
+      setAbierta(undefined);
+      setMotivo("");
+    }
+  }
+
+  if (lista === undefined) return <Cargando mensaje="Cargando anotaciones..." />;
+
+  if (abierta) {
+    return (
+      <Pagina titulo="Anular anotación" descripcion={abierta.estudiante}>
+        <Tarjeta>
+          <Subtitulo>{abierta.tipo}</Subtitulo>
+          <Cuerpo>{abierta.descripcion}</Cuerpo>
+          <Cuerpo>{`${fechaLegible(abierta.fecha)} · ${abierta.puntos} puntos`}</Cuerpo>
+        </Tarjeta>
+        <Tarjeta>
+          <Campo
+            etiqueta="¿Por qué la anulas?"
+            value={motivo}
+            onChangeText={setMotivo}
+            multiline
+            maxLength={300}
+            ayuda="Queda registrado. Por ejemplo: me equivoqué de estudiante."
+            editable={!op.pendiente}
+          />
+        </Tarjeta>
+        <Aviso>
+          Deja de contar para el puntaje del período, y la familia la verá como
+          anulada.
+        </Aviso>
+        <ErrorMensaje mensaje={op.error} />
+        <Boton
+          onPress={() => void confirmar()}
+          pendiente={op.pendiente}
+          disabled={!motivo.trim()}
+        >
+          Anular la anotación
+        </Boton>
+        <Boton secundario onPress={() => setAbierta(undefined)} disabled={op.pendiente}>
+          Cancelar
+        </Boton>
+      </Pagina>
+    );
+  }
+
+  return (
+    <Pagina
+      titulo="Anotaciones recientes"
+      descripcion="Lo que se anotó en el curso esta semana. Si te equivocaste, aquí se corrige."
+    >
+      {lista.length === 0 ? (
+        <EstadoVacio icono="notebook" titulo="Nada anotado esta semana">
+          Las anotaciones de los últimos siete días aparecen aquí.
+        </EstadoVacio>
+      ) : (
+        lista.map((a) => (
+          <Tarjeta key={a.id}>
+            <Subtitulo>{a.estudiante}</Subtitulo>
+            <Chip etiqueta={etiquetaAccion(a.estado)} />
+            <Cuerpo>{`${a.tipo} · ${a.puntos > 0 ? `+${a.puntos}` : a.puntos} · ${fechaLegible(a.fecha)}`}</Cuerpo>
+            <Cuerpo>{a.descripcion}</Cuerpo>
+            {a.anulable ? (
+              <Boton secundario onPress={() => setAbierta(a)}>
+                Anular
+              </Boton>
+            ) : a.estado === "VIGENTE" ? (
+              <Cuerpo>Las positivas no se anulan desde aquí.</Cuerpo>
+            ) : null}
+          </Tarjeta>
+        ))
+      )}
+      <Boton secundario onPress={onVolver}>
+        Volver al curso
       </Boton>
     </Pagina>
   );

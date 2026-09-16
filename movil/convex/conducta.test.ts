@@ -272,3 +272,92 @@ describe("conducta — asistencia, reportes y cierre nocturno (#10)", () => {
     expect(primero.generados).toBe(1); expect(segundo.generados).toBe(0);
   });
 });
+
+/* =======================================================================
+ * Deshacer una anotacion puesta por error
+ * ======================================================================= */
+
+/** El curso y un tipo negativo del catalogo sembrado, sobre el `fixture`. */
+async function conCursoYNegativa(f: Awaited<ReturnType<typeof fixture>>) {
+  return await f.t.run(async (ctx) => {
+    const matricula = (await ctx.db.query("matricula").collect())[0];
+    const negativa = (await ctx.db.query("tipoAccion").collect())
+      .find((x) => x.codigo === "NEG_INDISCIPLINA")!;
+    return { cursoId: matricula.cursoId, negativaId: negativa._id };
+  });
+}
+
+/**
+ * `anularAccion` existia y auditaba, pero ninguna pantalla la llamaba porque
+ * no habia forma de listar lo que un docente ya anoto. Un error quedaba en el
+ * expediente de un menor hasta que la familia reclamara.
+ */
+it("lista las anotaciones recientes del curso, lo mas nuevo primero", async () => {
+  const f = await fixture();
+  const { cursoId, negativaId } = await conCursoYNegativa(f);
+
+  await f.cliente.mutation(api.conducta.registrarAccion, f.args);
+  vi.advanceTimersByTime(1000);
+  await f.cliente.mutation(api.conducta.registrarAccion, {
+    ...f.args, tipoAccionId: negativaId, puntosAplicados: -1, descripcion: "Se equivocó de alumno",
+  });
+
+  const lista = await f.cliente.query(api.conducta.anotacionesRecientesDelCurso, { cursoId });
+  expect(lista).toHaveLength(2);
+  expect(lista[0]).toMatchObject({
+    estudiante: "Prueba Prueba", descripcion: "Se equivocó de alumno", signo: "NEGATIVA",
+  });
+});
+
+/**
+ * `anulable` lo decide el servidor con la misma regla que `anularAccion`: solo
+ * una negativa vigente. Si lo decidiera la pantalla, podria ofrecer un boton
+ * que despues se rechaza.
+ */
+it("marca como anulable solo la negativa vigente", async () => {
+  const f = await fixture();
+  const { cursoId, negativaId } = await conCursoYNegativa(f);
+  await f.cliente.mutation(api.conducta.registrarAccion, f.args);
+  await f.cliente.mutation(api.conducta.registrarAccion, {
+    ...f.args, tipoAccionId: negativaId, puntosAplicados: -1,
+  });
+
+  const lista = await f.cliente.query(api.conducta.anotacionesRecientesDelCurso, { cursoId });
+  expect(lista.find((a) => a.signo === "POSITIVA")?.anulable).toBe(false);
+  expect(lista.find((a) => a.signo === "NEGATIVA")?.anulable).toBe(true);
+});
+
+it("tras anularla, sigue en la lista pero ya no es anulable", async () => {
+  const f = await fixture();
+  const { cursoId, negativaId } = await conCursoYNegativa(f);
+  const id = await f.cliente.mutation(api.conducta.registrarAccion, {
+    ...f.args, tipoAccionId: negativaId, puntosAplicados: -1,
+  });
+
+  await f.cliente.mutation(api.conducta.anularAccion, { accionRegistradaId: id, motivo: "Era otro alumno" });
+
+  const [fila] = await f.cliente.query(api.conducta.anotacionesRecientesDelCurso, { cursoId });
+  expect(fila).toMatchObject({ estado: "ANULADA", anulable: false });
+});
+
+it("no enseña lo de hace más de una semana", async () => {
+  const f = await fixture();
+  const { cursoId } = await conCursoYNegativa(f);
+  await f.cliente.mutation(api.conducta.registrarAccion, { ...f.args, fechaOcurrencia: "2026-09-01" });
+
+  expect(await f.cliente.query(api.conducta.anotacionesRecientesDelCurso, { cursoId })).toHaveLength(0);
+});
+
+it("un docente que no es titular del curso no ve sus anotaciones", async () => {
+  const f = await fixture();
+  const { cursoId } = await conCursoYNegativa(f);
+  await f.t.run(async (ctx) => {
+    const perfil = await ctx.db.insert("perfilUsuario", {
+      authSubject: "otro_docente", tipoDocumento: "CEDULA", numeroDocumento: "0000000009", actualizadoEn: Date.now(),
+    });
+    await ctx.db.insert("docente", { perfilUsuarioId: perfil, actualizadoEn: Date.now() });
+  });
+  await expect(
+    f.t.withIdentity({ subject: "otro_docente" }).query(api.conducta.anotacionesRecientesDelCurso, { cursoId }),
+  ).rejects.toMatchObject({ data: { codigo: expect.any(String) } });
+});
