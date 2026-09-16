@@ -768,6 +768,14 @@ export default defineSchema({
      */
     expiraEn: v.optional(v.number()),
     renovacionAutomatica: v.boolean(),
+    /**
+     * Nacida de una compra de prueba (ADR-008). Una suscripcion del Test Store
+     * concede acceso igual que una real -- y debe hacerlo, porque asi se
+     * prueba y se graba el video -- pero tiene que poder distinguirse: si no,
+     * los datos de la demostracion y los de un piloto real quedan mezclados
+     * sin forma de separarlos.
+     */
+    esSandbox: v.optional(v.boolean()),
     ...actualizadoEn,
   })
     .index("por_usuario", ["perfilUsuarioId", "estado"])
@@ -792,6 +800,15 @@ export default defineSchema({
     recibidoEn: v.number(),
     procesadoEn: v.optional(v.number()),
     errorProcesamiento: v.optional(v.string()),
+    /**
+     * `true` cuando el evento vino del Test Store de RevenueCat (ADR-008).
+     *
+     * El payload entero ya se guarda, asi que el dato existia dentro del JSON
+     * -- pero no se podia consultar. Con la columna se pueden separar las
+     * compras de prueba de las reales sin borrar nada, que es la regla del
+     * proyecto. Opcional por los eventos anteriores a la columna.
+     */
+    esSandbox: v.optional(v.boolean()),
   }).index("por_evento_externo", ["eventoIdExterno"]),
 
   /** E6 / I2: exportar el PDF acumulado viendo un anuncio recompensado. */
