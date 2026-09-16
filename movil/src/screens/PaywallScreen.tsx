@@ -22,12 +22,14 @@
  * las dos ramas por eso, y cada paywall lee solo la suya.
  */
 
+import { useEffect, useState } from "react";
 import { useQuery } from "convex/react";
 
 import { api } from "../../convex/_generated/api";
 import { EstadoVacio } from "../components/Estado";
 import {
   Aviso,
+  Boton,
   Cargando,
   Cuerpo,
   Pagina,
@@ -35,6 +37,13 @@ import {
   Tarjeta,
 } from "../components/NucleoUI";
 import { fechaHoraLegible } from "../lib/fechas";
+import {
+  comprar,
+  paquetesDisponibles,
+  prepararCompras,
+  restaurarCompras,
+  type PaqueteComprable,
+} from "../lib/compras";
 
 type Audiencia = "DOCENTE" | "REPRESENTANTE";
 
@@ -85,6 +94,43 @@ function Paywall({ audiencia, titulo, descripcion }: {
 }) {
   const suscripcion = useQuery(api.suscripciones.miSuscripcion);
   const planes = useQuery(api.suscripciones.planesDisponibles, { audiencia });
+  const perfil = useQuery(api.nucleo.obtenerPerfil);
+  const [paquetes, setPaquetes] = useState<PaqueteComprable[]>([]);
+  const [comprando, setComprando] = useState<string>();
+  const [aviso, setAviso] = useState<string>();
+
+  /**
+   * El SDK se ata al perfil de Convex, que es como el webhook sabe a quien
+   * aplicar el cobro. Con la clave ausente esto no hace nada y la pantalla
+   * sigue siendo informativa, igual que antes.
+   */
+  useEffect(() => {
+    if (!perfil?.perfilUsuarioId) return;
+    let vivo = true;
+    void (async () => {
+      const motivo = await prepararCompras(perfil.perfilUsuarioId);
+      if (!vivo || motivo) return;
+      setPaquetes(await paquetesDisponibles());
+    })();
+    return () => { vivo = false; };
+  }, [perfil?.perfilUsuarioId]);
+
+  async function comprarPlan(productoId: string) {
+    const paquete = paquetes.find((p) => p.productoId === productoId);
+    if (!paquete) return;
+    setComprando(productoId);
+    setAviso(undefined);
+    const r = await comprar(paquete.identificador);
+    setComprando(undefined);
+    if (r.estado === "COMPRADA") {
+      // El acceso no se escribe aqui: lo concede el webhook (ADR-006). La
+      // pantalla se actualiza sola cuando `miSuscripcion` lo refleje.
+      setAviso("Compra registrada. Tu plan se activa en unos segundos.");
+    } else if (r.estado === "ERROR") {
+      setAviso(r.mensaje);
+    }
+    // Cancelar no es un error: quien decide no comprar no merece un mensaje.
+  }
 
   if (suscripcion === undefined || planes === undefined) return <Cargando />;
 
@@ -150,15 +196,45 @@ function Paywall({ audiencia, titulo, descripcion }: {
             <Cuerpo>
               {plan.periodicidad === "ANUAL" ? "Cobro anual." : "Cobro mensual."}
             </Cuerpo>
+            {/* El precio lo pone RevenueCat en la moneda de la persona
+                (ADR-006). Si el SDK no esta disponible no hay paquete, y
+                entonces no hay boton: nunca se ofrece comprar algo que no se
+                puede cobrar. */}
+            {paquetes.find((p) => p.productoId === plan.productoGooglePlay) ? (
+              <Boton
+                onPress={() => void comprarPlan(plan.productoGooglePlay!)}
+                pendiente={comprando === plan.productoGooglePlay}
+              >
+                {`Suscribirme por ${paquetes.find((p) => p.productoId === plan.productoGooglePlay)!.precio}`}
+              </Boton>
+            ) : null}
           </Tarjeta>
         ))
       )}
 
-      <Aviso>
-        La compra dentro de la aplicación todavía no está disponible en esta
-        versión. Cuando lo esté, el precio lo vas a ver aquí en tu moneda, con
-        el cobro gestionado por Google Play.
-      </Aviso>
+      {aviso && <Aviso>{aviso}</Aviso>}
+
+      {paquetes.length > 0 ? (
+        <Boton
+          secundario
+          onPress={() => void (async () => {
+            const r = await restaurarCompras();
+            setAviso(
+              r.estado === "COMPRADA"
+                ? "Listo. Si tenías un plan activo, ya está aplicado."
+                : "No se pudo restaurar ahora mismo.",
+            );
+          })()}
+        >
+          Restaurar una compra anterior
+        </Boton>
+      ) : (
+        <Aviso>
+          La compra dentro de la aplicación todavía no está disponible en esta
+          versión. Cuando lo esté, el precio lo vas a ver aquí en tu moneda, con
+          el cobro gestionado por Google Play.
+        </Aviso>
+      )}
     </Pagina>
   );
 }
