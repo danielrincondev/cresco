@@ -161,7 +161,13 @@ export function NucleoScreen() {
    * cien mas recientes y Convex la mantiene viva por suscripcion, asi que
    * abrir la bandeja no vuelve a pedir nada.
    */
-  const novedades = useQuery(api.interaccion.misNotificaciones);
+  // `"skip"` hasta que haya perfil: preguntar por la bandeja de alguien que
+  // todavia no tiene cuenta es una llamada sin sentido, y era la que rompia
+  // la pantalla justo despues de registrarse.
+  const novedades = useQuery(
+    api.interaccion.misNotificaciones,
+    perfil ? {} : "skip",
+  );
   const sinLeer = (novedades ?? []).filter((n) => n.leidaEn === undefined).length;
   const [ruta, setRuta] = useState<Ruta>({ tipo: "inicio" });
   const [rolElegido, setRol] = useState<Rol>();
