@@ -65,6 +65,10 @@ export const procesarEvento = internalMutation({
       revenuecatAppUserId: args.appUserId,
       payload: args.payload,
       recibidoEn: ahora,
+      // Se lee del payload antes de interpretarlo: un evento que despues falle
+      // al aplicarse tiene que quedar marcado igual, porque para separar datos
+      // de prueba de datos reales da igual si se aplico o no.
+      esSandbox: lecturaSandbox(args.payload),
     });
 
     // --- Efecto sobre la suscripción -------------------------------------
@@ -136,6 +140,12 @@ export const eventosSinAplicar = internalQuery({
   },
 });
 
+/** `environment` del payload crudo, sin pasar por el interprete. */
+function lecturaSandbox(payload: unknown): boolean {
+  const evento = (payload as { event?: { environment?: unknown } } | null)?.event;
+  return evento?.environment === "SANDBOX";
+}
+
 async function aplicar(ctx: MutationCtx, payload: unknown, ahora: number) {
   const lectura = leerEvento(payload);
   if (!lectura.ok) throw new Error(lectura.motivo);
@@ -200,6 +210,10 @@ async function aplicar(ctx: MutationCtx, payload: unknown, ahora: number) {
     expiraEn: interpretacion.expiraEn ?? undefined,
     renovacionAutomatica: interpretacion.renovacionAutomatica,
     revenuecatAppUserId: evento.app_user_id,
+    // ADR-008. `interpretarEvento` ya lo calculaba y **se descartaba**: una
+    // compra del Test Store quedaba indistinguible de una real salvo leyendo
+    // el JSON del payload a mano.
+    esSandbox: interpretacion.esSandbox,
     actualizadoEn: ahora,
   };
 

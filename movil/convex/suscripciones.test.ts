@@ -313,3 +313,72 @@ describe("suscripciones — los pagos que no se pudieron aplicar", () => {
       .toMatchObject({ total: 1, sinAplicar: 0, eventos: [] });
   });
 });
+
+describe("suscripciones — separar las compras de prueba de las reales (ADR-008)", () => {
+  /** Un evento de compra tal como lo manda RevenueCat, con su entorno. */
+  const evento = (entorno: "SANDBOX" | "PRODUCTION", appUserId: string) => ({
+    eventoIdExterno: `evt-${entorno}`,
+    tipoEvento: "INITIAL_PURCHASE",
+    appUserId,
+    payload: {
+      event: {
+        id: `evt-${entorno}`,
+        type: "INITIAL_PURCHASE",
+        app_user_id: appUserId,
+        product_id: "REP_PREMIUM_MENSUAL",
+        environment: entorno,
+        purchased_at_ms: Date.now(),
+        expiration_at_ms: Date.now() + 30 * DIA,
+      },
+    },
+  });
+
+  /**
+   * `interpretarEvento` ya calculaba `esSandbox` y **se descartaba**. Una
+   * compra del Test Store -- la que se hace para grabar el video -- quedaba
+   * indistinguible de una real salvo leyendo el JSON del payload a mano.
+   */
+  it("marca la suscripción y el evento nacidos de una compra de prueba", async () => {
+    const t = convexTest(schema, modules);
+    await sembrarPlanes(t);
+    const perfilUsuarioId = await sembrarPersona(t, "rep_1", { representante: true });
+
+    await t.mutation(internal.suscripciones.procesarEvento, evento("SANDBOX", perfilUsuarioId));
+
+    const estado = await t.run(async (ctx) => ({
+      suscripcion: await ctx.db.query("suscripcion").unique(),
+      evento: await ctx.db.query("eventoRevenuecat").unique(),
+    }));
+    expect(estado.suscripcion?.esSandbox).toBe(true);
+    expect(estado.evento?.esSandbox).toBe(true);
+    // Y da acceso igual que una real: asi es como se prueba y se graba.
+    expect(estado.suscripcion?.estado).toBe("ACTIVA");
+  });
+
+  it("una compra real no queda marcada", async () => {
+    const t = convexTest(schema, modules);
+    await sembrarPlanes(t);
+    const perfilUsuarioId = await sembrarPersona(t, "rep_2", { representante: true });
+
+    await t.mutation(internal.suscripciones.procesarEvento, evento("PRODUCTION", perfilUsuarioId));
+
+    const suscripcion = await t.run((ctx) => ctx.db.query("suscripcion").unique());
+    expect(suscripcion?.esSandbox).toBe(false);
+  });
+
+  /**
+   * La marca se lee del payload crudo, antes de interpretarlo: un evento que
+   * despues falla al aplicarse tiene que quedar marcado igual, porque para
+   * separar datos de prueba de datos reales da lo mismo si se aplico.
+   */
+  it("un evento de prueba que falla al aplicarse sigue marcado", async () => {
+    const t = convexTest(schema, modules);
+    const perfilUsuarioId = await sembrarPersona(t, "rep_3", { representante: true });
+    // Sin planes sembrados, `aplicar` falla al resolver el producto.
+    await t.mutation(internal.suscripciones.procesarEvento, evento("SANDBOX", perfilUsuarioId));
+
+    const guardado = await t.run((ctx) => ctx.db.query("eventoRevenuecat").unique());
+    expect(guardado?.esSandbox).toBe(true);
+    expect(guardado?.errorProcesamiento).toBeDefined();
+  });
+});
