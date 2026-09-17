@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api, internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import schema from "./schema";
+import { sanearParaConvex } from "./lib/revenuecat";
 
 const modules = import.meta.glob(["./suscripciones.ts", "./_generated/*.js"]);
 
@@ -380,5 +381,84 @@ describe("suscripciones — separar las compras de prueba de las reales (ADR-008
     const guardado = await t.run((ctx) => ctx.db.query("eventoRevenuecat").unique());
     expect(guardado?.esSandbox).toBe(true);
     expect(guardado?.errorProcesamiento).toBeDefined();
+  });
+});
+
+describe("suscripciones — el payload real de RevenueCat se puede guardar", () => {
+  /**
+   * Encontrado con el boton "Send test event" del panel, el 17 de septiembre.
+   * RevenueCat manda `subscriber_attributes` con claves reservadas suyas
+   * (`$displayName`, `$email`, `$phoneNumber`) y **Convex prohibe los nombres
+   * de campo que empiezan por `$`**. Guardar el evento tal cual tumbaba la
+   * transaccion entera: 500 al webhook, cinco reintentos, y el cobro perdido.
+   *
+   * No es cosa del evento de prueba: una compra real trae esos atributos.
+   */
+  it("guarda un evento con atributos que empiezan por $", async () => {
+    const t = convexTest(schema, modules);
+    await sembrarPlanes(t);
+    const perfilUsuarioId = await sembrarPersona(t, "rep_9", { representante: true });
+
+    // Igual que hace `http.ts`: el payload se sanea **antes** de cruzar la
+    // frontera de la mutation, porque Convex valida el valor al pasarlo como
+    // argumento -- el `$` revienta antes incluso de llegar al insert.
+    const crudo = {
+        event: {
+          id: "evt-con-dolar",
+          type: "INITIAL_PURCHASE",
+          app_user_id: perfilUsuarioId,
+          product_id: "REP_PREMIUM_MENSUAL",
+          environment: "SANDBOX",
+          purchased_at_ms: Date.now(),
+          expiration_at_ms: Date.now() + 30 * DIA,
+          subscriber_attributes: {
+            $displayName: { value: "Mister Mistoffelees", updated_at_ms: 1 },
+            $email: { value: "tuxedo@revenuecat.com", updated_at_ms: 1 },
+            my_custom_attribute_1: { value: "catnip", updated_at_ms: 1 },
+          },
+        },
+    };
+
+    await t.mutation(internal.suscripciones.procesarEvento, {
+      eventoIdExterno: "evt-con-dolar",
+      tipoEvento: "INITIAL_PURCHASE",
+      appUserId: perfilUsuarioId,
+      payload: sanearParaConvex(crudo),
+    });
+
+    const guardado = await t.run((ctx) => ctx.db.query("eventoRevenuecat").unique());
+    const atributos = (guardado?.payload as { event: { subscriber_attributes: Record<string, unknown> } })
+      .event.subscriber_attributes;
+    // El `$` pasa a `_`: se conserva el dato y el nombre sigue siendo legible.
+    expect(Object.keys(atributos).sort()).toEqual(["_displayName", "_email", "my_custom_attribute_1"]);
+    // Y la suscripcion se aplico igual.
+    expect(await t.run((ctx) => ctx.db.query("suscripcion").unique())).toMatchObject({ estado: "ACTIVA" });
+  });
+
+  /**
+   * El evento de prueba del panel manda un UUID como `app_user_id`. Con
+   * `ctx.db.get` eso lanzaba un error que deshacia la transaccion, asi que ni
+   * el evento fallido quedaba registrado.
+   */
+  it("un app_user_id que no es de Cresco queda registrado con su error, no revienta", async () => {
+    const t = convexTest(schema, modules);
+    await sembrarPlanes(t);
+
+    await t.mutation(internal.suscripciones.procesarEvento, {
+      eventoIdExterno: "evt-uuid",
+      tipoEvento: "INITIAL_PURCHASE",
+      appUserId: "64dd9550-fda9-4fab-b669-d65b2c54cb92",
+      payload: {
+        event: {
+          id: "evt-uuid", type: "INITIAL_PURCHASE",
+          app_user_id: "64dd9550-fda9-4fab-b669-d65b2c54cb92",
+          product_id: "REP_PREMIUM_MENSUAL", environment: "SANDBOX",
+        },
+      },
+    });
+
+    const guardado = await t.run((ctx) => ctx.db.query("eventoRevenuecat").unique());
+    expect(guardado?.errorProcesamiento).toContain("no es un perfilUsuario de Cresco");
+    expect(await t.run((ctx) => ctx.db.query("suscripcion").unique())).toBeNull();
   });
 });

@@ -315,6 +315,30 @@ export function interpretarEvento(evento: EventoRevenuecat): Interpretacion {
 }
 
 /**
+ * Prepara el payload para poder guardarlo en Convex.
+ *
+ * RevenueCat manda `subscriber_attributes` con claves reservadas suyas:
+ * `$displayName`, `$email`, `$phoneNumber`. **Convex prohibe los nombres de
+ * campo que empiezan por `$`**, asi que guardar el evento tal cual lanza
+ * `Field name $displayName starts with a '$', which is reserved` y tumba la
+ * transaccion entera -- el manejador devuelve 500 y RevenueCat reintenta cinco
+ * veces antes de **descartar el cobro**.
+ *
+ * Se renombran a `_`: se conserva el dato y el nombre sigue siendo legible.
+ * No se descartan porque el payload entero es la prueba de lo que llego, y
+ * esa es la razon de guardarlo.
+ */
+export function sanearParaConvex(valor: unknown): unknown {
+  if (Array.isArray(valor)) return valor.map(sanearParaConvex);
+  if (valor === null || typeof valor !== "object") return valor;
+  const limpio: Record<string, unknown> = {};
+  for (const [clave, dentro] of Object.entries(valor as Record<string, unknown>)) {
+    limpio[clave.startsWith("$") ? `_${clave.slice(1)}` : clave] = sanearParaConvex(dentro);
+  }
+  return limpio;
+}
+
+/**
  * Decide si hay acceso ahora mismo.
  *
  * Es la regla que impide el bug descrito arriba: una suscripción CANCELADA

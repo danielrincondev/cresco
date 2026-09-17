@@ -8,7 +8,7 @@
 import { httpRouter } from "convex/server";
 import { httpAction } from "./_generated/server";
 import { internal } from "./_generated/api";
-import { autenticarPeticion, leerEvento } from "./lib/revenuecat";
+import { autenticarPeticion, leerEvento, sanearParaConvex } from "./lib/revenuecat";
 
 /**
  * POST /webhooks/revenuecat
@@ -79,7 +79,10 @@ const webhookRevenuecat = httpAction(async (ctx, request) => {
     eventoIdExterno: lectura.evento.id,
     tipoEvento: lectura.evento.type,
     appUserId: lectura.evento.app_user_id,
-    payload: cuerpo,
+    // Saneado **aqui**, antes de cruzar la frontera de la mutation: Convex
+    // valida el valor al pasarlo como argumento, asi que un `$displayName` de
+    // RevenueCat revienta antes incluso de llegar al insert.
+    payload: sanearParaConvex(cuerpo),
   });
 
   return new Response(JSON.stringify(resultado), {
