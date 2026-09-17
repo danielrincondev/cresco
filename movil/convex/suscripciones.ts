@@ -190,7 +190,18 @@ async function aplicar(ctx: MutationCtx, payload: unknown, ahora: number) {
     );
   }
 
-  const perfilId = evento.app_user_id as Id<"perfilUsuario">;
+  // `normalizeId` en vez de `get` directo: con un identificador que no es de
+  // Convex -- el evento de prueba manda un UUID -- `get` lanza un error que
+  // deshace la transaccion, y entonces ni siquiera queda registrado el evento
+  // fallido. Asi se convierte en un error de dominio normal, que el manejador
+  // guarda y responde 200.
+  const perfilId = ctx.db.normalizeId("perfilUsuario", evento.app_user_id);
+  if (perfilId === null) {
+    throw new Error(
+      `El app_user_id "${evento.app_user_id}" no es un perfilUsuario de Cresco. ` +
+        `La app debe configurar el SDK con el perfilUsuario._id.`,
+    );
+  }
   const perfil = await ctx.db.get(perfilId);
   if (perfil === null) {
     throw new Error(`No existe el perfilUsuario ${evento.app_user_id} que envió RevenueCat.`);
