@@ -642,12 +642,14 @@ export const inconformidadesDelDocente = query({
  * - `MODIFICADA` — la acción pasa a `MODIFICADA`, vale 0 puntos.
  * - `ANULADA` — la acción pasa a `ANULADA`, vale 0 puntos.
  *
- * ⚠️ **Coordinación pendiente con Persona B (#9).** Poner la acción en 0 exige
- * recalcular `puntajePeriodo`, y ese recálculo es del módulo de conducta —
- * no se duplica aquí. Mientras `conducta.ts` no exponga esa función, esta
- * mutation deja la acción en su estado final correcto y **marca el puntaje
- * como pendiente de recálculo**; el día que exista, se llama desde aquí.
- * Ver el comentario `RECALCULO_PENDIENTE` más abajo.
+ * Poner la acción en 0 exige recalcular `puntajePeriodo`, y ese recálculo es
+ * del módulo de conducta — no se duplica aquí. Desde #77 existe
+ * `conducta.recalcularPuntaje` y **se llama desde esta mutation**: el puntaje
+ * queda correcto en la misma transacción, no pendiente de nada.
+ *
+ * ADR-005: el puntaje no se ajusta a mano nunca. Se deriva de las acciones
+ * VIGENTES, así que anular una no "resta puntos": la acción deja de contar y
+ * el total se vuelve a calcular.
  */
 export const resolverInconformidad = mutation({
   args: {
