@@ -30,6 +30,7 @@ import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import { MODALIDAD, REGLAS, TIPO_ALERTA } from "../../convex/lib/enums";
 import { Chip, Chips, EstadoVacio } from "../components/Estado";
+import { EsqueletoPagina } from "../components/Movimiento";
 import {
   Aviso,
   Boton,
@@ -824,7 +825,7 @@ export function PerfilDocente() {
     if (r.ok) setGuardado(true);
   }
 
-  if (perfil === undefined) return <Cargando />;
+  if (perfil === undefined) return <EsqueletoPagina etiqueta="Cargando el perfil" />;
 
   return (
     <Pagina
@@ -918,7 +919,7 @@ export function ProfesorACargo({
 }) {
   const ficha = useQuery(api.interaccion.docenteACargo, { estudianteId });
 
-  if (ficha === undefined) return <Cargando />;
+  if (ficha === undefined) return <EsqueletoPagina etiqueta="Cargando la ficha" />;
 
   if (ficha === null) {
     return (

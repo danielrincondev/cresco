@@ -27,6 +27,7 @@ import { useQuery } from "convex/react";
 
 import { api } from "../../convex/_generated/api";
 import { EstadoVacio } from "../components/Estado";
+import { EsqueletoPagina } from "../components/Movimiento";
 import {
   Aviso,
   Boton,
@@ -132,7 +133,8 @@ function Paywall({ audiencia, titulo, descripcion }: {
     // Cancelar no es un error: quien decide no comprar no merece un mensaje.
   }
 
-  if (suscripcion === undefined || planes === undefined) return <Cargando />;
+  if (suscripcion === undefined || planes === undefined)
+    return <EsqueletoPagina tarjetas={2} etiqueta="Cargando los planes" />;
 
   const rama = audiencia === "DOCENTE" ? suscripcion.docente : suscripcion.representante;
 
@@ -186,8 +188,8 @@ function Paywall({ audiencia, titulo, descripcion }: {
           Todavía no hay planes de pago publicados para esta sección.
         </Aviso>
       ) : (
-        planes.map((plan) => (
-          <Tarjeta key={plan.codigo}>
+        planes.map((plan, i) => (
+          <Tarjeta key={plan.codigo} orden={i}>
             <Subtitulo>{plan.nombre}</Subtitulo>
             {plan.sinPublicidad && <Cuerpo>· Sin anuncios</Cuerpo>}
             {limitesLegibles(plan.limites as Record<string, unknown>).map((frase) => (

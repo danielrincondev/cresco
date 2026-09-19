@@ -32,6 +32,7 @@ import type { Id } from "../../convex/_generated/dataModel";
 import { Chip, EstadoVacio } from "../components/Estado";
 import { etiquetaAccion } from "../lib/estados";
 import { fechaLegible } from "../lib/fechas";
+import { EsqueletoPagina } from "../components/Movimiento";
 import {
   Aviso,
   Boton,
@@ -108,8 +109,8 @@ export function AnotarConducta({
         </EstadoVacio>
       ) : (
         <>
-          {estudiantes.map((e) => (
-            <Tarjeta key={e.estudianteId}>
+          {estudiantes.map((e, i) => (
+            <Tarjeta key={e.estudianteId} orden={i}>
               <Subtitulo>
                 {e.nombres} {e.apellidos}
               </Subtitulo>
@@ -187,7 +188,7 @@ function FormularioAccion({
     );
   }
 
-  if (catalogo === undefined) return <Cargando mensaje="Cargando el catálogo..." />;
+  if (catalogo === undefined) return <EsqueletoPagina etiqueta="Cargando el catálogo" />;
 
   return (
     <Pagina
@@ -326,7 +327,7 @@ export function AnotacionesRecientes({
     }
   }
 
-  if (lista === undefined) return <Cargando mensaje="Cargando anotaciones..." />;
+  if (lista === undefined) return <EsqueletoPagina etiqueta="Cargando las anotaciones" />;
 
   if (abierta) {
     return (
@@ -376,8 +377,8 @@ export function AnotacionesRecientes({
           Las anotaciones de los últimos siete días aparecen aquí.
         </EstadoVacio>
       ) : (
-        lista.map((a) => (
-          <Tarjeta key={a.id}>
+        lista.map((a, i) => (
+          <Tarjeta key={a.id} orden={i}>
             <Subtitulo>{a.estudiante}</Subtitulo>
             <Chip etiqueta={etiquetaAccion(a.estado)} />
             <Cuerpo>{`${a.tipo} · ${a.puntos > 0 ? `+${a.puntos}` : a.puntos} · ${fechaLegible(a.fecha)}`}</Cuerpo>

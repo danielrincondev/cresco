@@ -2,10 +2,8 @@ import React from "react";
 import { afterEach, expect, it, vi } from "vitest";
 import { act, create, type ReactTestRenderer } from "react-test-renderer";
 
-vi.mock("react-native", () => ({
-  ActivityIndicator: "ActivityIndicator", KeyboardAvoidingView: "KeyboardAvoidingView",
-  Pressable: "Pressable", ScrollView: "ScrollView", Text: "Text", TextInput: "TextInput",
-  View: "View", Platform: { OS: "android" }, StyleSheet: { create: (e: unknown) => e },
+vi.mock("react-native", async () => ({
+  ...(await import("../test/mockReactNative")).reactNative(),
 }));
 
 // `NucleoUI` importa `Icono` desde #66 (el boton de atras del encabezado).

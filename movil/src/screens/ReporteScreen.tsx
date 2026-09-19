@@ -31,6 +31,7 @@ import type { FunctionReturnType } from "convex/server";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import { Chip, Chips, EstadoVacio } from "../components/Estado";
+import { EsqueletoPagina } from "../components/Movimiento";
 import {
   Aviso,
   Boton,
@@ -111,7 +112,7 @@ export function ReporteDeHoy({
   // DP-006: abrir el reporte de un menor es una lectura sensible.
   useLecturaSensible(estudianteId, "REPORTE_ESTUDIANTE");
 
-  if (hoy === undefined) return <Cargando mensaje="Cargando el reporte..." />;
+  if (hoy === undefined) return <EsqueletoPagina etiqueta="Cargando el reporte" />;
 
   return (
     <Pagina titulo={nombre} descripcion="Lo de hoy, contado por su docente.">
@@ -151,7 +152,7 @@ export function ReportesAnteriores({
   const datos = useQuery(api.conducta.reportesAnteriores, { estudianteId });
   useLecturaSensible(estudianteId, "REPORTE_ESTUDIANTE");
 
-  if (datos === undefined) return <Cargando mensaje="Cargando el historial..." />;
+  if (datos === undefined) return <EsqueletoPagina etiqueta="Cargando el historial" />;
 
   return (
     <Pagina titulo="Reportes anteriores" descripcion={nombre}>
@@ -203,7 +204,7 @@ export function ReporteAcumulado({
   // llena de filas repetidas.
   useLecturaSensible(estudianteId, "BITACORA_ACCIONES");
 
-  if (datos === undefined) return <Cargando mensaje="Cargando el acumulado..." />;
+  if (datos === undefined) return <EsqueletoPagina etiqueta="Cargando el acumulado" />;
 
   return (
     <Pagina titulo={`${nombre} · ${datos.periodo.nombre}`}>
@@ -232,8 +233,8 @@ export function ReporteAcumulado({
           No hay nada registrado todavía.
         </EstadoVacio>
       ) : (
-        datos.bitacora.map((accion) => (
-          <Tarjeta key={accion.id}>
+        datos.bitacora.map((accion, i) => (
+          <Tarjeta key={accion.id} orden={i}>
             {/* Cada anotacion abre su detalle, que es donde vive el derecho a
                 reclamar (P7). Enterrarlo en un submenu seria no darlo. */}
             <Chips>

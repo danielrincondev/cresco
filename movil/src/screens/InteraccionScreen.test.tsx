@@ -14,11 +14,11 @@ const estado = vi.hoisted(() => ({
   loadMore: vi.fn(),
   citas: [] as any[],
 }));
-vi.mock("react-native", () => ({
-  ActivityIndicator: "ActivityIndicator", KeyboardAvoidingView: "KeyboardAvoidingView",
-  Pressable: "Pressable", ScrollView: "ScrollView", Text: "Text", TextInput: "TextInput",
-  View: "View", Modal: "Modal", Platform: { OS: "web" },
-  Linking: { openURL: vi.fn() }, StyleSheet: { create: (x: unknown) => x },
+vi.mock("react-native", async () => ({
+  ...(await import("../test/mockReactNative")).reactNative(),
+  Platform: { OS: "web" },
+  Modal: "Modal",
+  Linking: { openURL: vi.fn() },
 }));
 vi.mock("@clerk/expo", () => ({
   useSession: () => ({ session: { getToken: estado.getToken, startVerification: estado.startVerification, attemptFirstFactorVerification: estado.attemptFirstFactorVerification } }),

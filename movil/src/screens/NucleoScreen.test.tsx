@@ -21,12 +21,12 @@ const estado = vi.hoisted(() => ({
   novedades: [] as { leidaEn?: number }[],
   funciones: new Map<string, (args: unknown) => Promise<unknown>>(),
 }));
-vi.mock("react-native", () => ({
-  ActivityIndicator: "ActivityIndicator", KeyboardAvoidingView: "KeyboardAvoidingView",
-  Pressable: "Pressable", ScrollView: "ScrollView", Text: "Text", TextInput: "TextInput",
-  View: "View", Modal: "Modal", Platform: { OS: "web" },
+vi.mock("react-native", async () => ({
+  ...(await import("../test/mockReactNative")).reactNative(),
+  Platform: { OS: "web" },
+  Modal: "Modal",
   BackHandler: { addEventListener: () => ({ remove() {} }) },
-  Share: { share: vi.fn() }, StyleSheet: { create: (x: unknown) => x },
+  Share: { share: vi.fn() },
 }));
 vi.mock("react-native-safe-area-context", () => ({ SafeAreaView: "SafeAreaView" }));
 vi.mock("@clerk/expo", () => ({

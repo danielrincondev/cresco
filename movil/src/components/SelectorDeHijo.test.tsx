@@ -2,9 +2,8 @@ import React from "react";
 import { expect, it, vi } from "vitest";
 import { act, create } from "react-test-renderer";
 
-vi.mock("react-native", () => ({
-  Pressable: "Pressable", ScrollView: "ScrollView", Text: "Text", View: "View",
-  StyleSheet: { create: (e: unknown) => e },
+vi.mock("react-native", async () => ({
+  ...(await import("../test/mockReactNative")).reactNative(),
 }));
 
 const { SelectorDeHijo } = await import("./SelectorDeHijo");

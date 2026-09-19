@@ -18,6 +18,7 @@ import {
   type TextInputProps,
 } from "react-native";
 import { ConvexError } from "convex/values";
+import { Aparece } from "./Movimiento";
 import { Icono } from "../theme/Icono";
 import {
   AREA_TACTIL_MINIMA,
@@ -143,8 +144,22 @@ export function Pagina({
     </KeyboardAvoidingView>
   );
 }
-export function Tarjeta({ children }: PropsWithChildren) {
-  return <View style={s.tarjeta}>{children}</View>;
+/**
+ * Tarjeta, que entra subiendo.
+ *
+ * `orden` es el índice dentro de una lista y escalona la entrada: se pasa
+ * `orden={i}` al mapear. Sin él todas entran a la vez, que es lo correcto
+ * cuando la tarjeta está sola en la pantalla.
+ *
+ * La animación vive en `Aparece` y se apaga sola con "reducir movimiento",
+ * así que aquí no hay nada que decidir.
+ */
+export function Tarjeta({ children, orden }: PropsWithChildren<{ orden?: number }>) {
+  return (
+    <Aparece orden={orden} style={s.tarjeta}>
+      {children}
+    </Aparece>
+  );
 }
 export function Cuerpo({ children }: PropsWithChildren) {
   return <Text style={s.texto}>{children}</Text>;

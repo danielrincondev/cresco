@@ -1,6 +1,13 @@
 /**
- * Sistema de diseño de Cresco. Dueño del archivo: Persona A (decisión del 3 de
- * agosto — A construye las pantallas con más variedad de componentes).
+ * Sistema de diseño de Cresco.
+ *
+ * Dueño del archivo: **Persona C**. Lo fue Persona A por la decisión del 3 de
+ * agosto —A construía las pantallas con más variedad de componentes—, y pasó a
+ * C el 10 de septiembre con DP-012, junto con el resto de la interfaz. Ver
+ * `.github/CODEOWNERS`.
+ *
+ * El movimiento vive aparte, en `Movimiento.ts`: mismos criterios, misma regla
+ * de "ningún valor mágico fuera del tema".
  *
  * Cada valor de aquí sale de una decisión escrita, no de un criterio de quien
  * programó la pantalla. Las fuentes son
@@ -150,6 +157,12 @@ export const TonoEstado = {
  */
 export const Fuente = {
   familia: "Inter",
+  /**
+   * ⚠️ Solo se cargan **dos** pesos en `App.tsx`: `Inter` (400) e
+   * `Inter-Semibold` (600). `medio` está declarado pero su fuente no se carga,
+   * así que usarlo no da 500 — da 400 sin avisar. O se carga
+   * `Inter_500Medium` o se quita de aquí; mientras tanto, no usarlo.
+   */
   peso: { regular: "400", medio: "500", semibold: "600" },
 } as const;
 
@@ -161,7 +174,17 @@ export const Tamano = {
   lg: 20,
   xl: 24,
   xxl: 32,
-  /** El número grande de P6: el elemento más importante de la app del padre. */
+  /**
+   * ⚠️ **Sin uso, y no hay que dárselo.** Venía de la dirección visual, que
+   * pedía el puntaje de P6 como número grande. Una decisión posterior lo
+   * anuló: por C3 la cifra va **dentro** del texto de la franja, y
+   * `etiquetaFranja` lo garantiza. Como dice la cabecera de `ReporteScreen`,
+   * una cifra sin la frase de la franja se lee como una nota escolar, que es
+   * justo lo que el puntaje de conducta no es.
+   *
+   * Se conserva para que quede constancia de por qué no se usa: borrarlo sin
+   * más invita a que alguien lo reintroduzca dentro de seis meses.
+   */
   puntaje: 56,
 } as const;
 
@@ -223,6 +246,11 @@ export const Profundidad = { borde: 1 } as const;
  *  spinner   — micro-interacciones: guardar, enviar, confirmar
  *  hibrido   — procesos que calculan (ej. el acumulado del parcial):
  *              esqueleto de la estructura + spinner al centro
+ *
+ * Los dos primeros ya existen: `EsqueletoPagina` en `components/Movimiento.tsx`
+ * y `Cargando` en `components/NucleoUI.tsx`. El patrón se elige en la llamada,
+ * no con esta constante —qué está cargando lo sabe la pantalla, no el tema—,
+ * así que estos valores son documentación de la regla, no una API.
  */
 export const PatronCarga = {
   esqueleto: "esqueleto",
