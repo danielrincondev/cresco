@@ -7,6 +7,7 @@ import {
 } from "react";
 import {
   ActivityIndicator,
+  Animated,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -18,7 +19,7 @@ import {
   type TextInputProps,
 } from "react-native";
 import { ConvexError } from "convex/values";
-import { Aparece } from "./Movimiento";
+import { Aparece, useEntrada } from "./Movimiento";
 import { Icono } from "../theme/Icono";
 import {
   AREA_TACTIL_MINIMA,
@@ -178,15 +179,27 @@ export function Aviso({ children }: PropsWithChildren) {
     </View>
   );
 }
+/**
+ * El mensaje de error, que entra en vez de aparecer de golpe.
+ *
+ * Un error que se materializa sin transición se lee como que algo se rompió.
+ * Entrando —corto, 200 ms— se lee como que el sistema respondió, que es lo que
+ * de verdad pasó: casi todos estos mensajes son validaciones, no averías.
+ *
+ * Se anima el propio `Text` con `Animated.Text` en lugar de envolverlo: un
+ * envoltorio cambiaría el sitio del mensaje dentro del flex de la pantalla, y
+ * el error aparece en sitios muy distintos de la aplicación.
+ */
 export function ErrorMensaje({ mensaje }: { mensaje: string | null }) {
+  const entrada = useEntrada();
   return mensaje ? (
-    <Text
+    <Animated.Text
       accessibilityRole="alert"
       accessibilityLiveRegion="polite"
-      style={s.error}
+      style={[s.error, entrada]}
     >
       {mensaje}
-    </Text>
+    </Animated.Text>
   ) : null;
 }
 /**

@@ -17,7 +17,12 @@ vi.mock("react-native", async () => ({
   },
 }));
 
+// `NucleoUI` arrastra `Icono`, y ese trae JSX sin transpilar desde
+// `@expo/vector-icons`. Mismo mock que el resto de pruebas de interfaz.
+vi.mock("../theme/Icono", () => ({ Icono: "Icono" }));
+
 const { Aparece, Esqueleto, EsqueletoPagina } = await import("./Movimiento");
+const { ErrorMensaje } = await import("./NucleoUI");
 
 const pintar = async (e: React.ReactElement) => {
   let v!: ReactTestRenderer;
@@ -94,4 +99,30 @@ it("el esqueleto de pagina pinta las tarjetas que se le piden", async () => {
   const hijos = (v.toJSON() as { children: unknown[] }).children;
   // El titulo mas las dos tarjetas.
   expect(hijos).toHaveLength(3);
+});
+
+/**
+ * La razon de ser de `useEntrada`: animar **sin envolver**. Un `View` de mas
+ * alrededor del error le cambiaria el sitio dentro del flex de la pantalla, y
+ * este mensaje aparece en sitios muy distintos de la aplicacion. Si alguien lo
+ * refactoriza a `<Aparece>`, esta prueba se entera.
+ */
+it("el mensaje de error se anima sin ganar un envoltorio", async () => {
+  const v = await pintar(<ErrorMensaje mensaje="Falta el mensaje" />);
+  const raiz = v.toJSON() as { type: string; children: unknown[] };
+  expect(raiz.type).toBe("Animated.Text");
+  expect(raiz.children).toEqual(["Falta el mensaje"]);
+});
+
+it("el mensaje de error sigue siendo un texto con movimiento reducido", async () => {
+  ajustes.reducir = true;
+  const v = await pintar(<ErrorMensaje mensaje="Falta el mensaje" />);
+  const raiz = v.toJSON() as { type: string; props: Record<string, unknown> };
+  expect(raiz.type).toBe("Animated.Text");
+  expect(raiz.props.accessibilityRole).toBe("alert");
+});
+
+it("sin mensaje no pinta nada", async () => {
+  const v = await pintar(<ErrorMensaje mensaje={null} />);
+  expect(v.toJSON()).toBeNull();
 });

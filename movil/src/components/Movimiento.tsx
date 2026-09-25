@@ -78,30 +78,23 @@ export function useReduceMotion(): boolean {
 }
 
 /**
- * Entrada: aparece subiendo unos píxeles.
+ * El estilo de una entrada, para aplicarlo al elemento que ya existe.
  *
- * `orden` escalona la entrada dentro de una lista. Se pasa el índice del
- * elemento y este componente calcula el retraso, con tope en
- * `MAXIMO_ESCALONADO` para que una lista de 40 no tarde dos segundos en
- * terminar de entrar.
+ * Es la versión sin envoltorio de `Aparece`, y existe por una razón concreta:
+ * envolver un elemento en un `View` para animarlo **le cambia el sitio en el
+ * layout**. Da igual lo cuidadoso que seas con los estilos; en un flex el hijo
+ * pasa a ser el envoltorio y no el elemento. Para algo suelto —un mensaje de
+ * error, un estado vacío— eso es riesgo gratis: el componente puede animarse a
+ * sí mismo con `Animated.Text` o `Animated.View` y no mover nada.
  *
- * El contenido **nunca se queda invisible**: la animación arranca en el mismo
- * efecto que la monta, y con movimiento reducido ni siquiera se crea. Un
- * componente que deja el contenido en `opacity: 0` esperando algo es un
- * componente que un día deja la pantalla en blanco.
+ * Devuelve `null` con movimiento reducido, que aplicado a un `style` no hace
+ * nada. Así quien lo usa no necesita ramificar.
  */
-export function Aparece({
-  children,
+export function useEntrada({
   orden = 0,
-  distancia = Desplazamiento.base,
-  duracion = Duracion.base,
-  style,
-}: PropsWithChildren<{
-  orden?: number;
-  distancia?: number;
-  duracion?: number;
-  style?: ViewStyle;
-}>) {
+  distancia = Desplazamiento.sutil,
+  duracion = Duracion.rapida,
+}: { orden?: number; distancia?: number; duracion?: number } = {}) {
   const reducir = useReduceMotion();
   const progreso = useRef(new Animated.Value(0)).current;
 
@@ -119,30 +112,57 @@ export function Aparece({
     });
     animacion.start();
     return () => animacion.stop?.();
-  }, [progreso, reducir, orden, duracion]);
+  }, [progreso, reducir, orden, duracion, distancia]);
 
-  if (reducir) return <View style={style}>{children}</View>;
+  if (reducir) return null;
 
-  return (
-    <Animated.View
-      style={[
-        style,
-        {
-          opacity: progreso,
-          transform: [
-            {
-              translateY: progreso.interpolate({
-                inputRange: [0, 1],
-                outputRange: [distancia, 0],
-              }),
-            },
-          ],
-        },
-      ]}
-    >
-      {children}
-    </Animated.View>
-  );
+  return {
+    opacity: progreso,
+    transform: [
+      {
+        translateY: progreso.interpolate({
+          inputRange: [0, 1],
+          outputRange: [distancia, 0],
+        }),
+      },
+    ],
+  };
+}
+
+/**
+ * Entrada: aparece subiendo unos píxeles.
+ *
+ * La versión con envoltorio, para cuando hace falta animar **un grupo** de
+ * elementos —el contenido de una tarjeta, un bloque del esqueleto— y el
+ * envoltorio ya va a existir de todas formas. Para un elemento suelto, usar
+ * `useEntrada` y ahorrarse el `View`.
+ *
+ * `orden` escalona la entrada dentro de una lista. Se pasa el índice del
+ * elemento y se calcula el retraso, con tope en `MAXIMO_ESCALONADO` para que
+ * una lista de 40 no tarde dos segundos en terminar de entrar.
+ *
+ * El contenido **nunca se queda invisible**: la animación arranca en el mismo
+ * efecto que lo monta, y con movimiento reducido ni siquiera se crea. Un
+ * componente que deja el contenido en `opacity: 0` esperando algo es un
+ * componente que un día deja la pantalla en blanco.
+ */
+export function Aparece({
+  children,
+  orden = 0,
+  distancia = Desplazamiento.base,
+  duracion = Duracion.base,
+  style,
+}: PropsWithChildren<{
+  orden?: number;
+  distancia?: number;
+  duracion?: number;
+  style?: ViewStyle;
+}>) {
+  const entrada = useEntrada({ orden, distancia, duracion });
+
+  if (entrada === null) return <View style={style}>{children}</View>;
+
+  return <Animated.View style={[style, entrada]}>{children}</Animated.View>;
 }
 
 /**
