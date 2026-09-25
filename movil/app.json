@@ -5,6 +5,7 @@
     "scheme": "cresco",
     "version": "1.0.0",
     "orientation": "portrait",
+    "userInterfaceStyle": "light",
     "platforms": [
       "android",
       "web"
