@@ -20,6 +20,7 @@ import { api } from "../../convex/_generated/api";
 import { PARENTESCO } from "../../convex/lib/enums";
 import { Icono } from "../theme/Icono";
 import { CampoFecha } from "../components/CampoFecha";
+import { BarraInferior, type PestanaInferior } from "../components/BarraInferior";
 import {
   EncabezadoPerfil,
   ItemMenu,
@@ -473,6 +474,37 @@ export function NucleoScreen() {
         : undefined;
   const nombreDelPerfil =
     `${perfil?.nombres ?? ""} ${perfil?.apellidos ?? ""}`.trim() || "Tu cuenta";
+  /**
+   * Las tres pestañas de la familia. Orden pedido: cita, inicio, reporte —
+   * el reporte del día queda a la derecha, más cerca del pulgar de quien
+   * sostiene el teléfono con una mano, porque es la que más se toca.
+   *
+   * "Reporte diario" se deshabilita sin `hijoDelMenu`: antes de tener un hijo
+   * aprobado no hay a qué reporte ir, y llevaría a una pantalla vacía en vez
+   * de a nada.
+   */
+  const pestanasFamilia: PestanaInferior[] = [
+    { clave: "citas", icono: "calendar-blank", etiqueta: "Pedir una cita" },
+    { clave: "inicio", icono: "home", etiqueta: "Inicio" },
+    {
+      clave: "reporteHoy",
+      icono: "file-document",
+      etiqueta: "Reporte diario",
+      disponible: hijoDelMenu !== undefined,
+    },
+  ];
+  const pestanaActiva =
+    ruta.tipo === "citas" || ruta.tipo === "inicio" || ruta.tipo === "reporteHoy"
+      ? ruta.tipo
+      : "";
+  const irAPestana = (clave: string) => {
+    if (clave === "reporteHoy") {
+      if (!hijoDelMenu) return;
+      setRuta({ tipo: "reporteHoy", estudianteId: hijoDelMenu.estudianteId, nombre: hijoDelMenu.nombre });
+      return;
+    }
+    setRuta({ tipo: clave as "citas" | "inicio" });
+  };
   const listaCursos = cursos?.cursos;
   const cursoActivo =
     "curso" in ruta
@@ -751,6 +783,19 @@ export function NucleoScreen() {
           </>
         )}
       </LimiteError>
+      {/* Fuera de `LimiteError` y como hermana del contenido, no dentro: es
+          navegación fija, tiene que sobrevivir aunque la pantalla de arriba
+          reviente. Un flex child normal, igual que la barra de arriba —
+          empuja el contenido hacia arriba sin taparlo, y no necesita sus
+          propios márgenes de sistema porque `SafeAreaView` ya reserva la
+          franja de gestos de Android para toda la columna. */}
+      {perfil && rol === "REPRESENTANTE" && (
+        <BarraInferior
+          pestanas={pestanasFamilia}
+          activa={pestanaActiva}
+          onCambiar={irAPestana}
+        />
+      )}
       {/* Al final del árbol para que pinte por encima de todo lo demás. Se
           desmonta solo al terminar de cerrarse, así que no se queda
           interceptando toques invisible sobre la pantalla. */}
