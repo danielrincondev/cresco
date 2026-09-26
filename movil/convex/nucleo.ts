@@ -50,6 +50,14 @@ async function presentarPerfil(ctx: QueryCtx, perfil: Doc<"perfilUsuario">) {
     perfilUsuarioId: perfil._id,
     nombres: perfil.nombres ?? null,
     apellidos: perfil.apellidos ?? null,
+    // El documento viaja para que la pantalla pueda **enseñarlo bloqueado**.
+    // Sin esto el formulario de perfil salia con el documento vacio, y quien
+    // solo queria anadirse un rol tenia que reescribir su cedula de memoria o
+    // se llevaba un CONFLICTO -- `completarPerfil` rechaza cambiar la
+    // identidad, pero el unico aviso llegaba despues de guardar.
+    // Son sus propios datos, en su propia sesion: no amplia lo que nadie ve.
+    tipoDocumento: perfil.tipoDocumento,
+    numeroDocumento: perfil.numeroDocumento,
     docenteId: docente?._id ?? null,
     representanteId: representante?._id ?? null,
   };
@@ -866,10 +874,27 @@ export const aprobarEstudiante = mutation({
     }
     await ctx.db.patch("estudiante", estudiante._id, { ...cambios, estadoVerificacion: "APROBADO",
       aprobadoPorDocenteId: docente._id, aprobadoEn: ahora, actualizadoEn: ahora });
+    // Las correcciones del docente **se anotan**. Hasta aqui la bitacora solo
+    // guardaba el cambio de `estadoVerificacion`, asi que un docente podia
+    // cambiar el nombre y el numero de documento de un estudiante --lo que
+    // reasigna a que persona apunta el registro-- y el rastro decia unicamente
+    // "APROBADO". DP-006 existe para que las acciones sensibles dejen huella, y
+    // esta se la saltaba entera.
+    //
+    // Solo se anotan los campos que cambiaron de verdad: repetir los mismos
+    // datos en `antes` y `despues` en cada aprobacion haria ilegible la bitacora
+    // justo cuando haya algo que mirar, y multiplicaria copias de datos
+    // personales de un menor sin que nadie las haya pedido.
+    const corregidos = (Object.keys(cambios) as (keyof typeof cambios)[])
+      .filter((campo) => estudiante[campo] !== cambios[campo]);
+    const antes = Object.fromEntries(corregidos.map((c) => [c, estudiante[c]]));
+    const despues = Object.fromEntries(corregidos.map((c) => [c, cambios[c]]));
+
     await auditar(ctx, { accion: "APROBAR", entidadTipo: "estudiante", entidadId: estudiante._id,
       institucionId: estudiante.institucionId,
-      datosAntes: { estadoVerificacion: estudiante.estadoVerificacion },
-      datosDespues: { estadoVerificacion: "APROBADO", cursoId: args.cursoId, matriculaId } });
+      datosAntes: { estadoVerificacion: estudiante.estadoVerificacion, ...antes },
+      datosDespues: { estadoVerificacion: "APROBADO", cursoId: args.cursoId, matriculaId,
+        ...despues, camposCorregidos: corregidos } });
     return { estudianteId: estudiante._id, matriculaId };
   }),
 });

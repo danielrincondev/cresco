@@ -81,6 +81,10 @@ const perfil = {
   perfilUsuarioId: "perfil" as NonNullable<Perfil>["perfilUsuarioId"],
   nombres: "Kenny",
   apellidos: "Chung",
+  // La identidad del perfil. Viaja para que la pantalla pueda enseñarla
+  // bloqueada en vez de pedir que se reescriba de memoria.
+  tipoDocumento: "CEDULA" as const,
+  numeroDocumento: "0923062384",
   docenteId: null,
   representanteId: "representante" as NonNullable<Perfil>["representanteId"],
 };

@@ -416,8 +416,16 @@ function PerfilForm({
   // editable, no de solo lectura.
   const [nombres, setNombres] = useState(perfil?.nombres ?? user?.firstName ?? "");
   const [apellidos, setApellidos] = useState(perfil?.apellidos ?? user?.lastName ?? "");
-  const [documento, setDocumento] = useState<"CEDULA" | "PASAPORTE">("CEDULA");
-  const [numero, setNumero] = useState("");
+  // El documento se precarga del perfil y queda bloqueado: es la identidad de
+  // la cuenta y `completarPerfil` rechaza cambiarla. Antes salia vacio, asi que
+  // anadirse un rol obligaba a reescribir la cedula de memoria.
+  const identidadFijada = perfil !== null;
+  // `SIN_DOCUMENTO` existe en el esquema para estudiantes sin cedula, nunca
+  // para un adulto: `completarPerfil` solo acepta CEDULA o PASAPORTE.
+  const [documento, setDocumento] = useState<"CEDULA" | "PASAPORTE">(
+    perfil?.tipoDocumento === "PASAPORTE" ? "PASAPORTE" : "CEDULA",
+  );
+  const [numero, setNumero] = useState(perfil?.numeroDocumento ?? "");
   const [telefono, setTelefono] = useState("");
   const [docente, setDocente] = useState(!!perfil?.docenteId);
   const [representante, setRepresentante] = useState(!!perfil?.representanteId);
@@ -481,20 +489,31 @@ function PerfilForm({
           maxLength={60}
           editable={!op.pendiente}
         />
+        {/* El documento es la identidad, y `completarPerfil` rechaza cambiarlo
+            con CONFLICTO. Hasta aqui la pantalla lo pintaba editable de todas
+            formas: un formulario que ofrece algo que el servidor prohibe, y el
+            unico aviso llegaba como error despues de guardar. El nombre si se
+            corrige, porque un apellido mal escrito es una errata, no otra
+            persona. */}
         <Opciones
           valor={documento}
           opciones={documentosAdulto}
           onChange={setDocumento}
-          disabled={op.pendiente}
+          disabled={op.pendiente || identidadFijada}
         />
         <Campo
           etiqueta="Número de documento"
+          ayuda={
+            identidadFijada
+              ? "Tu documento identifica tu cuenta y no se puede cambiar. Si está mal, escríbenos."
+              : undefined
+          }
           value={numero}
           onChangeText={setNumero}
           autoCapitalize="characters"
           keyboardType={documento === "CEDULA" ? "number-pad" : "default"}
           maxLength={documento === "CEDULA" ? 10 : 30}
-          editable={!op.pendiente}
+          editable={!op.pendiente && !identidadFijada}
         />
         <Campo
           etiqueta="Teléfono (opcional)"
@@ -681,48 +700,39 @@ function DetalleCurso({
   const [pestana, setPestana] = useState<"PENDIENTES" | "ESTUDIANTES">(
     "PENDIENTES",
   );
+  const [mas, setMas] = useState(false);
   const invitar = useMutation(api.nucleo.crearInvitacion);
   const op = useOperacion();
   async function invitarFamilias() {
     const r = await op.ejecutar(() => invitar({ cursoId: curso.id }));
     if (r.ok) navegar({ tipo: "invitacion", curso, invitacion: r.valor });
   }
+  // Sin parciales no se puede aprobar a nadie, asi que el curso esta a medio
+  // montar y lo unico que importa es terminarlo. Con ellos, la pantalla pasa a
+  // servir al dia a dia.
+  const sinMontar = calendario !== undefined && calendario.periodos.length === 0;
+
   return (
     <Pagina titulo={curso.nombre} descripcion={curso.institucion}>
-      <Tarjeta>
-        <Subtitulo>Calendario del curso</Subtitulo>
-        {!calendario ? (
-          <Cargando />
-        ) : calendario.periodos.length === 0 ? (
-          <>
-            <Cuerpo>Define los parciales antes de aprobar estudiantes.</Cuerpo>
-            <Boton
-              secundario
-              onPress={() => navegar({ tipo: "periodos", curso })}
-            >
-              Definir parciales
-            </Boton>
-          </>
-        ) : (
-          calendario.periodos.map((p) => (
-            <View key={p.id}>
-              <Text style={styles.etiqueta}>{p.nombre}</Text>
-              <Cuerpo>
-                {p.fechaInicio} — {p.fechaFin}
-              </Cuerpo>
-            </View>
-          ))
-        )}
-      </Tarjeta>
-      <Boton pendiente={op.pendiente} onPress={() => void invitarFamilias()}>
-        Invitar representantes
-      </Boton>
-      <ErrorMensaje mensaje={op.error} />
+      {!calendario ? (
+        <Cargando />
+      ) : sinMontar ? (
+        <>
+          <Aviso>
+            Este curso todavía no tiene parciales. Defínelos antes de aprobar
+            estudiantes: el puntaje de cada uno vive dentro de un parcial.
+          </Aviso>
+          <Boton onPress={() => navegar({ tipo: "periodos", curso })}>
+            Definir parciales
+          </Boton>
+        </>
+      ) : null}
+
+      {/* El dia a dia primero, y solo tres. Un docente hace estas tres cosas
+          cada jornada; las demas, de vez en cuando. */}
+      <Subtitulo>Hoy</Subtitulo>
       <Boton onPress={() => navegar({ tipo: "anotar", curso })}>
         Anotar conducta
-      </Boton>
-      <Boton secundario onPress={() => navegar({ tipo: "recientes", curso })}>
-        Anotaciones recientes
       </Boton>
       <Boton secundario onPress={() => navegar({ tipo: "asistencia", curso })}>
         Pasar lista
@@ -730,21 +740,11 @@ function DetalleCurso({
       <Boton secundario onPress={() => navegar({ tipo: "reporteDia", curso })}>
         Reporte del día
       </Boton>
-      <Boton secundario onPress={() => navegar({ tipo: "comunicado", curso })}>
-        Avisar al curso
-      </Boton>
-      <Boton secundario onPress={() => navegar({ tipo: "agenda", curso })}>
-        Atención a familias
-      </Boton>
-      <Boton secundario onPress={() => navegar({ tipo: "alerta", curso })}>
-        Alerta de emergencia
-      </Boton>
-      <Boton secundario onPress={() => navegar({ tipo: "perfilDocente" })}>
-        Tu perfil profesional
-      </Boton>
-      <Boton secundario onPress={() => navegar({ tipo: "plan" })}>
-        Tu plan
-      </Boton>
+
+      {/* El contenido, no al final. Un docente entra a ver a sus estudiantes:
+          tenerlos debajo de nueve botones obligaba a recorrer la navegacion
+          entera para llegar a lo que vino a buscar. */}
+      <Subtitulo>Estudiantes</Subtitulo>
       <Opciones
         valor={pestana}
         opciones={[
@@ -760,6 +760,61 @@ function DetalleCurso({
         />
       ) : (
         <Estudiantes curso={curso} />
+      )}
+      <Boton pendiente={op.pendiente} onPress={() => void invitarFamilias()}>
+        Invitar representantes
+      </Boton>
+      <ErrorMensaje mensaje={op.error} />
+
+      {/* Fuera del plegable a proposito: en una emergencia los segundos
+          cuentan, y esconderla detras de un toque mas seria cobrarselos. */}
+      <Boton secundario onPress={() => navegar({ tipo: "alerta", curso })}>
+        Alerta de emergencia
+      </Boton>
+
+      <Boton secundario onPress={() => setMas(!mas)}>
+        {mas ? "Menos opciones" : "Más opciones"}
+      </Boton>
+      {mas && (
+        <>
+          <Boton
+            secundario
+            onPress={() => navegar({ tipo: "recientes", curso })}
+          >
+            Anotaciones recientes
+          </Boton>
+          <Boton
+            secundario
+            onPress={() => navegar({ tipo: "comunicado", curso })}
+          >
+            Avisar al curso
+          </Boton>
+          <Boton secundario onPress={() => navegar({ tipo: "agenda", curso })}>
+            Atención a familias
+          </Boton>
+          <Boton secundario onPress={() => navegar({ tipo: "periodos", curso })}>
+            Parciales del curso
+          </Boton>
+          <Boton secundario onPress={() => navegar({ tipo: "perfilDocente" })}>
+            Tu perfil profesional
+          </Boton>
+          <Boton secundario onPress={() => navegar({ tipo: "plan" })}>
+            Tu plan
+          </Boton>
+          {calendario && calendario.periodos.length > 0 && (
+            <Tarjeta>
+              <Subtitulo>Calendario del curso</Subtitulo>
+              {calendario.periodos.map((p) => (
+                <View key={p.id}>
+                  <Text style={styles.etiqueta}>{p.nombre}</Text>
+                  <Cuerpo>
+                    {p.fechaInicio} — {p.fechaFin}
+                  </Cuerpo>
+                </View>
+              ))}
+            </Tarjeta>
+          )}
+        </>
       )}
     </Pagina>
   );
