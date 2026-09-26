@@ -22,6 +22,7 @@ const estado = vi.hoisted(() => ({
   funciones: new Map<string, (args: unknown) => Promise<unknown>>(),
   barraInferior: true,
   barraInferiorGuardada: [] as boolean[],
+  hijos: [] as { estudianteId: string; nombres: string; apellidos: string; estadoVerificacion: string }[],
 }));
 vi.mock("react-native", async () => ({
   ...(await import("../test/mockReactNative")).reactNative(),
@@ -66,7 +67,7 @@ vi.mock("convex/react", () => ({
     getFunctionName(ref) === "interaccion:misNotificaciones"
       ? estado.novedades
       : estado.perfil,
-  usePaginatedQuery: () => ({ results: [], status: "Exhausted", loadMore: vi.fn() }),
+  usePaginatedQuery: () => ({ results: estado.hijos, status: "Exhausted", loadMore: vi.fn() }),
   useMutation: (ref: Parameters<typeof getFunctionName>[0]) => {
     const nombre = getFunctionName(ref);
     if (!estado.funciones.has(nombre)) estado.funciones.set(nombre, async (args: unknown) => {
@@ -121,6 +122,7 @@ beforeEach(() => {
   estado.novedades = [];
   estado.barraInferior = true;
   estado.barraInferiorGuardada = [];
+  estado.hijos = [];
 });
 afterEach(async () => {
   if (vista) await act(async () => vista!.unmount());
@@ -381,4 +383,51 @@ it("apagar el interruptor en Ajustes apaga la barra y lo deja guardado", async (
 
   expect(estado.barraInferiorGuardada).toEqual([false]);
   expect(tablist()).toBeUndefined();
+});
+
+/* ---------- Arranque en el reporte del dia ---------- */
+
+const HIJO_APROBADO = {
+  estudianteId: "estudiante-1",
+  nombres: "Ana",
+  apellidos: "Pérez",
+  estadoVerificacion: "APROBADO",
+};
+
+/**
+ * "Mis hijos" tiene funciones que solo hacen falta al inicio del año
+ * lectivo. Con al menos un hijo aprobado, abrir la app debe ir directo a lo
+ * que se usa cada tarde: el reporte de hoy.
+ */
+it("con un hijo aprobado, la app abre en su reporte del día", async () => {
+  estado.hijos = [HIJO_APROBADO];
+  await montar();
+  expect(JSON.stringify(vista!.toJSON())).toContain("Lo de hoy, contado por su docente.");
+});
+
+/** Sin ningún hijo aprobado todavía, "Mis hijos" sigue siendo la portada. */
+it("sin hijos aprobados, la portada sigue siendo Mis hijos", async () => {
+  await montar();
+  expect(JSON.stringify(vista!.toJSON())).toContain("Acompaña a tus hijos");
+});
+
+/**
+ * El punto que distingue esto de un simple redirect fijo: "Inicio" tiene que
+ * seguir significando algo. Si tocarlo rebotara siempre de vuelta al
+ * reporte, apretarlo no llevaría a ningún lado.
+ */
+it("tocar Inicio después del arranque sí lleva a Mis hijos, y se queda ahí", async () => {
+  estado.hijos = [HIJO_APROBADO];
+  await montar();
+  expect(JSON.stringify(vista!.toJSON())).toContain("Lo de hoy, contado por su docente.");
+
+  await act(async () =>
+    vista!.root.findByProps({ accessibilityLabel: "Inicio" }).props.onPress(),
+  );
+  expect(JSON.stringify(vista!.toJSON())).toContain("Acompaña a tus hijos");
+
+  // Un segundo render (p.ej. una novedad que llega) no debe rebotarlo de
+  // vuelta: el arranque automático ya se gastó, y ahora es Inicio de verdad.
+  await actualizar();
+  expect(JSON.stringify(vista!.toJSON())).toContain("Acompaña a tus hijos");
 });

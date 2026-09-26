@@ -472,6 +472,31 @@ export function NucleoScreen() {
   const hijoAprobado = (hijos ?? []).find(
     (h) => h.estadoVerificacion === "APROBADO",
   );
+  /**
+   * Con al menos un hijo aprobado, la aplicación abre en **su reporte de
+   * hoy**, no en "Mis hijos". Es a lo que una familia entra cada tarde; "Mis
+   * hijos" tiene funciones que solo hacen falta al inicio del año lectivo
+   * —registrar, ver el estado de una solicitud— y obligar a pasar por ahí
+   * cada vez era un toque de más para lo que de verdad se usa a diario.
+   *
+   * **Solo una vez por apertura, y solo desde `inicio`.** Sin el `yaAbrio`,
+   * cada vez que alguien tocara "Inicio" a propósito —desde el menú o la
+   * barra inferior— la aplicación lo rebotaría de vuelta al reporte, y
+   * "Inicio" dejaría de significar nada: apretarlo y no ir a ningún lado es
+   * peor que no tenerlo. El efecto solo actúa la primera vez que hay datos,
+   * justo después de abrir la app; a partir de ahí, "Inicio" vuelve a ser
+   * una decisión de quien lo toca, no una sugerencia que se deshace sola.
+   */
+  const yaAbrioEnReporte = useRef(false);
+  useEffect(() => {
+    if (yaAbrioEnReporte.current || ruta.tipo !== "inicio" || !hijoAprobado) return;
+    yaAbrioEnReporte.current = true;
+    setRuta({
+      tipo: "reporteHoy",
+      estudianteId: hijoAprobado.estudianteId,
+      nombre: `${hijoAprobado.nombres} ${hijoAprobado.apellidos}`,
+    });
+  }, [hijoAprobado, ruta.tipo]);
   const hijoDelMenu =
     "estudianteId" in ruta
       ? { estudianteId: ruta.estudianteId, nombre: ruta.nombre }
