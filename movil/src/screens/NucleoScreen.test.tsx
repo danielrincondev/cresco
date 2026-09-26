@@ -20,6 +20,8 @@ const estado = vi.hoisted(() => ({
   consentimientoDesactualizado: false,
   novedades: [] as { leidaEn?: number }[],
   funciones: new Map<string, (args: unknown) => Promise<unknown>>(),
+  barraInferior: true,
+  barraInferiorGuardada: [] as boolean[],
 }));
 vi.mock("react-native", async () => ({
   ...(await import("../test/mockReactNative")).reactNative(),
@@ -45,6 +47,15 @@ vi.mock("../lib/registroPendiente", () => ({
   guardarRegistro: vi.fn(async (_id: string, solicitud: SolicitudRegistro) => { estado.guardada = solicitud; }),
   recuperarRegistro: vi.fn(async () => estado.guardada),
   borrarRegistro: vi.fn(async () => { estado.guardada = null; }),
+}));
+// Sin este mock, `preferenciasFamilia.ts` carga el `expo-secure-store` real,
+// que referencia `__DEV__` -- una global que solo existe bajo Metro, no aqui.
+vi.mock("../lib/preferenciasFamilia", () => ({
+  leerBarraInferior: vi.fn(async () => estado.barraInferior),
+  guardarBarraInferior: vi.fn(async (_id: string, activa: boolean) => {
+    estado.barraInferior = activa;
+    estado.barraInferiorGuardada.push(activa);
+  }),
 }));
 vi.mock("convex/react", () => ({
   useConvexAuth: () => ({ isAuthenticated: estado.autenticado }),
@@ -108,6 +119,8 @@ beforeEach(() => {
   estado.fallosAuditoria = 0;
   estado.consentimientoDesactualizado = false;
   estado.novedades = [];
+  estado.barraInferior = true;
+  estado.barraInferiorGuardada = [];
 });
 afterEach(async () => {
   if (vista) await act(async () => vista!.unmount());
@@ -276,4 +289,96 @@ it("resume el contador a partir de diez", async () => {
   await montar();
 
   expect(JSON.stringify(vista!.toJSON())).toContain("9+");
+});
+
+/* ---------- Barra inferior de la familia ---------- */
+
+const porTextoDeMenu = (texto: string) => {
+  // El mock devuelve los componentes nativos como cadenas, y el tipo de
+  // `n.type` no lo sabe: de ahi las comparaciones ensanchadas.
+  const nodoTexto = vista!.root.findAll(
+    (n) => (n.type as unknown) === "Text" && n.props.children === texto,
+  )[0];
+  let nodo = nodoTexto.parent!;
+  while (nodo && (nodo.type as unknown) !== "Pressable") nodo = nodo.parent!;
+  return nodo!;
+};
+async function abrirMenu() {
+  await act(async () =>
+    vista!.root.findByProps({ accessibilityLabel: "Abrir el menú" }).props.onPress(),
+  );
+}
+const tablist = () =>
+  vista!.root.findAllByProps({ accessibilityRole: "tablist" })[0];
+const scroll = async (y: number) => {
+  const sv = vista!.root.findByType("ScrollView" as never);
+  await act(async () =>
+    sv.props.onScroll({ nativeEvent: { contentOffset: { y } } }),
+  );
+};
+
+it("la barra inferior existe para el representante y no para el docente", async () => {
+  await montar();
+  expect(tablist()).toBeTruthy();
+  expect(
+    vista!.root.findAll((n) => n.props.accessibilityLabel === "Inicio"),
+  ).not.toHaveLength(0);
+
+  // El mock de useQuery de este archivo solo conoce "obtenerPerfil" y
+  // "misNotificaciones": para cualquier otra consulta -incluida
+  // listarCursos, que usa la pantalla del docente- devuelve el perfil tal
+  // cual, y `<Cursos>` revienta leyendo un campo que no existe ahi. Es un
+  // hueco del mock compartido, no del producto: por eso el volcado de error
+  // en stderr es ruido esperado, y la asercion que importa (sin barra
+  // inferior para el docente) sigue siendo válida pese a él.
+  estado.perfil = { ...perfil, representanteId: null, docenteId: "docente" as never };
+  await actualizar();
+  expect(tablist()).toBeUndefined();
+});
+
+/**
+ * El corazon de lo que pidio Kenny: leer hacia abajo la esconde, volver hacia
+ * arriba la trae de vuelta. Si `Pagina` no estuviera avisando de su scroll a
+ * `NucleoScreen` -- el enganche entero via `ContextoBarraInferior` -- esto no
+ * se moveria nunca, aunque cada pieza por separado (la propia `BarraInferior`)
+ * pase sus pruebas sueltas.
+ */
+it("el scroll hacia abajo esconde la barra y hacia arriba la trae de vuelta", async () => {
+  await montar();
+  expect(tablist().props.pointerEvents).toBe("auto");
+
+  await scroll(200);
+  expect(tablist().props.pointerEvents).toBe("none");
+
+  await scroll(60);
+  expect(tablist().props.pointerEvents).toBe("auto");
+});
+
+/** Cerca del principio de la pantalla, la barra no se esconde aunque el scroll avance un poco. */
+it("no se esconde cerca del principio de la pantalla", async () => {
+  await montar();
+  await scroll(15);
+  expect(tablist().props.pointerEvents).toBe("auto");
+});
+
+/**
+ * El interruptor de Ajustes tiene que apagar la barra de verdad (no solo
+ * marcarse a si mismo) y quedar guardado para la proxima vez que se abra la
+ * app -- las dos cosas a la vez, o el ajuste no sirve de nada.
+ */
+it("apagar el interruptor en Ajustes apaga la barra y lo deja guardado", async () => {
+  await montar();
+  expect(tablist()).toBeTruthy();
+
+  await abrirMenu();
+  await act(async () => porTextoDeMenu("Ajustes").props.onPress());
+
+  const interruptor = vista!.root.findByProps({
+    accessibilityLabel: "Mostrar la barra de Cita, Inicio y Reporte",
+  });
+  expect(interruptor.props.accessibilityState.checked).toBe(true);
+  await act(async () => interruptor.props.onPress());
+
+  expect(estado.barraInferiorGuardada).toEqual([false]);
+  expect(tablist()).toBeUndefined();
 });

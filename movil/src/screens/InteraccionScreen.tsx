@@ -40,6 +40,7 @@ import {
   Casilla,
   Cuerpo,
   ErrorMensaje,
+  Interruptor,
   Opciones,
   Pagina,
   Subtitulo,
@@ -1008,13 +1009,39 @@ export function ProfesorACargo({
  * tiene que encontrarse la verdad — si busca aquí y no halla nada, la promesa
  * queda como una mentira en vez de como un pendiente declarado.
  */
-export function Ajustes() {
+export function Ajustes({
+  esRepresentante = false,
+  barraInferiorActiva = true,
+  onCambiarBarraInferior,
+}: {
+  /** El docente no tiene barra inferior: sin este dato, la tarjeta de abajo
+   * saldría en su pantalla ofreciendo apagar algo que nunca tuvo. */
+  esRepresentante?: boolean;
+  barraInferiorActiva?: boolean;
+  onCambiarBarraInferior?: (activa: boolean) => void;
+}) {
   const { signOut } = useClerk();
   const [privacidad, setPrivacidad] = useState(false);
   const op = useOperacion();
 
   return (
     <Pagina titulo="Ajustes">
+      {esRepresentante && (
+        <Tarjeta>
+          <Subtitulo>Menú de abajo</Subtitulo>
+          <Interruptor
+            etiqueta="Mostrar la barra de Cita, Inicio y Reporte"
+            encendido={barraInferiorActiva}
+            onChange={() => onCambiarBarraInferior?.(!barraInferiorActiva)}
+          />
+          <Cuerpo>
+            Viene encendida por defecto. Se esconde sola mientras lees algo
+            largo, para dejarte ver el contenido completo, y vuelve al
+            desplazarte hacia arriba.
+          </Cuerpo>
+        </Tarjeta>
+      )}
+
       <Tarjeta>
         <Subtitulo>Avisos en el teléfono</Subtitulo>
         <Cuerpo>

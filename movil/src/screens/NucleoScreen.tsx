@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   BackHandler,
   Modal,
@@ -9,7 +9,7 @@ import {
   Text,
   View,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { useClerk, useUser } from "@clerk/expo";
 import { useMutation, usePaginatedQuery, useQuery } from "convex/react";
 import { ConvexError } from "convex/values";
@@ -20,7 +20,11 @@ import { api } from "../../convex/_generated/api";
 import { PARENTESCO } from "../../convex/lib/enums";
 import { Icono } from "../theme/Icono";
 import { CampoFecha } from "../components/CampoFecha";
-import { BarraInferior, type PestanaInferior } from "../components/BarraInferior";
+import {
+  ALTO_CONTENIDO_BARRA,
+  BarraInferior,
+  type PestanaInferior,
+} from "../components/BarraInferior";
 import {
   EncabezadoPerfil,
   ItemMenu,
@@ -44,6 +48,7 @@ import {
   Campo,
   Cargando,
   Casilla,
+  ContextoBarraInferior,
   Cuerpo,
   ErrorMensaje,
   LimiteError,
@@ -91,6 +96,10 @@ import {
   recuperarRegistro,
   type SolicitudRegistro,
 } from "../lib/registroPendiente";
+import {
+  guardarBarraInferior,
+  leerBarraInferior,
+} from "../lib/preferenciasFamilia";
 
 type Rol = "DOCENTE" | "REPRESENTANTE";
 type Curso = FunctionReturnType<
@@ -505,6 +514,70 @@ export function NucleoScreen() {
     }
     setRuta({ tipo: clave as "citas" | "inicio" });
   };
+
+  /**
+   * La preferencia de la familia: si quiere la barra o la apagó desde
+   * Ajustes. Vive en el teléfono (`preferenciasFamilia.ts`), no en Convex —
+   * ver ahí por qué. Empieza en `true` porque es el valor con el que llega
+   * toda cuenta nueva y porque la lectura es casi instantánea: el parpadeo de
+   * quien la apagó, entre montar y que la lectura resuelva, es imperceptible
+   * frente a que todo el mundo vea la pantalla sin barra un instante en cada
+   * apertura.
+   */
+  const [barraInferiorActiva, setBarraInferiorActiva] = useState(true);
+  useEffect(() => {
+    if (!perfil?.perfilUsuarioId) return;
+    let vivo = true;
+    void leerBarraInferior(perfil.perfilUsuarioId).then((activa) => {
+      if (vivo) setBarraInferiorActiva(activa);
+    });
+    return () => { vivo = false; };
+  }, [perfil?.perfilUsuarioId]);
+  const cambiarBarraInferior = (activa: boolean) => {
+    setBarraInferiorActiva(activa);
+    if (perfil?.perfilUsuarioId) void guardarBarraInferior(perfil.perfilUsuarioId, activa);
+  };
+
+  /**
+   * Esconderse al leer, aparecer al volver hacia arriba.
+   *
+   * `ultimoY` no es estado: cambia en cada evento de scroll, y ponerlo en
+   * `useState` forzaría un re-render por cada uno de ellos. `UMBRAL` evita que
+   * el temblor normal de un dedo parado cuente como "cambié de dirección" y
+   * la barra parpadee; `CERCA_DEL_TOPE` la mantiene siempre visible al
+   * principio de la pantalla, donde ocultarla a los dos primeros píxeles se
+   * sentiría roto en vez de útil.
+   */
+  const [barraVisible, setBarraVisible] = useState(true);
+  const ultimoY = useRef(0);
+  const manejarScrollPagina = (y: number) => {
+    const UMBRAL = 10;
+    const CERCA_DEL_TOPE = 24;
+    const delta = y - ultimoY.current;
+    ultimoY.current = y;
+    if (y < CERCA_DEL_TOPE) setBarraVisible(true);
+    else if (delta > UMBRAL) setBarraVisible(false);
+    else if (delta < -UMBRAL) setBarraVisible(true);
+  };
+  /**
+   * El mismo número que `BarraInferior` usa para su propio alto: `Pagina`
+   * necesita saber cuánto reservar de sitio para que la barra, cuando está
+   * visible, no tape el último elemento de la pantalla que esté abierta.
+   */
+  const margenesSistema = useSafeAreaInsets();
+  const rellenoBarraInferior =
+    ALTO_CONTENIDO_BARRA + Math.max(margenesSistema?.bottom ?? 0, Espacio.sm);
+  const contextoBarra =
+    perfil && rol === "REPRESENTANTE" && barraInferiorActiva
+      ? { onScroll: manejarScrollPagina, relleno: rellenoBarraInferior }
+      : null;
+  // Al cambiar de pantalla, la barra vuelve a mostrarse y el rastro de scroll
+  // se reinicia: si no, llegar a una pantalla nueva "escondido" porque la
+  // anterior habia quedado scrolleada hacia abajo se sentiria como un fallo.
+  useEffect(() => {
+    setBarraVisible(true);
+    ultimoY.current = 0;
+  }, [ruta]);
   const listaCursos = cursos?.cursos;
   const cursoActivo =
     "curso" in ruta
@@ -645,6 +718,7 @@ export function NucleoScreen() {
         )}
       </View>
       <ErrorMensaje mensaje={salida.error} />
+      <ContextoBarraInferior.Provider value={contextoBarra}>
       <LimiteError key={`${ruta.tipo}-${rol}`} onVolver={volver}>
         {perfil === undefined ? (
           <Cargando mensaje="Cargando tu espacio..." />
@@ -674,7 +748,11 @@ export function NucleoScreen() {
         ) : ruta.tipo === "notificaciones" ? (
           <Notificaciones />
         ) : ruta.tipo === "ajustes" ? (
-          <Ajustes />
+          <Ajustes
+            esRepresentante={rol === "REPRESENTANTE"}
+            barraInferiorActiva={barraInferiorActiva}
+            onCambiarBarraInferior={cambiarBarraInferior}
+          />
         ) : ruta.tipo === "reclamos" ? (
           <ReclamosDocente />
         ) : ruta.tipo === "agenda" ? (
@@ -783,16 +861,18 @@ export function NucleoScreen() {
           </>
         )}
       </LimiteError>
+      </ContextoBarraInferior.Provider>
       {/* Fuera de `LimiteError` y como hermana del contenido, no dentro: es
           navegación fija, tiene que sobrevivir aunque la pantalla de arriba
-          reviente. Un flex child normal, igual que la barra de arriba —
-          empuja el contenido hacia arriba sin taparlo, y no necesita sus
-          propios márgenes de sistema porque `SafeAreaView` ya reserva la
-          franja de gestos de Android para toda la columna. */}
-      {perfil && rol === "REPRESENTANTE" && (
+          reviente. Absoluta a propósito -- ver la cabecera de
+          `BarraInferior.tsx` para por qué, y por qué eso es lo que le permite
+          esconderse al leer sin dejar un hueco donde estaba. Se apaga del
+          todo (ni se monta) cuando la familia la desactivó desde Ajustes. */}
+      {perfil && rol === "REPRESENTANTE" && barraInferiorActiva && (
         <BarraInferior
           pestanas={pestanasFamilia}
           activa={pestanaActiva}
+          visible={barraVisible}
           onCambiar={irAPestana}
         />
       )}

@@ -1,26 +1,38 @@
 import React from "react";
-import { expect, it, vi } from "vitest";
+import { beforeEach, expect, it, vi } from "vitest";
 import { act, create, type ReactTestRenderer } from "react-test-renderer";
+
+const ajustes = vi.hoisted(() => ({ reducir: false }));
 
 vi.mock("react-native", async () => ({
   ...(await import("../test/mockReactNative")).reactNative(),
+  AccessibilityInfo: {
+    isReduceMotionEnabled: () => Promise.resolve(ajustes.reducir),
+    addEventListener: () => ({ remove: () => {} }),
+  },
 }));
 vi.mock("../theme/Icono", () => ({ Icono: "Icono" }));
 // El mismo mock que usa `MenuLateral.test.tsx`: en pruebas no hay pantalla,
-// así que las medidas del sistema van a cero salvo que una prueba diga otra.
+// así que las medidas del sistema van a cero.
 vi.mock("react-native-safe-area-context", () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));
 
 const { BarraInferior, CIRCULO_ACTIVO } = await import("./BarraInferior");
 
-const pintar = (e: React.ReactElement) => {
+const pintar = async (e: React.ReactElement) => {
   let v!: ReactTestRenderer;
-  act(() => {
+  // `await`: con movimiento normal la animacion arranca en un efecto, y
+  // `useReduceMotion` resuelve una promesa al montar.
+  await act(async () => {
     v = create(e);
   });
   return v;
 };
+
+beforeEach(() => {
+  ajustes.reducir = false;
+});
 
 const PESTANAS = [
   { clave: "citas", icono: "calendar-blank" as const, etiqueta: "Pedir una cita" },
@@ -31,19 +43,24 @@ const PESTANAS = [
 const porEtiqueta = (v: ReactTestRenderer, etiqueta: string) =>
   v.root.findAll((n) => n.props.accessibilityLabel === etiqueta).at(0)!;
 
-it("pinta las tres pestañas con su etiqueta de accesibilidad", () => {
-  const v = pintar(
-    <BarraInferior pestanas={PESTANAS} activa="inicio" onCambiar={() => {}} />,
+it("pinta las tres pestañas con su etiqueta de accesibilidad", async () => {
+  const v = await pintar(
+    <BarraInferior pestanas={PESTANAS} activa="inicio" visible onCambiar={() => {}} />,
   );
   for (const p of PESTANAS) {
     expect(porEtiqueta(v, p.etiqueta)).toBeTruthy();
   }
 });
 
-it("tocar una pestaña avisa con su clave", () => {
+it("tocar una pestaña avisa con su clave", async () => {
   const cambios: string[] = [];
-  const v = pintar(
-    <BarraInferior pestanas={PESTANAS} activa="inicio" onCambiar={(c) => cambios.push(c)} />,
+  const v = await pintar(
+    <BarraInferior
+      pestanas={PESTANAS}
+      activa="inicio"
+      visible
+      onCambiar={(c) => cambios.push(c)}
+    />,
   );
   act(() => porEtiqueta(v, "Pedir una cita").props.onPress());
   expect(cambios).toEqual(["citas"]);
@@ -54,9 +71,9 @@ it("tocar una pestaña avisa con su clave", () => {
  * es el "estás aquí" que ya usa el resto del sistema (menú lateral, chips de
  * estado). La pestaña activa tiene que pedirlo; las demás, no.
  */
-it("solo la pestaña activa pide el icono relleno", () => {
-  const v = pintar(
-    <BarraInferior pestanas={PESTANAS} activa="reporteHoy" onCambiar={() => {}} />,
+it("solo la pestaña activa pide el icono relleno", async () => {
+  const v = await pintar(
+    <BarraInferior pestanas={PESTANAS} activa="reporteHoy" visible onCambiar={() => {}} />,
   );
   expect(v.root.findAllByProps({ nombre: "file-document" })[0].props.activo).toBe(true);
   expect(v.root.findAllByProps({ nombre: "home" })[0].props.activo).toBe(false);
@@ -68,9 +85,9 @@ it("solo la pestaña activa pide el icono relleno", () => {
  * `.parent` sube del icono al círculo que lo envuelve, sin depender de en qué
  * posición exacta del árbol quede ese envoltorio.
  */
-it("solo la pestaña activa lleva el círculo de realce, y con alfa", () => {
-  const v = pintar(
-    <BarraInferior pestanas={PESTANAS} activa="citas" onCambiar={() => {}} />,
+it("solo la pestaña activa lleva el círculo de realce, y con alfa", async () => {
+  const v = await pintar(
+    <BarraInferior pestanas={PESTANAS} activa="citas" visible onCambiar={() => {}} />,
   );
   const circuloDe = (nombreIcono: string) =>
     v.root.findAllByProps({ nombre: nombreIcono })[0].parent!.props.style as unknown[];
@@ -80,7 +97,7 @@ it("solo la pestaña activa lleva el círculo de realce, y con alfa", () => {
 
   expect(activo.some((s) => s?.backgroundColor === CIRCULO_ACTIVO)).toBe(true);
   expect(inactivo.some((s) => s?.backgroundColor === CIRCULO_ACTIVO)).toBe(false);
-  // Con alfa: un color de 8 dígitos hex, no una mancha solida de 6.
+  // Con alfa: un color de 8 dígitos hex, no una mancha sólida de 6.
   expect(CIRCULO_ACTIVO).toMatch(/^#[0-9A-Fa-f]{8}$/);
 });
 
@@ -88,32 +105,54 @@ it("solo la pestaña activa lleva el círculo de realce, y con alfa", () => {
  * Sin hijo aprobado no hay a qué reporte ir. Una pestaña que lleva a una
  * pantalla vacía es peor que una pestaña apagada que explica por qué.
  */
-it("una pestaña marcada como no disponible se deshabilita", () => {
+it("una pestaña marcada como no disponible se deshabilita", async () => {
   const pestanas = [...PESTANAS.slice(0, 2), { ...PESTANAS[2], disponible: false }];
-  const v = pintar(<BarraInferior pestanas={pestanas} activa="inicio" onCambiar={() => {}} />);
+  const v = await pintar(
+    <BarraInferior pestanas={pestanas} activa="inicio" visible onCambiar={() => {}} />,
+  );
   const boton = porEtiqueta(v, "Reporte diario");
   expect(boton.props.disabled).toBe(true);
   expect(boton.props.accessibilityState.disabled).toBe(true);
 });
 
 /**
- * `SafeAreaView` ya reserva la franja de gestos de Android para toda la
- * pantalla, pero `MenuLateral` demostró que no basta con confiar en eso para
- * un elemento pegado al borde. La barra pide sus propios márgenes y los usa.
+ * `visible={false}` no es solo estética: mientras está deslizada fuera de la
+ * pantalla no puede seguir robando el foco ni los toques de lo que haya
+ * quedado a la vista debajo de su antiguo sitio.
  */
-it("suma el margen inferior del sistema a su propio relleno", async () => {
-  vi.resetModules();
-  vi.doMock("react-native-safe-area-context", () => ({
-    useSafeAreaInsets: () => ({ top: 0, bottom: 30, left: 0, right: 0 }),
-  }));
-  vi.doMock("react-native", async () => ({
-    ...(await import("../test/mockReactNative")).reactNative(),
-  }));
-  vi.doMock("../theme/Icono", () => ({ Icono: "Icono" }));
-  const { BarraInferior: ConMargen } = await import("./BarraInferior");
+it("oculta no intercepta toques ni se anuncia a un lector de pantalla", async () => {
+  const v = await pintar(
+    <BarraInferior pestanas={PESTANAS} activa="inicio" visible={false} onCambiar={() => {}} />,
+  );
+  const raiz = v.toJSON() as unknown as { props: Record<string, unknown> };
+  expect(raiz.props.pointerEvents).toBe("none");
+  expect(raiz.props.accessibilityElementsHidden).toBe(true);
+});
 
-  const v = pintar(<ConMargen pestanas={PESTANAS} activa="inicio" onCambiar={() => {}} />);
-  const raiz = v.toJSON() as unknown as { props: { style: unknown[] } };
-  const estilos = [raiz.props.style].flat(Infinity) as { paddingBottom?: number }[];
-  expect(estilos.some((s) => s?.paddingBottom === 30)).toBe(true);
+it("visible sí acepta toques y es accesible", async () => {
+  const v = await pintar(
+    <BarraInferior pestanas={PESTANAS} activa="inicio" visible onCambiar={() => {}} />,
+  );
+  const raiz = v.toJSON() as unknown as { props: Record<string, unknown> };
+  expect(raiz.props.pointerEvents).toBe("auto");
+  expect(raiz.props.accessibilityElementsHidden).toBe(false);
+});
+
+/**
+ * Con "reducir movimiento" no se desliza, pero sigue apareciendo y
+ * desapareciendo: apagar la animación no puede apagar la función.
+ */
+it("con movimiento reducido igual respeta visible/oculto", async () => {
+  ajustes.reducir = true;
+  const oculta = await pintar(
+    <BarraInferior pestanas={PESTANAS} activa="inicio" visible={false} onCambiar={() => {}} />,
+  );
+  expect((oculta.toJSON() as unknown as { props: Record<string, unknown> }).props.pointerEvents)
+    .toBe("none");
+
+  const visible = await pintar(
+    <BarraInferior pestanas={PESTANAS} activa="inicio" visible onCambiar={() => {}} />,
+  );
+  expect((visible.toJSON() as unknown as { props: Record<string, unknown> }).props.pointerEvents)
+    .toBe("auto");
 });

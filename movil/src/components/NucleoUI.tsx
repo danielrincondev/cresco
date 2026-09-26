@@ -1,6 +1,8 @@
 import {
   Component,
+  createContext,
   type PropsWithChildren,
+  useContext,
   useEffect,
   useRef,
   useState,
@@ -19,8 +21,9 @@ import {
   type TextInputProps,
 } from "react-native";
 import { ConvexError } from "convex/values";
-import { Aparece, useEntrada } from "./Movimiento";
+import { Aparece, useEntrada, useReduceMotion } from "./Movimiento";
 import { Icono } from "../theme/Icono";
+import { Curva } from "../theme/Movimiento";
 import {
   AREA_TACTIL_MINIMA,
   Espacio,
@@ -81,6 +84,28 @@ export function useOperacion() {
  * El boton de atras lleva etiqueta de accesibilidad propia: una flecha sola no
  * le dice nada a quien usa lector de pantalla.
  */
+/**
+ * Canal opcional para que `Pagina` avise de su scroll a quien la envuelva, sin
+ * que cada una de las ~25 pantallas que la usan tenga que declarar un prop
+ * nuevo.
+ *
+ * Hoy lo consume `BarraInferior`, en `NucleoScreen.tsx`: esconderse al leer y
+ * volver a aparecer al desplazarse hacia arriba necesita saber en qué
+ * dirección se mueve el `ScrollView` de la pantalla que esté abierta en cada
+ * momento, y esa pantalla cambia constantemente sin que `NucleoUI.tsx` sepa
+ * cuál es. `relleno` es el alto que esa barra ocupa cuando está visible: sin
+ * reservarlo aquí, el último elemento de cada pantalla quedaría tapado
+ * mientras la barra está a la vista.
+ *
+ * `null` —el valor por omisión, sin `Provider`— es exactamente "no hay barra
+ * de la que preocuparse": así es como se comporta cada pantalla del docente
+ * hoy mismo, sin cambiar una línea en ninguna de ellas.
+ */
+export const ContextoBarraInferior = createContext<{
+  onScroll: (y: number) => void;
+  relleno: number;
+} | null>(null);
+
 export function Pagina({
   titulo,
   descripcion,
@@ -93,6 +118,7 @@ export function Pagina({
   atras?: { onPress: () => void; etiqueta?: string };
   accion?: { texto: string; onPress: () => void; deshabilitada?: boolean };
 }>) {
+  const barraInferior = useContext(ContextoBarraInferior);
   return (
     <KeyboardAvoidingView
       style={s.flex}
@@ -100,7 +126,16 @@ export function Pagina({
     >
       <ScrollView
         keyboardShouldPersistTaps="handled"
-        contentContainerStyle={s.pagina}
+        contentContainerStyle={[
+          s.pagina,
+          barraInferior && { paddingBottom: barraInferior.relleno },
+        ]}
+        onScroll={
+          barraInferior
+            ? (e) => barraInferior.onScroll(e.nativeEvent.contentOffset.y)
+            : undefined
+        }
+        scrollEventThrottle={barraInferior ? 16 : undefined}
       >
         <View style={s.encabezado}>
           {(atras || accion) && (
@@ -401,6 +436,81 @@ export function Casilla({
     </Pressable>
   );
 }
+
+/** Proporción clásica de un interruptor: la pista mide el doble que la bolita. */
+const ALTO_PISTA = 28;
+const ANCHO_PISTA = ALTO_PISTA * 2;
+/** Cuánto tarda la bolita del interruptor en cruzar de un lado a otro. */
+const DURACION_INTERRUPTOR = 160;
+
+/**
+ * Interruptor de encendido/apagado — el "switch" que `Casilla` no es.
+ *
+ * `Casilla` marca una elección dentro de un formulario que hay que guardar.
+ * Un interruptor es distinto: la acción de tocarlo **es** el cambio, sin un
+ * botón de guardar aparte, así que necesita decirlo con otra forma. Ningún
+ * `#hex` nuevo: encendido usa `Marca.base`, apagado el borde neutro de
+ * siempre, y la bolita es la superficie blanca de cualquier tarjeta.
+ */
+export function Interruptor({
+  encendido,
+  etiqueta,
+  onChange,
+  disabled,
+}: {
+  encendido: boolean;
+  etiqueta: string;
+  onChange: () => void;
+  disabled?: boolean;
+}) {
+  const reducir = useReduceMotion();
+  const progreso = useRef(new Animated.Value(encendido ? 1 : 0)).current;
+  useEffect(() => {
+    if (reducir) {
+      progreso.setValue(encendido ? 1 : 0);
+      return;
+    }
+    const animacion = Animated.timing(progreso, {
+      toValue: encendido ? 1 : 0,
+      duration: DURACION_INTERRUPTOR,
+      easing: Curva.entrada,
+      useNativeDriver: true,
+    });
+    animacion.start();
+    return () => animacion.stop?.();
+  }, [encendido, reducir, progreso]);
+
+  return (
+    <Pressable
+      accessibilityRole="switch"
+      accessibilityLabel={etiqueta}
+      accessibilityState={{ checked: encendido, disabled }}
+      disabled={disabled}
+      onPress={onChange}
+      style={s.interruptorFila}
+    >
+      <Text style={[s.texto, s.flex]}>{etiqueta}</Text>
+      <View style={[s.interruptorPista, encendido && s.interruptorPistaEncendida]}>
+        <Animated.View
+          style={[
+            s.interruptorBola,
+            {
+              transform: [
+                {
+                  translateX: progreso.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [0, ANCHO_PISTA - ALTO_PISTA],
+                  }),
+                },
+              ],
+            },
+          ]}
+        />
+      </View>
+    </Pressable>
+  );
+}
+
 export function Opciones<T extends string>({
   valor,
   opciones,
@@ -632,4 +742,30 @@ export const s = StyleSheet.create({
   },
   casillaMarcada: { backgroundColor: Marca.base },
   check: { color: Texto.sobreColor, fontSize: 18 },
+  interruptorFila: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Espacio.md,
+    minHeight: AREA_TACTIL_MINIMA,
+  },
+  interruptorPista: {
+    width: ANCHO_PISTA,
+    height: ALTO_PISTA,
+    borderRadius: Radio.pill,
+    borderWidth: 1,
+    borderColor: Superficie.borde,
+    backgroundColor: Superficie.borde,
+    justifyContent: "center",
+    // "flex-start": sin esto, `stretch` (el valor por defecto) ignoraría el
+    // ancho fijo de la bolita y la estiraria a lo ancho de toda la pista.
+    alignItems: "flex-start",
+  },
+  interruptorPistaEncendida: { backgroundColor: Marca.base, borderColor: Marca.base },
+  interruptorBola: {
+    width: ALTO_PISTA - 4,
+    height: ALTO_PISTA - 4,
+    marginHorizontal: 2,
+    borderRadius: Radio.pill,
+    backgroundColor: Superficie.tarjeta,
+  },
 });

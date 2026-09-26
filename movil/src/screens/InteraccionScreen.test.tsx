@@ -35,7 +35,7 @@ vi.mock("convex/react", () => ({
     return vi.fn();
   },
 }));
-import { AgendaDocente, AlertaDocente, CitasFamilia } from "./InteraccionScreen";
+import { AgendaDocente, AlertaDocente, Ajustes, CitasFamilia } from "./InteraccionScreen";
 import { Boton, Campo, Casilla, Opciones } from "../components/NucleoUI";
 
 let vista: ReactTestRenderer;
@@ -249,4 +249,44 @@ it("acota el historial a 5 citas y permite expandirlo", async () => {
   expect(texto).toContain("Motivo 6");
   expect(texto).toContain("Motivo 7");
   expect(texto).toContain("Ver menos citas");
+});
+
+/* ---------- Ajustes: el interruptor de la barra inferior ---------- */
+
+/**
+ * El docente no tiene barra inferior (issue de UX de la familia): sin este
+ * guardia, su pantalla de Ajustes ofrecería apagar algo que nunca existió
+ * para él.
+ */
+it("el docente no ve la tarjeta de la barra inferior en Ajustes", async () => {
+  await act(async () => { vista = create(<Ajustes esRepresentante={false} />); });
+  expect(JSON.stringify(vista.toJSON())).not.toContain("Menú de abajo");
+});
+
+it("el representante ve el interruptor y refleja el estado que recibe", async () => {
+  await act(async () => {
+    vista = create(<Ajustes esRepresentante barraInferiorActiva={false} />);
+  });
+  const interruptor = vista.root.findByProps({
+    accessibilityLabel: "Mostrar la barra de Cita, Inicio y Reporte",
+  });
+  expect(interruptor.props.accessibilityState.checked).toBe(false);
+});
+
+it("tocar el interruptor avisa con el valor invertido, sin decidir nada por su cuenta", async () => {
+  const cambios: boolean[] = [];
+  await act(async () => {
+    vista = create(
+      <Ajustes
+        esRepresentante
+        barraInferiorActiva
+        onCambiarBarraInferior={(v) => cambios.push(v)}
+      />,
+    );
+  });
+  const interruptor = vista.root.findByProps({
+    accessibilityLabel: "Mostrar la barra de Cita, Inicio y Reporte",
+  });
+  await act(async () => interruptor.props.onPress());
+  expect(cambios).toEqual([false]);
 });
