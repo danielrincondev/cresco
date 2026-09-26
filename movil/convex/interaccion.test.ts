@@ -1476,3 +1476,19 @@ describe("interaccion — la bandeja no crece sin freno", () => {
     expect(await e.docente.query(api.interaccion.misNotificaciones)).toHaveLength(0);
   });
 });
+
+/**
+ * El fallo que rompia el alta: la campana de novedades consultaba
+ * `misNotificaciones` nada mas entrar, y esa consulta exigia un perfil. Un
+ * usuario recien registrado **todavia no lo tiene** -- lo crea en el
+ * formulario siguiente -- asi que lanzaba, el limite de error lo capturaba, y
+ * la pantalla decia "No pudimos cargar esta vista". Nadie podia pasar del
+ * registro. Se descubrio instalando el APK, no con pruebas.
+ */
+it("sin perfil devuelve una bandeja vacia, no un error", async () => {
+  const t = convexTest(schema, modules);
+  // Autenticado pero sin haber completado el alta: no hay `perfilUsuario`.
+  const recienRegistrado = t.withIdentity({ subject: "nuevo_sin_perfil" });
+
+  expect(await recienRegistrado.query(api.interaccion.misNotificaciones)).toEqual([]);
+});

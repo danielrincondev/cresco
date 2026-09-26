@@ -50,6 +50,7 @@ import {
   exigirRepresentante,
   exigirTitularDelCurso,
   exigirVinculo,
+  perfilActual,
 } from "./lib/permisos";
 
 /**
@@ -1138,7 +1139,12 @@ const NOTIFICACIONES_EN_BANDEJA = 100;
 export const misNotificaciones = query({
   args: {},
   handler: (ctx) => conErroresPublicos(async () => {
-    const perfil = await exigirPerfil(ctx);
+    // Sin perfil **no es un error**: es el estado normal entre registrarse y
+    // completar el alta, y en ese momento la bandeja esta vacia por
+    // definicion. Lanzar aqui tumbaba la pantalla entera del usuario nuevo.
+    const perfil = await perfilActual(ctx);
+    if (perfil === null) return [];
+
     return await ctx.db
       .query("notificacion")
       .withIndex("por_usuario", (q) => q.eq("perfilUsuarioId", perfil._id))
