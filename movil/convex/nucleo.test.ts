@@ -189,6 +189,113 @@ describe("nucleo — periodos", () => {
     await expect(t.query(api.nucleo.obtenerCalendarioCurso, { cursoId })).rejects.toThrow("Inicia sesión para continuar");
   });
 
+  /**
+   * `definirPeriodos` es de un solo uso, asi que hasta el 26 de septiembre un
+   * docente que se equivocaba por unos dias al montar el año **no tenia
+   * ninguna salida**: ni la aplicacion ni el servidor.
+   */
+  describe("corregir las fechas ya definidas", () => {
+    async function conPeriodos(t: ReturnType<typeof convexTest>) {
+      const { cliente, cursoId } = await cursoDe(t);
+      await cliente.mutation(api.nucleo.definirPeriodos, { cursoId, periodos: periodosValidos });
+      const { periodos } = await cliente.query(api.nucleo.obtenerCalendarioCurso, { cursoId });
+      return { cliente, cursoId, periodos };
+    }
+
+    it("corrige solo lo que cambió", async () => {
+      const t = convexTest(schema, modules);
+      const { cliente, cursoId, periodos } = await conPeriodos(t);
+      const r = await cliente.mutation(api.nucleo.corregirFechasPeriodos, {
+        cursoId,
+        fechas: [
+          { periodoAcademicoId: periodos[0].id, fechaInicio: periodos[0].fechaInicio, fechaFin: "2026-07-08" },
+          { periodoAcademicoId: periodos[1].id, fechaInicio: periodos[1].fechaInicio, fechaFin: periodos[1].fechaFin },
+        ],
+      });
+      expect(r).toEqual({ corregidos: 1 });
+      const calendario = await cliente.query(api.nucleo.obtenerCalendarioCurso, { cursoId });
+      expect(calendario.periodos[0].fechaFin).toBe("2026-07-08");
+      expect(calendario.periodos[1].fechaInicio).toBe(periodosValidos[1].fechaInicio);
+    });
+
+    it("rechaza fechas que solapan", async () => {
+      const t = convexTest(schema, modules);
+      const { cliente, cursoId, periodos } = await conPeriodos(t);
+      await expect(cliente.mutation(api.nucleo.corregirFechasPeriodos, {
+        cursoId,
+        fechas: [
+          { periodoAcademicoId: periodos[0].id, fechaInicio: periodos[0].fechaInicio, fechaFin: "2026-08-01" },
+          { periodoAcademicoId: periodos[1].id, fechaInicio: periodos[1].fechaInicio, fechaFin: periodos[1].fechaFin },
+        ],
+      })).rejects.toThrow("no pueden solaparse");
+    });
+
+    it("rechaza salirse del año lectivo", async () => {
+      const t = convexTest(schema, modules);
+      const { cliente, cursoId, periodos } = await conPeriodos(t);
+      await expect(cliente.mutation(api.nucleo.corregirFechasPeriodos, {
+        cursoId,
+        fechas: [
+          { periodoAcademicoId: periodos[0].id, fechaInicio: "2020-01-01", fechaFin: periodos[0].fechaFin },
+          { periodoAcademicoId: periodos[1].id, fechaInicio: periodos[1].fechaInicio, fechaFin: periodos[1].fechaFin },
+        ],
+      })).rejects.toThrow("dentro del año lectivo");
+    });
+
+    /**
+     * Comprobar solapes con la mitad de los parciales daria por buena una
+     * correccion que pisa a la otra mitad.
+     */
+    it("exige la lista completa", async () => {
+      const t = convexTest(schema, modules);
+      const { cliente, cursoId, periodos } = await conPeriodos(t);
+      await expect(cliente.mutation(api.nucleo.corregirFechasPeriodos, {
+        cursoId,
+        fechas: [{ periodoAcademicoId: periodos[0].id, fechaInicio: "2026-05-01", fechaFin: periodos[0].fechaFin }],
+      })).rejects.toThrow("todos los parciales");
+    });
+
+    /**
+     * Un parcial cerrado tiene los puntajes congelados y las familias ya los
+     * vieron. Moverle las fechas cambiaria que anotaciones caen dentro sin
+     * recalcular nada, asi que el puntaje que leyeron dejaria de cuadrar.
+     */
+    it("no mueve un parcial cerrado, pero deja reenviar sus fechas iguales", async () => {
+      const t = convexTest(schema, modules);
+      const { cliente, cursoId, periodos } = await conPeriodos(t);
+      await t.run((ctx) => ctx.db.patch("periodoAcademico", periodos[0].id, { estado: "CERRADO" }));
+
+      await expect(cliente.mutation(api.nucleo.corregirFechasPeriodos, {
+        cursoId,
+        fechas: [
+          { periodoAcademicoId: periodos[0].id, fechaInicio: periodos[0].fechaInicio, fechaFin: "2026-07-08" },
+          { periodoAcademicoId: periodos[1].id, fechaInicio: periodos[1].fechaInicio, fechaFin: periodos[1].fechaFin },
+        ],
+      })).rejects.toThrow("ya está cerrado");
+
+      // Reenviarlas sin cambio no es mover nada: corregir el segundo parcial
+      // no puede quedar bloqueado porque el primero este cerrado.
+      const r = await cliente.mutation(api.nucleo.corregirFechasPeriodos, {
+        cursoId,
+        fechas: [
+          { periodoAcademicoId: periodos[0].id, fechaInicio: periodos[0].fechaInicio, fechaFin: periodos[0].fechaFin },
+          { periodoAcademicoId: periodos[1].id, fechaInicio: periodos[1].fechaInicio, fechaFin: "2026-09-20" },
+        ],
+      });
+      expect(r).toEqual({ corregidos: 1 });
+    });
+
+    it("solo el titular corrige", async () => {
+      const t = convexTest(schema, modules);
+      const { cursoId, periodos } = await conPeriodos(t);
+      const otro = await sembrarDocente(t, "docente_2");
+      await expect(otro.cliente.mutation(api.nucleo.corregirFechasPeriodos, {
+        cursoId,
+        fechas: periodos.map((p) => ({ periodoAcademicoId: p.id, fechaInicio: p.fechaInicio, fechaFin: p.fechaFin })),
+      })).rejects.toThrow("No eres el docente titular");
+    });
+  });
+
   it("solo permite que el docente titular defina los periodos", async () => {
     const t = convexTest(schema, modules);
     const { cursoId } = await cursoDe(t);

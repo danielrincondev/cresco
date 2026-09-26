@@ -552,6 +552,117 @@ export const definirPeriodos = mutation({
   }),
 });
 
+/**
+ * Corregir las fechas de los parciales ya definidos.
+ *
+ * `definirPeriodos` es de un solo uso: si ya existen, rechaza con CONFLICTO. Y
+ * un docente que se equivocó por tres días al montar el año no tenía **ninguna
+ * salida** — ni la aplicación ni el servidor. Esto la abre.
+ *
+ * ## Qué se puede cambiar y qué no
+ *
+ * Solo las **fechas**. Ni el número de parciales ni su orden ni sus nombres:
+ * `puntajePeriodo` tiene una fila por parcial y por matrícula, así que añadir
+ * o quitar uno cambiaría el puntaje de todos los estudiantes del curso. Eso no
+ * es una corrección, es otra cosa, y merecería su propia decisión.
+ *
+ * ## Un parcial cerrado no se mueve
+ *
+ * Al cerrarse, sus puntajes quedan congelados y las familias ya vieron el
+ * resultado. Moverle las fechas cambiaría qué anotaciones caen dentro sin
+ * recalcular nada, así que el puntaje que ya leyeron dejaría de cuadrar con lo
+ * que se ve. Se rechaza con un mensaje que lo dice.
+ */
+export const corregirFechasPeriodos = mutation({
+  args: {
+    cursoId: v.id("curso"),
+    fechas: v.array(
+      v.object({
+        periodoAcademicoId: v.id("periodoAcademico"),
+        fechaInicio: v.string(),
+        fechaFin: v.string(),
+      }),
+    ),
+  },
+  handler: (ctx, args) => conErroresPublicos(async () => {
+    await exigirTitularDelCurso(ctx, args.cursoId);
+    const curso = await ctx.db.get("curso", args.cursoId);
+    if (curso === null) throw new ErrorDominio("NO_ENCONTRADO", "El curso no existe.");
+    const anioLectivo = await ctx.db.get("anioLectivo", curso.anioLectivoId);
+    if (anioLectivo === null) {
+      throw new ErrorDominio("NO_ENCONTRADO", "El año lectivo del curso no existe.");
+    }
+
+    const existentes = await ctx.db
+      .query("periodoAcademico")
+      .withIndex("por_anio_orden", (q) => q.eq("anioLectivoId", anioLectivo._id))
+      .collect();
+    if (existentes.length === 0) {
+      throw new ErrorDominio("NO_ENCONTRADO", "Este año lectivo todavía no tiene parciales.");
+    }
+    // Se exige la lista **completa**: comprobar solapes con la mitad de los
+    // parciales daria por buena una correccion que pisa a la otra mitad.
+    if (args.fechas.length !== existentes.length) {
+      throw new ErrorDominio("VALIDACION", "Envía las fechas de todos los parciales.");
+    }
+
+    const porId = new Map(existentes.map((p) => [p._id, p]));
+    const propuestos = args.fechas.map((f) => {
+      const actual = porId.get(f.periodoAcademicoId);
+      if (!actual) {
+        throw new ErrorDominio("NO_ENCONTRADO", "Ese parcial no es de este año lectivo.");
+      }
+      exigirFechaISO(f.fechaInicio, `La fecha de inicio de ${actual.nombre}`);
+      exigirFechaISO(f.fechaFin, `La fecha de fin de ${actual.nombre}`);
+      exigirRangoFechas(f.fechaInicio, f.fechaFin, `el parcial ${actual.nombre}`);
+      if (f.fechaInicio < anioLectivo.fechaInicio || f.fechaFin > anioLectivo.fechaFin) {
+        throw new ErrorDominio("FECHAS_INVALIDAS", "Los parciales deben estar dentro del año lectivo.");
+      }
+      const cambia =
+        actual.fechaInicio !== f.fechaInicio || actual.fechaFin !== f.fechaFin;
+      if (cambia && actual.estado === "CERRADO") {
+        throw new ErrorDominio(
+          "CONFLICTO",
+          `${actual.nombre} ya está cerrado: sus puntajes están congelados y las familias ya los vieron.`,
+        );
+      }
+      return { actual, ...f, cambia };
+    });
+    if (porId.size !== new Set(args.fechas.map((f) => f.periodoAcademicoId)).size) {
+      throw new ErrorDominio("VALIDACION", "No repitas el mismo parcial dos veces.");
+    }
+
+    const porFecha = [...propuestos].sort((a, b) => a.fechaInicio.localeCompare(b.fechaInicio));
+    for (let i = 1; i < porFecha.length; i++) {
+      if (porFecha[i].fechaInicio <= porFecha[i - 1].fechaFin) {
+        throw new ErrorDominio("CONFLICTO", "Las fechas de los parciales no pueden solaparse.");
+      }
+    }
+    // El orden de los parciales lo fija su numero, no la correccion: si las
+    // fechas nuevas los dejaran en otra secuencia, "segundo parcial" pasaria a
+    // ir antes que el primero.
+    if (porFecha.some((p, indice) => p.actual.orden !== indice + 1)) {
+      throw new ErrorDominio(
+        "FECHAS_INVALIDAS",
+        "El orden de los parciales debe coincidir con sus fechas.",
+      );
+    }
+
+    const ahora = Date.now();
+    let corregidos = 0;
+    for (const p of propuestos) {
+      if (!p.cambia) continue;
+      await ctx.db.patch("periodoAcademico", p.periodoAcademicoId, {
+        fechaInicio: p.fechaInicio,
+        fechaFin: p.fechaFin,
+        actualizadoEn: ahora,
+      });
+      corregidos++;
+    }
+    return { corregidos };
+  }),
+});
+
 // Invitaciones y alta de estudiantes — #7.
 const VERSION_CONSENTIMIENTO = "2026-09-v2";
 const tipoDocumentoEstudiante = v.union(...TIPO_DOCUMENTO.map((tipo) => v.literal(tipo)));

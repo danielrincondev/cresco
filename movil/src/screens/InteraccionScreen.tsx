@@ -31,6 +31,7 @@ import type { Id } from "../../convex/_generated/dataModel";
 import { MODALIDAD, REGLAS, TIPO_ALERTA } from "../../convex/lib/enums";
 import { Chip, Chips, EstadoVacio } from "../components/Estado";
 import { EsqueletoPagina } from "../components/Movimiento";
+import { CampoFecha } from "../components/CampoFecha";
 import {
   Aviso,
   Boton,
@@ -287,13 +288,11 @@ export function AgendaDocente({ curso }: { curso: Curso }) {
     >
       <Tarjeta>
         <Subtitulo>Publicar una franja</Subtitulo>
-        <Campo
+        <CampoFecha
           etiqueta="Día"
-          ayuda={fechaValida ? fechaLegible(fecha) : "Usa el formato 2026-09-15."}
-          value={fecha}
-          onChangeText={setFecha}
-          placeholder="2026-09-15"
-          autoCapitalize="none"
+          ayuda={fechaValida ? fechaLegible(fecha) : "Escríbela o elígela en el calendario."}
+          valor={fecha}
+          onChange={setFecha}
         />
         <View style={i.dos}>
           <View style={i.mitad}>

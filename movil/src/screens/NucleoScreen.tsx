@@ -190,6 +190,13 @@ function MenuDocente({
   if (curso) {
     return (
       <>
+        {/* Arriba del todo: es la salida del curso, y abajo del cajón no se
+            veía sin desplazarse. */}
+        <ItemMenu
+          icono="home"
+          texto="Inicio"
+          onPress={() => ir({ tipo: "inicio" })}
+        />
         <SeccionMenu titulo={curso.nombre} />
         <ItemMenu
           icono="notebook"
@@ -238,12 +245,6 @@ function MenuDocente({
           texto="Alerta de emergencia"
           activo={ruta.tipo === "alerta"}
           onPress={() => ir({ tipo: "alerta", curso })}
-        />
-        <SeparadorMenu />
-        <ItemMenu
-          icono="school"
-          texto="Cursos"
-          onPress={() => ir({ tipo: "inicio" })}
         />
         <PieMenu>
           <ItemMenu icono="logout" texto="Cerrar sesión" peligro onPress={onSalir} />
@@ -1102,6 +1103,130 @@ function Mas({ status, cargar }: { status: string; cargar: () => void }) {
   ) : null;
 }
 
+/**
+ * Corregir las fechas de unos parciales ya definidos.
+ *
+ * Solo fechas: el número de parciales y su orden no se tocan, porque
+ * `puntajePeriodo` tiene una fila por parcial y por matrícula y añadir o
+ * quitar uno movería el puntaje de todo el curso.
+ *
+ * Un parcial cerrado se enseña pero no se edita: sus puntajes están
+ * congelados y las familias ya los vieron.
+ */
+function CorregirPeriodos({
+  curso,
+  periodos,
+  anio,
+  onGuardar,
+}: {
+  curso: Curso;
+  periodos: {
+    id: Id<"periodoAcademico">;
+    nombre: string;
+    fechaInicio: string;
+    fechaFin: string;
+    estado: string;
+  }[];
+  anio: { fechaInicio: string; fechaFin: string };
+  onGuardar: () => void;
+}) {
+  const corregir = useMutation(api.nucleo.corregirFechasPeriodos);
+  const [fechas, setFechas] = useState(() =>
+    periodos.map((p) => ({ fechaInicio: p.fechaInicio, fechaFin: p.fechaFin })),
+  );
+  const [listo, setListo] = useState(false);
+  const op = useOperacion();
+
+  const cambiado = fechas.some(
+    (f, i) =>
+      f.fechaInicio !== periodos[i].fechaInicio || f.fechaFin !== periodos[i].fechaFin,
+  );
+
+  async function guardar() {
+    const r = await op.ejecutar(() =>
+      corregir({
+        cursoId: curso.id,
+        fechas: periodos.map((p, i) => ({
+          periodoAcademicoId: p.id,
+          fechaInicio: fechas[i].fechaInicio,
+          fechaFin: fechas[i].fechaFin,
+        })),
+      }),
+    );
+    if (r.ok) setListo(true);
+  }
+
+  if (listo)
+    return (
+      <Pagina titulo="Fechas corregidas">
+        <Aviso>
+          Los parciales quedaron con las fechas nuevas. El puntaje de cada
+          estudiante se sigue calculando dentro del parcial que le toca.
+        </Aviso>
+        <Boton onPress={onGuardar}>Volver al curso</Boton>
+      </Pagina>
+    );
+
+  return (
+    <Pagina
+      titulo="Fechas de los parciales"
+      descripcion={`Puedes corregirlas mientras el parcial no esté cerrado. Año lectivo: ${anio.fechaInicio} a ${anio.fechaFin}.`}
+    >
+      {periodos.map((p, i) => {
+        const cerrado = p.estado === "CERRADO";
+        return (
+          <Tarjeta key={p.id} orden={i}>
+            <Subtitulo>{p.nombre}</Subtitulo>
+            {cerrado ? (
+              <>
+                <Cuerpo>{`${p.fechaInicio} — ${p.fechaFin}`}</Cuerpo>
+                <Aviso>
+                  Este parcial ya cerró. Sus puntajes están congelados y las
+                  familias ya los vieron, así que sus fechas no se mueven.
+                </Aviso>
+              </>
+            ) : (
+              <>
+                <CampoFecha
+                  etiqueta="Inicio"
+                  valor={fechas[i].fechaInicio}
+                  editable={!op.pendiente}
+                  onChange={(v) =>
+                    setFechas(
+                      fechas.map((f, n) => (n === i ? { ...f, fechaInicio: v } : f)),
+                    )
+                  }
+                />
+                <CampoFecha
+                  etiqueta="Fin"
+                  valor={fechas[i].fechaFin}
+                  editable={!op.pendiente}
+                  onChange={(v) =>
+                    setFechas(
+                      fechas.map((f, n) => (n === i ? { ...f, fechaFin: v } : f)),
+                    )
+                  }
+                />
+              </>
+            )}
+          </Tarjeta>
+        );
+      })}
+      <ErrorMensaje mensaje={op.error} />
+      <Boton
+        onPress={() => void guardar()}
+        pendiente={op.pendiente}
+        disabled={!cambiado}
+      >
+        Guardar las fechas
+      </Boton>
+      <Boton secundario disabled={op.pendiente} onPress={onGuardar}>
+        Volver al curso
+      </Boton>
+    </Pagina>
+  );
+}
+
 function PeriodosForm({
   curso,
   onGuardar,
@@ -1136,12 +1261,17 @@ function PeriodosForm({
     );
     if (r.ok) onGuardar();
   }
+  // Ya definidos: la pantalla pasa a corregir, no a crear. Antes era un
+  // callejon —"el calendario ya esta guardado" y a volver— y un docente que se
+  // equivoco por tres dias al montar el año no tenia ninguna salida.
   if (calendario?.periodos.length)
     return (
-      <Pagina titulo="Parciales definidos">
-        <Aviso>El calendario ya está guardado.</Aviso>
-        <Boton onPress={onGuardar}>Volver al curso</Boton>
-      </Pagina>
+      <CorregirPeriodos
+        curso={curso}
+        periodos={calendario.periodos}
+        anio={{ fechaInicio: calendario.fechaInicio, fechaFin: calendario.fechaFin }}
+        onGuardar={onGuardar}
+      />
     );
   return (
     <Pagina
