@@ -46,7 +46,7 @@ import { etiquetaAccion, etiquetaFranja } from "../lib/estados";
 import type { AccionDeLaBitacora } from "./ReclamarScreen";
 import { fechaLegible } from "../lib/fechas";
 import { useLecturaSensible } from "../lib/useLecturaSensible";
-import { Espacio, Tamano, Texto } from "../theme/Theme";
+import { Espacio, Franja, Radio, Superficie, Tamano, Texto } from "../theme/Theme";
 
 type Reporte = NonNullable<
   FunctionReturnType<typeof api.conducta.reporteDeHoy>["reporte"]
@@ -204,15 +204,66 @@ export function ReportesAnteriores({
   );
 }
 
+/**
+ * Los seis tramos de la escala, en orden y con el ancho real de cada uno —
+ * no seis franjas iguales, porque no lo son: la de partida mide 10 puntos
+ * (51 a 60) y la excelente mide 20 (81 a 100). Los límites y los colores
+ * están duplicados a propósito desde `convex/semillas.ts`, que es la fuente:
+ * si algún día cambian ahí, este es el otro sitio que hay que tocar.
+ */
+const TRAMOS_FRANJA = [
+  { color: Franja.CRITICA, hasta: 15 },
+  { color: Franja.MUY_BAJO, hasta: 30 },
+  { color: Franja.BAJO, hasta: 50 },
+  { color: Franja.BASE, hasta: 60 },
+  { color: Franja.BUENO, hasta: 80 },
+  { color: Franja.EXCELENTE, hasta: 100 },
+] as const;
+
+/**
+ * La evolución del estudiante en una sola barra: la escala completa de 0 a
+ * 100 coloreada por franja, con un marcador en el puntaje de hoy.
+ *
+ * Existe **incluso sin una sola acción registrada** — un estudiante recién
+ * aprobado empieza en el punto de partida (51-60), y ese es un tramo de la
+ * escala como cualquier otro, no la ausencia de datos. Por C3 el número
+ * sigue estando aparte, en el chip de arriba: esta barra es la ubicación
+ * visual, no reemplaza a la cifra.
+ */
+function BarraDeFranjas({ puntaje }: { puntaje: number }) {
+  const posicion = Math.min(100, Math.max(0, puntaje));
+  return (
+    <View style={r.barra} accessibilityElementsHidden>
+      <View style={r.barraPista}>
+        {TRAMOS_FRANJA.map((tramo, i) => (
+          <View
+            key={tramo.color}
+            style={{
+              flex: tramo.hasta - (i === 0 ? 0 : TRAMOS_FRANJA[i - 1].hasta),
+              backgroundColor: tramo.color,
+            }}
+          />
+        ))}
+      </View>
+      <View style={[r.barraMarcador, { left: `${posicion}%` }]} />
+    </View>
+  );
+}
+
 /** P6 — El acumulado del parcial, con la bitacora completa. */
 export function ReporteAcumulado({
   estudianteId,
   nombre,
+  hijos,
+  onCambiarHijo,
   onVolver,
   onVerAccion,
 }: {
   estudianteId: Id<"estudiante">;
   nombre: string;
+  /** Todos los hijos aprobados, para poder cambiar sin salir de la pantalla. */
+  hijos?: { estudianteId: string; nombre: string }[];
+  onCambiarHijo?: (estudianteId: string, nombre: string) => void;
   onVolver: () => void;
   onVerAccion: (accion: AccionDeLaBitacora) => void;
 }) {
@@ -226,15 +277,40 @@ export function ReporteAcumulado({
   if (datos === undefined) return <EsqueletoPagina etiqueta="Cargando el acumulado" />;
 
   return (
-    <Pagina titulo={`${nombre} · ${datos.periodo.nombre}`}>
+    <Pagina titulo={datos.periodo ? `${nombre} · ${datos.periodo.nombre}` : nombre}>
+      {hijos && hijos.length > 0 && (
+        <HijoActivo
+          hijos={hijos}
+          activo={estudianteId}
+          onCambiar={(id) => {
+            const elegido = hijos.find((h) => h.estudianteId === id);
+            if (elegido) onCambiarHijo?.(id, elegido.nombre);
+          }}
+        />
+      )}
       <Tarjeta>
         <Chip
           etiqueta={etiquetaFranja(datos.franja?.nombre ?? "Sin franja", datos.puntaje)}
         />
+        {/* La barra completa de 0 a 100: no solo el color de hoy, sino dónde
+            cae ese número dentro de las seis franjas posibles. Existe incluso
+            sin una sola acción registrada -- el punto de partida (51-60) es
+            una franja como cualquier otra, no una ausencia de datos. */}
+        <BarraDeFranjas puntaje={datos.puntaje} />
         {datos.franja && <Cuerpo>{datos.franja.frase}</Cuerpo>}
         <Text style={r.dato}>
           {`Suma ${datos.puntosPositivos > 0 ? `+${datos.puntosPositivos}` : 0} · Resta ${datos.puntosNegativos}`}
         </Text>
+        {!datos.periodo && (
+          // Sin parcial vigente hoy -- entre dos parciales, o el docente
+          // todavia no definio ninguno-- la familia sigue viendo el punto de
+          // partida de su hijo, no un error. Distinto de "cerrado": aqui
+          // puede que ni haya empezado.
+          <Aviso>
+            Hoy no hay un parcial en curso. En cuanto el docente tenga uno
+            activo, aquí vas a ver su evolución.
+          </Aviso>
+        )}
         {datos.congelado && (
           // El parcial cerro: el numero ya no se mueve. Decirlo evita que una
           // familia espere un cambio que no va a llegar.
@@ -285,5 +361,24 @@ const r = StyleSheet.create({
     fontFamily: "Inter",
     fontSize: Tamano.sm,
     lineHeight: 22,
+  },
+  barra: { paddingVertical: Espacio.sm, width: "100%" },
+  barraPista: {
+    flexDirection: "row",
+    height: 14,
+    width: "100%",
+    borderRadius: Radio.pill,
+    overflow: "hidden",
+  },
+  barraMarcador: {
+    position: "absolute",
+    top: -4,
+    width: 6,
+    height: 22,
+    borderRadius: Radio.sm,
+    backgroundColor: Texto.primario,
+    borderWidth: 2,
+    borderColor: Superficie.tarjeta,
+    transform: [{ translateX: -3 }],
   },
 });

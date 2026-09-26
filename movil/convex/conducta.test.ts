@@ -147,6 +147,91 @@ it("con un parcial recién definido por la mutation real (PLANIFICADO, no EN_CUR
   expect(progreso.franja).not.toBeNull();
 });
 
+/**
+ * El segundo bug que Kenny encontró probando de verdad: un estudiante recién
+ * aprobado, sin una sola acción todavía, se quedaba sin franja —
+ * `puntaje?.franjaConductaId` solo existe después de la primera
+ * `recalcularPuntaje`, y esa nunca corrió. La pantalla necesita el color y la
+ * frase desde el primer día, no desde la primera anotación.
+ */
+it("reporteAcumulado calcula la franja aunque nunca haya corrido recalcularPuntaje (sin acciones)", async () => {
+  const { t, args } = await fixture();
+  // `fixture()` deja la matrícula sin ninguna fila en `puntajePeriodo`: es
+  // exactamente el estado de un estudiante recién aprobado.
+  const repPerfilId = await t.run((ctx) => ctx.db.insert("perfilUsuario", {
+    authSubject: "familia_sin_acciones", tipoDocumento: "CEDULA", numeroDocumento: "0000000004", actualizadoEn: Date.now(),
+  }));
+  await t.run(async (ctx) => {
+    const representanteId = await ctx.db.insert("representante", { perfilUsuarioId: repPerfilId, actualizadoEn: Date.now() });
+    await ctx.db.insert("vinculoRepresentacion", {
+      representanteId, estudianteId: args.estudianteId, parentesco: "PADRE",
+      estado: "ACTIVO", vigenteDesde: "2026-09-01", actualizadoEn: Date.now(),
+    });
+  });
+  const progreso = await t.withIdentity({ subject: "familia_sin_acciones" })
+    .query(api.conducta.reporteAcumulado, { estudianteId: args.estudianteId });
+  expect(progreso.puntaje).toBe(60);
+  expect(progreso.bitacora).toEqual([]);
+  expect(progreso.franja).toMatchObject({ nombre: "En el punto de partida" });
+});
+
+/**
+ * El primer bug: sin ningún parcial cubriendo hoy —entre dos parciales, o el
+ * docente todavía no definió ninguno—, `reporteAcumulado` lanzaba
+ * `PERIODO_NO_VIGENTE` sin que nada lo atrapara, y la familia se llevaba
+ * "No pudimos cargar esta vista" en vez de ver el punto de partida.
+ */
+it("reporteAcumulado no revienta sin ningún parcial cubriendo hoy: punto de partida, sin error", async () => {
+  const t = convexTest(schema, modules);
+  await t.run(async (ctx) => {
+    const perfilUsuarioId = await ctx.db.insert("perfilUsuario", {
+      authSubject: "docente_sin_parcial_hoy", tipoDocumento: "CEDULA", numeroDocumento: "0000000005", actualizadoEn: Date.now(),
+    });
+    await ctx.db.insert("docente", { perfilUsuarioId, actualizadoEn: Date.now() });
+  });
+  const cliente = t.withIdentity({ subject: "docente_sin_parcial_hoy" });
+  const curso = await cliente.mutation(api.nucleo.crearCurso, {
+    nombreInstitucion: "Escuela de prueba", nombreCurso: "Octavo A", nivel: "8vo", paralelo: "A",
+    anioInicio: "2026-05-04", anioFin: "2027-02-26",
+  });
+  // Ninguno de los dos cubre "hoy" (2026-09-09, por el reloj congelado):
+  // el primero ya terminó, el segundo todavía no empieza.
+  await cliente.mutation(api.nucleo.definirPeriodos, {
+    cursoId: curso.id,
+    periodos: [
+      { nombre: "Primer parcial", orden: 1, fechaInicio: "2026-05-04", fechaFin: "2026-09-01" },
+      { nombre: "Segundo parcial", orden: 2, fechaInicio: "2026-09-20", fechaFin: "2026-11-30" },
+    ],
+  });
+  await t.mutation(internal.semillas.cargar, {});
+  const estudianteId = await t.run(async (ctx) => {
+    const c = (await ctx.db.get(curso.id))!;
+    const a = (await ctx.db.get(c.anioLectivoId))!;
+    const estudianteId = await ctx.db.insert("estudiante", {
+      institucionId: a.institucionId, tipoDocumento: "SIN_DOCUMENTO", numeroDocumento: "", nombres: "Sin", apellidos: "Parcial",
+      origenRegistro: "DOCENTE_MANUAL", estadoVerificacion: "APROBADO", estado: "ACTIVO", actualizadoEn: Date.now(),
+    });
+    await ctx.db.insert("matricula", { estudianteId, cursoId: c._id, fechaIngreso: "2026-09-01", estado: "CURSANDO", actualizadoEn: Date.now() });
+    const representanteId = await ctx.db.insert("representante", {
+      perfilUsuarioId: await ctx.db.insert("perfilUsuario", {
+        authSubject: "familia_sin_parcial_hoy", tipoDocumento: "CEDULA", numeroDocumento: "0000000006", actualizadoEn: Date.now(),
+      }), actualizadoEn: Date.now(),
+    });
+    await ctx.db.insert("vinculoRepresentacion", {
+      representanteId, estudianteId, parentesco: "MADRE", estado: "ACTIVO", vigenteDesde: "2026-09-01", actualizadoEn: Date.now(),
+    });
+    return estudianteId;
+  });
+
+  const progreso = await t.withIdentity({ subject: "familia_sin_parcial_hoy" })
+    .query(api.conducta.reporteAcumulado, { estudianteId });
+  expect(progreso.periodo).toBeNull();
+  expect(progreso.puntaje).toBe(60);
+  expect(progreso.congelado).toBe(false);
+  expect(progreso.bitacora).toEqual([]);
+  expect(progreso.franja).toMatchObject({ nombre: "En el punto de partida" });
+});
+
 it("control: registra, recalcula y rechaza superar +4", async () => {
   const { t, cliente, args } = await fixture();
   await cliente.mutation(api.conducta.registrarAccion, args);

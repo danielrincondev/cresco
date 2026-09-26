@@ -23,7 +23,7 @@ async function conErroresPublicos<T>(operacion: () => Promise<T>): Promise<T> {
   }
 }
 
-async function franjaDe(ctx: MutationCtx, puntaje: number): Promise<Id<"franjaConducta"> | undefined> {
+async function franjaDe(ctx: QueryCtx | MutationCtx, puntaje: number): Promise<Id<"franjaConducta"> | undefined> {
   const franjas = await ctx.db.query("franjaConducta").collect();
   return franjas.find((f) => puntaje >= f.puntajeDesde && puntaje <= f.puntajeHasta)?._id;
 }
@@ -470,11 +470,39 @@ export const reporteAcumulado = query({
     await exigirVinculo(ctx, args.estudianteId);
     const matricula = await ctx.db.query("matricula").withIndex("por_estudiante_estado", (q) => q.eq("estudianteId", args.estudianteId).eq("estado", "CURSANDO")).unique();
     if (matricula === null) throw new ErrorDominio("NO_ENCONTRADO", "El estudiante no tiene matrícula vigente.");
-    const periodo = await periodoDelCurso(ctx, matricula.cursoId);
-    const puntaje = await ctx.db.query("puntajePeriodo").withIndex("por_matricula_periodo", (q) => q.eq("matriculaId", matricula._id).eq("periodoAcademicoId", periodo._id)).unique();
-    const acciones = await ctx.db.query("accionRegistrada").withIndex("por_matricula_periodo", (q) => q.eq("matriculaId", matricula._id).eq("periodoAcademicoId", periodo._id)).collect();
-    const franja = puntaje?.franjaConductaId === undefined ? null : await ctx.db.get(puntaje.franjaConductaId);
-    return { periodo: { nombre: periodo.nombre, fechaInicio: periodo.fechaInicio, fechaFin: periodo.fechaFin }, puntaje: puntaje?.puntajeActual ?? 60, puntosPositivos: puntaje?.puntosPositivos ?? 0, puntosNegativos: puntaje?.puntosNegativos ?? 0, congelado: puntaje?.congelado ?? false, franja: franja === null ? null : { nombre: franja.nombre, frase: franja.fraseRepresentante, color: franja.colorHex ?? null }, bitacora: acciones.sort((a, b) => b.fechaOcurrencia.localeCompare(a.fechaOcurrencia)).map((a) => ({ id: a._id, fecha: a.fechaOcurrencia, signo: a.signo, puntos: a.estado === "VIGENTE" ? a.puntosAplicados : 0, descripcion: a.descripcion, estado: a.estado })) };
+    const curso = await ctx.db.get(matricula.cursoId);
+    if (curso === null) throw new ErrorDominio("NO_ENCONTRADO", "El curso no existe.");
+    /**
+     * A diferencia de `guardarReporteGeneral`/`tomarAsistencia` —que son
+     * acciones del docente y con razón exigen un parcial vigente para
+     * ejecutarse—, esta es una **lectura de la familia**. No tiene ninguna
+     * acción que rechazar: si hoy cae entre dos parciales, o el docente
+     * todavía no definió ninguno, la familia igual tiene que poder abrir la
+     * pantalla y ver que su hijo arranca en el puntaje base, en vez de
+     * llevarse un "no pudimos cargar esta vista" que no distingue "sin datos
+     * todavía" de "la aplicación se rompió".
+     */
+    const periodo = await periodoVigentePorFecha(ctx, curso.anioLectivoId, hoyEnGuayaquil());
+    const puntaje = periodo && await ctx.db.query("puntajePeriodo").withIndex("por_matricula_periodo", (q) => q.eq("matriculaId", matricula._id).eq("periodoAcademicoId", periodo._id)).unique();
+    const acciones = periodo ? await ctx.db.query("accionRegistrada").withIndex("por_matricula_periodo", (q) => q.eq("matriculaId", matricula._id).eq("periodoAcademicoId", periodo._id)).collect() : [];
+    const puntajeEfectivo = puntaje?.puntajeActual ?? REGLAS.PUNTAJE_BASE;
+    // `puntaje?.franjaConductaId` solo existe despues de la primera
+    // `recalcularPuntaje` (la dispara registrar una accion). Un estudiante
+    // recien aprobado, sin ninguna accion todavia, tiene puntaje pero nunca
+    // tuvo ese recalculo -- y sin este `??`, la barra de franjas no tendria
+    // ni color ni frase que mostrar aunque el puntaje sea perfectamente
+    // valido. Se calcula en el momento con el mismo puntaje efectivo.
+    const franjaId = puntaje?.franjaConductaId ?? await franjaDe(ctx, puntajeEfectivo);
+    const franja = franjaId === undefined ? null : await ctx.db.get(franjaId);
+    return {
+      periodo: periodo && { nombre: periodo.nombre, fechaInicio: periodo.fechaInicio, fechaFin: periodo.fechaFin },
+      puntaje: puntajeEfectivo,
+      puntosPositivos: puntaje?.puntosPositivos ?? 0,
+      puntosNegativos: puntaje?.puntosNegativos ?? 0,
+      congelado: puntaje?.congelado ?? false,
+      franja: franja === null ? null : { nombre: franja.nombre, frase: franja.fraseRepresentante, color: franja.colorHex ?? null },
+      bitacora: acciones.sort((a, b) => b.fechaOcurrencia.localeCompare(a.fechaOcurrencia)).map((a) => ({ id: a._id, fecha: a.fechaOcurrencia, signo: a.signo, puntos: a.estado === "VIGENTE" ? a.puntosAplicados : 0, descripcion: a.descripcion, estado: a.estado })),
+    };
   }),
 });
 

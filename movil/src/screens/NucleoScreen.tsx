@@ -850,6 +850,10 @@ export function NucleoScreen() {
           <ReporteAcumulado
             estudianteId={ruta.estudianteId}
             nombre={ruta.nombre}
+            hijos={hijosAprobados}
+            onCambiarHijo={(estudianteId, nombre) =>
+              setRuta({ tipo: "acumulado", estudianteId: estudianteId as Id<"estudiante">, nombre })
+            }
             onVolver={() => setRuta({ ...ruta, tipo: "reporteHoy" })}
             onVerAccion={(accion) => setRuta({ ...ruta, tipo: "detalleAccion", accion })}
           />
