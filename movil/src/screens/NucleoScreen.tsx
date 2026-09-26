@@ -20,6 +20,12 @@ import { api } from "../../convex/_generated/api";
 import { PARENTESCO } from "../../convex/lib/enums";
 import { Icono } from "../theme/Icono";
 import {
+  ItemMenu,
+  MenuLateral,
+  SeccionMenu,
+  SeparadorMenu,
+} from "../components/MenuLateral";
+import {
   Espacio,
   Marca,
   Radio,
@@ -145,6 +151,127 @@ const documentosHijo = [
   { valor: "SIN_DOCUMENTO", texto: "Sin documento" },
 ] as const;
 
+/**
+ * El contenido del menú lateral del docente.
+ *
+ * Dos secciones y una raya entre ellas, porque son dos clases distintas de
+ * cosa: lo del curso abierto deja de existir cuando sales de él; lo de la
+ * cuenta, no. Sin esa separación "Pasar lista" y "Tu plan" parecen lo mismo.
+ *
+ * Las opciones de curso solo aparecen con un curso en contexto. **Anotaciones
+ * recientes vive arriba, en la cuenta, como pidió el diseño**, pero la
+ * consulta que la alimenta es `anotacionesRecientesDelCurso` y necesita uno:
+ * se resuelve con el curso abierto o, si el docente solo tiene uno, con ese.
+ * Sin ninguno de los dos no se ofrece, porque llevaría a una pantalla vacía.
+ */
+function MenuDocente({
+  ruta,
+  cursoActivo,
+  ir,
+  onSalir,
+}: {
+  ruta: Ruta;
+  cursoActivo: Curso | undefined;
+  ir: (ruta: Ruta) => void;
+  onSalir: () => void;
+}) {
+  const curso = "curso" in ruta ? ruta.curso : undefined;
+  return (
+    <>
+      {curso && (
+        <>
+          <SeccionMenu titulo={curso.nombre} />
+          <ItemMenu
+            icono="notebook"
+            texto="Anotar conducta"
+            activo={ruta.tipo === "anotar"}
+            onPress={() => ir({ tipo: "anotar", curso })}
+          />
+          <ItemMenu
+            icono="calendar-check"
+            texto="Pasar lista"
+            activo={ruta.tipo === "asistencia"}
+            onPress={() => ir({ tipo: "asistencia", curso })}
+          />
+          <ItemMenu
+            icono="file-document"
+            texto="Reporte del día"
+            activo={ruta.tipo === "reporteDia"}
+            onPress={() => ir({ tipo: "reporteDia", curso })}
+          />
+          <ItemMenu
+            icono="calendar-blank"
+            texto="Definir parciales"
+            activo={ruta.tipo === "periodos"}
+            onPress={() => ir({ tipo: "periodos", curso })}
+          />
+          <ItemMenu
+            icono="message-text"
+            texto="Avisar al curso"
+            activo={ruta.tipo === "comunicado"}
+            onPress={() => ir({ tipo: "comunicado", curso })}
+          />
+          <ItemMenu
+            icono="account-group"
+            texto="Atención a familias"
+            activo={ruta.tipo === "agenda"}
+            onPress={() => ir({ tipo: "agenda", curso })}
+          />
+          <ItemMenu
+            icono="alert"
+            texto="Alerta de emergencia"
+            activo={ruta.tipo === "alerta"}
+            onPress={() => ir({ tipo: "alerta", curso })}
+          />
+          <SeparadorMenu />
+        </>
+      )}
+
+      <SeccionMenu titulo="Tu cuenta" />
+      <ItemMenu
+        icono="school"
+        texto="Cursos"
+        activo={ruta.tipo === "inicio"}
+        onPress={() => ir({ tipo: "inicio" })}
+      />
+      {cursoActivo && (
+        <ItemMenu
+          icono="book-open"
+          texto="Anotaciones recientes"
+          activo={ruta.tipo === "recientes"}
+          onPress={() => ir({ tipo: "recientes", curso: cursoActivo })}
+        />
+      )}
+      <ItemMenu
+        icono="account"
+        texto="Mi perfil profesional"
+        activo={ruta.tipo === "perfilDocente"}
+        onPress={() => ir({ tipo: "perfilDocente" })}
+      />
+      <ItemMenu
+        icono="cog"
+        texto="Mi plan"
+        activo={ruta.tipo === "plan"}
+        onPress={() => ir({ tipo: "plan" })}
+      />
+      <SeparadorMenu />
+      <ItemMenu
+        icono="account"
+        texto="Mi perfil y roles"
+        activo={ruta.tipo === "perfil"}
+        onPress={() => ir({ tipo: "perfil" })}
+      />
+      <ItemMenu
+        icono="cog"
+        texto="Ajustes"
+        activo={ruta.tipo === "ajustes"}
+        onPress={() => ir({ tipo: "ajustes" })}
+      />
+      <ItemMenu icono="logout" texto="Cerrar sesión" onPress={onSalir} />
+    </>
+  );
+}
+
 export function NucleoScreen() {
   const perfil = useQuery(api.nucleo.obtenerPerfil);
   useAuditoriaSesion(perfil === null ? null : perfil?.perfilUsuarioId);
@@ -165,12 +292,43 @@ export function NucleoScreen() {
   const sinLeer = (novedades ?? []).filter((n) => n.leidaEn === undefined).length;
   const [ruta, setRuta] = useState<Ruta>({ tipo: "inicio" });
   const [rolElegido, setRol] = useState<Rol>();
+  const [menu, setMenu] = useState(false);
   const salida = useOperacion();
   const rol = rolElegido ?? (perfil?.docenteId ? "DOCENTE" : "REPRESENTANTE");
   const volver = () => setRuta({ tipo: "inicio" });
+  /**
+   * El curso con el que trabaja el menú.
+   *
+   * El de la ruta si la ruta lleva uno; si no, el único del docente cuando
+   * tiene uno solo — que es el caso del plan gratuito. Con varios cursos y
+   * ninguno abierto no hay forma de adivinar, y el menú omite lo que necesite
+   * curso en vez de llevar a una pantalla vacía.
+   */
+  const cursos = useQuery(
+    api.nucleo.listarCursos,
+    perfil?.docenteId ? {} : "skip",
+  );
+  const listaCursos = cursos?.cursos;
+  const cursoActivo =
+    "curso" in ruta
+      ? ruta.curso
+      : listaCursos?.length === 1
+        ? listaCursos[0]
+        : undefined;
+  /** Ir a un sitio desde el menú: navegar y cerrarlo, siempre juntos. */
+  const irDesdeMenu = (destino: Ruta) => {
+    setRuta(destino);
+    setMenu(false);
+  };
   useEffect(() => {
     if (Platform.OS !== "android") return;
     const listener = BackHandler.addEventListener("hardwareBackPress", () => {
+      // El menú se cierra antes que nada: si está abierto, es lo que la
+      // persona ve, y el boton de atras tiene que actuar sobre lo que ve.
+      if (menu) {
+        setMenu(false);
+        return true;
+      }
       if (ruta.tipo === "inicio") return false;
       if ("curso" in ruta && ruta.tipo !== "curso")
         setRuta({ tipo: "curso", curso: ruta.curso });
@@ -178,7 +336,7 @@ export function NucleoScreen() {
       return true;
     });
     return () => listener.remove();
-  }, [ruta]);
+  }, [ruta, menu]);
   const retroceder = () => {
     if ("curso" in ruta && ruta.tipo !== "curso")
       setRuta({ tipo: "curso", curso: ruta.curso });
@@ -187,6 +345,20 @@ export function NucleoScreen() {
   return (
     <SafeAreaView style={styles.pantalla}>
       <View style={styles.barra}>
+        {/* El menú se abre desde aquí. No hay gesto desde el borde —eso
+            necesitaría `gesture-handler`, que es nativo— y la hamburguesa es
+            la afordancia que descubre todo el mundo de todas formas. */}
+        {perfil && rol === "DOCENTE" ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Abrir el menú"
+            accessibilityState={{ expanded: menu }}
+            onPress={() => setMenu(true)}
+            style={styles.iconButton}
+          >
+            <Icono nombre="menu" decorativo />
+          </Pressable>
+        ) : null}
         {ruta.tipo !== "inicio" ? (
           <Pressable
             accessibilityRole="button"
@@ -196,7 +368,7 @@ export function NucleoScreen() {
           >
             <Icono nombre="arrow-left" decorativo />
           </Pressable>
-        ) : (
+        ) : perfil && rol === "DOCENTE" ? null : (
           <View style={styles.marcaIcono}>
             <Icono nombre="school" color={Marca.base} decorativo />
           </View>
@@ -235,33 +407,42 @@ export function NucleoScreen() {
                 </View>
               )}
             </Pressable>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Mi perfil y roles"
-              onPress={() => setRuta({ tipo: "perfil" })}
-              style={styles.iconButton}
-            >
-              <Icono nombre="account" decorativo />
-            </Pressable>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Ajustes"
-              onPress={() => setRuta({ tipo: "ajustes" })}
-              style={styles.iconButton}
-            >
-              <Icono nombre="cog" decorativo />
-            </Pressable>
+            {/* Perfil, ajustes y salir viven en el menú cuando hay menú. La
+                campana se queda en la barra: lleva el contador de sin leer, y
+                un aviso escondido detrás de un toque es medio aviso. */}
+            {rol !== "DOCENTE" && (
+              <>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Mi perfil y roles"
+                  onPress={() => setRuta({ tipo: "perfil" })}
+                  style={styles.iconButton}
+                >
+                  <Icono nombre="account" decorativo />
+                </Pressable>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Ajustes"
+                  onPress={() => setRuta({ tipo: "ajustes" })}
+                  style={styles.iconButton}
+                >
+                  <Icono nombre="cog" decorativo />
+                </Pressable>
+              </>
+            )}
           </>
         )}
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Cerrar sesión"
-          disabled={salida.pendiente}
-          onPress={() => void salida.ejecutar(() => signOut())}
-          style={styles.iconButton}
-        >
-          <Icono nombre="logout" decorativo />
-        </Pressable>
+        {!(perfil && rol === "DOCENTE") && (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Cerrar sesión"
+            disabled={salida.pendiente}
+            onPress={() => void salida.ejecutar(() => signOut())}
+            style={styles.iconButton}
+          >
+            <Icono nombre="logout" decorativo />
+          </Pressable>
+        )}
       </View>
       <ErrorMensaje mensaje={salida.error} />
       <LimiteError key={`${ruta.tipo}-${rol}`} onVolver={volver}>
@@ -397,6 +578,22 @@ export function NucleoScreen() {
           </>
         )}
       </LimiteError>
+      {/* Al final del árbol para que pinte por encima de todo lo demás. Se
+          desmonta solo al terminar de cerrarse, así que no se queda
+          interceptando toques invisible sobre la pantalla. */}
+      {perfil && rol === "DOCENTE" && (
+        <MenuLateral abierto={menu} onCerrar={() => setMenu(false)}>
+          <MenuDocente
+            ruta={ruta}
+            cursoActivo={cursoActivo}
+            ir={irDesdeMenu}
+            onSalir={() => {
+              setMenu(false);
+              void salida.ejecutar(() => signOut());
+            }}
+          />
+        </MenuLateral>
+      )}
     </SafeAreaView>
   );
 }
