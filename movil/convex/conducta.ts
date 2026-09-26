@@ -2,6 +2,7 @@ import { ConvexError, v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
 import { internalMutation, mutation, query, type MutationCtx, type QueryCtx } from "./_generated/server";
 import { ALCANCE_COMUNICADO, ENTITLEMENTS, ESTADO_ASISTENCIA, REGLAS, TIPO_COMUNICADO } from "./lib/enums";
+import { BANDERAS } from "./lib/flags";
 import { ErrorDominio, exigirAlcanceCoherente, exigirDuracionNota, exigirFechaEvento, exigirRangoTipoAccion, exigirSignoCoherente, exigirTopeDiario, exigirVentanaComunicado, calcularPuntaje, hoyEnGuayaquil, sumarDias } from "./lib/guardas";
 import { ErrorPermiso, auditar, exigirAccesoDocenteAEstudiante, exigirDocente, exigirTitularDelCurso, exigirVinculo } from "./lib/permisos";
 import { periodoVigentePorFecha } from "./lib/periodos";
@@ -131,11 +132,18 @@ export const registrarAccion = mutation({
 
     // Fin de semana o dia marcado como no lectivo: no se anota conducta un
     // dia en que el estudiante no estuvo en clase.
+    //
+    // BANDERAS.PERMITIR_ANOTAR_FIN_DE_SEMANA (ver lib/flags.ts) solo salta la
+    // mitad "es sabado o domingo" de esta guarda, para el QA del fin de
+    // semana antes de la entrega. Un `diaNoLectivo` declarado a mano sigue
+    // bloqueando igual: eso es la institucion diciendo "hoy no hay clase",
+    // no el calendario, y la bandera no lo toca.
     const diaNoLectivo = await ctx.db
       .query("diaNoLectivo")
       .withIndex("por_anio_fecha", (q) => q.eq("anioLectivoId", curso.anioLectivoId).eq("fecha", fecha))
       .first();
-    if (dia.getUTCDay() === 0 || dia.getUTCDay() === 6 || diaNoLectivo) {
+    const esFinDeSemana = dia.getUTCDay() === 0 || dia.getUTCDay() === 6;
+    if ((esFinDeSemana && !BANDERAS.PERMITIR_ANOTAR_FIN_DE_SEMANA) || diaNoLectivo) {
       throw new ErrorDominio("DIA_NO_LECTIVO", "Solo se pueden registrar acciones en días de clase.");
     }
     const hoy = await ctx.db.query("accionRegistrada").withIndex("por_matricula_fecha", (q) => q.eq("matriculaId", matricula._id).eq("fechaOcurrencia", fecha)).collect();

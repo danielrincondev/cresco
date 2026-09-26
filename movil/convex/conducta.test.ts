@@ -3,6 +3,7 @@
 import { convexTest } from "convex-test";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api, internal } from "./_generated/api";
+import { BANDERAS } from "./lib/flags";
 import schema from "./schema";
 
 const modules = import.meta.glob(["./conducta.ts", "./nucleo.ts", "./semillas.ts", "./_generated/*.js"]);
@@ -185,9 +186,52 @@ it.each(["", "basura", "2026-9-09", "2026-02-30", "2026-09-09T12:00:00Z"])("rech
   await expect(cliente.mutation(api.conducta.registrarAccion, { ...args, fechaOcurrencia })).rejects.toMatchObject({ data: { codigo: "FECHAS_INVALIDAS" } });
 });
 
-it.each(["2026-09-05", "2026-09-06"])("rechaza el fin de semana: %s", async fechaOcurrencia => {
-  const { cliente, args } = await fixture();
-  await expect(cliente.mutation(api.conducta.registrarAccion, { ...args, fechaOcurrencia })).rejects.toMatchObject({ data: { codigo: "DIA_NO_LECTIVO" } });
+/**
+ * La regla se prueba en sus dos estados, no solo en el que esté en `true` o
+ * `false` hoy en `flags.ts` — así el archivo sigue significando algo aunque
+ * la bandera del QA de fin de semana cambie de valor el lunes. Se muta el
+ * objeto compartido y se restaura en `finally`: es el mismo módulo que
+ * importa `conducta.ts`, así que afecta a la mutation real, no a una copia.
+ */
+async function conBandera<T>(valor: boolean, fn: () => Promise<T>): Promise<T> {
+  const original = BANDERAS.PERMITIR_ANOTAR_FIN_DE_SEMANA;
+  (BANDERAS as { PERMITIR_ANOTAR_FIN_DE_SEMANA: boolean }).PERMITIR_ANOTAR_FIN_DE_SEMANA = valor;
+  try {
+    return await fn();
+  } finally {
+    (BANDERAS as { PERMITIR_ANOTAR_FIN_DE_SEMANA: boolean }).PERMITIR_ANOTAR_FIN_DE_SEMANA = original;
+  }
+}
+
+it.each(["2026-09-05", "2026-09-06"])("rechaza el fin de semana con la bandera de QA apagada: %s", async fechaOcurrencia => {
+  await conBandera(false, async () => {
+    const { cliente, args } = await fixture();
+    await expect(cliente.mutation(api.conducta.registrarAccion, { ...args, fechaOcurrencia })).rejects.toMatchObject({ data: { codigo: "DIA_NO_LECTIVO" } });
+  });
+});
+
+/**
+ * `BANDERAS.PERMITIR_ANOTAR_FIN_DE_SEMANA` — QA del fin de semana antes de la
+ * entrega. Solo salta "es sábado o domingo"; un `diaNoLectivo` declarado a
+ * mano por la institución sigue bloqueando igual con la bandera encendida.
+ */
+it.each(["2026-09-05", "2026-09-06"])("con la bandera de QA encendida, el fin de semana ya no se rechaza: %s", async fechaOcurrencia => {
+  await conBandera(true, async () => {
+    const { cliente, args } = await fixture();
+    await expect(cliente.mutation(api.conducta.registrarAccion, { ...args, fechaOcurrencia })).resolves.toBeTruthy();
+  });
+});
+
+it("la bandera de QA no salta un día declarado explícitamente como no lectivo", async () => {
+  await conBandera(true, async () => {
+    const { t, cliente, ids, args } = await fixture();
+    // Un sábado, pero el mismo que además la institución marcó a mano.
+    await t.run((ctx) => ctx.db.insert("diaNoLectivo", {
+      anioLectivoId: ids.anioLectivoId, fecha: "2026-09-05", motivo: "Feriado local", actualizadoEn: Date.now(),
+    }));
+    await expect(cliente.mutation(api.conducta.registrarAccion, { ...args, fechaOcurrencia: "2026-09-05" }))
+      .rejects.toMatchObject({ data: { codigo: "DIA_NO_LECTIVO" } });
+  });
 });
 
 it("rechaza un docente ajeno con ErrorPermiso sin escribir acciones, puntajes ni auditoría", async () => {
