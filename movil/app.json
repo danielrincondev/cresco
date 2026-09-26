@@ -21,7 +21,7 @@
       "package": "app.cresco.mobile",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#00509E"
+        "backgroundColor": "#EBF4FA"
       }
     },
     "plugins": [
