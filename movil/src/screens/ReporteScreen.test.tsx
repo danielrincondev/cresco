@@ -10,10 +10,9 @@ const estado = vi.hoisted(() => ({
   lecturas: [] as unknown[],
 }));
 
-vi.mock("react-native", () => ({
-  ActivityIndicator: "ActivityIndicator", KeyboardAvoidingView: "KeyboardAvoidingView",
-  Pressable: "Pressable", ScrollView: "ScrollView", Text: "Text", TextInput: "TextInput",
-  View: "View", Platform: { OS: "web" }, StyleSheet: { create: (x: unknown) => x },
+vi.mock("react-native", async () => ({
+  ...(await import("../test/mockReactNative")).reactNative(),
+  Platform: { OS: "web" },
 }));
 vi.mock("../theme/Icono", () => ({ Icono: "Icono" }));
 vi.mock("convex/react", () => ({

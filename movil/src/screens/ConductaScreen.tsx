@@ -32,6 +32,7 @@ import type { Id } from "../../convex/_generated/dataModel";
 import { Chip, EstadoVacio } from "../components/Estado";
 import { etiquetaAccion } from "../lib/estados";
 import { fechaLegible } from "../lib/fechas";
+import { EsqueletoPagina } from "../components/Movimiento";
 import {
   Aviso,
   Boton,
@@ -108,8 +109,8 @@ export function AnotarConducta({
         </EstadoVacio>
       ) : (
         <>
-          {estudiantes.map((e) => (
-            <Tarjeta key={e.estudianteId}>
+          {estudiantes.map((e, i) => (
+            <Tarjeta key={e.estudianteId} orden={i}>
               <Subtitulo>
                 {e.nombres} {e.apellidos}
               </Subtitulo>
@@ -187,7 +188,7 @@ function FormularioAccion({
     );
   }
 
-  if (catalogo === undefined) return <Cargando mensaje="Cargando el catálogo..." />;
+  if (catalogo === undefined) return <EsqueletoPagina etiqueta="Cargando el catálogo" />;
 
   return (
     <Pagina
@@ -217,10 +218,16 @@ function FormularioAccion({
           catalogo.map((categoria) => (
             <View key={categoria.id} style={c.categoria}>
               <Text style={c.etiqueta}>{categoria.nombre}</Text>
+              {/* El signo se lee antes que el texto: verde lo que suma, rojo
+                  lo que resta. El elegido se rellena con la versión clara de
+                  su propio color, no con el azul de marca — así la selección
+                  confirma el signo en vez de taparlo. */}
               {categoria.tipos.map((t) => (
                 <Boton
                   key={t.id}
-                  secundario={tipo?.id !== t.id}
+                  secundario
+                  tono={t.signo}
+                  seleccionado={tipo?.id === t.id}
                   onPress={() => elegirTipo(t)}
                   disabled={op.pendiente}
                 >
@@ -305,9 +312,11 @@ type Reciente = FunctionReturnType<typeof api.conducta.anotacionesRecientesDelCu
 export function AnotacionesRecientes({
   cursoId,
   onVolver,
+  onAnotar,
 }: {
   cursoId: Id<"curso">;
   onVolver: () => void;
+  onAnotar: () => void;
 }) {
   const lista = useQuery(api.conducta.anotacionesRecientesDelCurso, { cursoId });
   const anular = useMutation(api.conducta.anularAccion);
@@ -326,7 +335,7 @@ export function AnotacionesRecientes({
     }
   }
 
-  if (lista === undefined) return <Cargando mensaje="Cargando anotaciones..." />;
+  if (lista === undefined) return <EsqueletoPagina etiqueta="Cargando las anotaciones" />;
 
   if (abierta) {
     return (
@@ -372,12 +381,23 @@ export function AnotacionesRecientes({
       descripcion="Lo que se anotó en el curso esta semana. Si te equivocaste, aquí se corrige."
     >
       {lista.length === 0 ? (
-        <EstadoVacio icono="notebook" titulo="Nada anotado esta semana">
-          Las anotaciones de los últimos siete días aparecen aquí.
+        /* Un estado vacío que solo dice "no hay nada" es un callejón: no
+           explica si falta hacer algo o si la pantalla está rota. Estas dos
+           frases cubren las dos razones reales de que esté vacía —todavía no
+           has anotado, o aún no tienes estudiantes aprobados— y el botón
+           lleva al sitio donde se arregla la primera. */
+        <EstadoVacio
+          icono="notebook"
+          titulo="Nada anotado esta semana"
+          accion={{ texto: "Anotar conducta", onPress: onAnotar }}
+        >
+          Aquí aparece lo de los últimos siete días, para corregirlo si hace
+          falta. Si acabas de crear el curso, recuerda que solo se puede anotar
+          a estudiantes ya aprobados.
         </EstadoVacio>
       ) : (
-        lista.map((a) => (
-          <Tarjeta key={a.id}>
+        lista.map((a, i) => (
+          <Tarjeta key={a.id} orden={i}>
             <Subtitulo>{a.estudiante}</Subtitulo>
             <Chip etiqueta={etiquetaAccion(a.estado)} />
             <Cuerpo>{`${a.tipo} · ${a.puntos > 0 ? `+${a.puntos}` : a.puntos} · ${fechaLegible(a.fecha)}`}</Cuerpo>

@@ -27,6 +27,7 @@ import { useQuery } from "convex/react";
 
 import { api } from "../../convex/_generated/api";
 import { EstadoVacio } from "../components/Estado";
+import { EsqueletoPagina } from "../components/Movimiento";
 import {
   Aviso,
   Boton,
@@ -38,6 +39,7 @@ import {
 } from "../components/NucleoUI";
 import { fechaHoraLegible } from "../lib/fechas";
 import {
+  type MotivoSinCompras,
   comprar,
   paquetesDisponibles,
   prepararCompras,
@@ -98,6 +100,9 @@ function Paywall({ audiencia, titulo, descripcion }: {
   const [paquetes, setPaquetes] = useState<PaqueteComprable[]>([]);
   const [comprando, setComprando] = useState<string>();
   const [aviso, setAviso] = useState<string>();
+  // Por que no se puede comprar, cuando no se puede. Decirlo evita que un
+  // muro de pago sin boton se lea como una pantalla rota.
+  const [sinCompras, setSinCompras] = useState<MotivoSinCompras | null>(null);
 
   /**
    * El SDK se ata al perfil de Convex, que es como el webhook sabe a quien
@@ -109,7 +114,9 @@ function Paywall({ audiencia, titulo, descripcion }: {
     let vivo = true;
     void (async () => {
       const motivo = await prepararCompras(perfil.perfilUsuarioId);
-      if (!vivo || motivo) return;
+      if (!vivo) return;
+      setSinCompras(motivo);
+      if (motivo) return;
       setPaquetes(await paquetesDisponibles());
     })();
     return () => { vivo = false; };
@@ -132,7 +139,8 @@ function Paywall({ audiencia, titulo, descripcion }: {
     // Cancelar no es un error: quien decide no comprar no merece un mensaje.
   }
 
-  if (suscripcion === undefined || planes === undefined) return <Cargando />;
+  if (suscripcion === undefined || planes === undefined)
+    return <EsqueletoPagina tarjetas={2} etiqueta="Cargando los planes" />;
 
   const rama = audiencia === "DOCENTE" ? suscripcion.docente : suscripcion.representante;
 
@@ -181,13 +189,20 @@ function Paywall({ audiencia, titulo, descripcion }: {
         ))}
       </Tarjeta>
 
+      {sinCompras === "CLAVE_DE_PRUEBA_EN_RELEASE" && (
+        <Aviso>
+          Esta build no puede cobrar: lleva la clave del Test Store de
+          RevenueCat, que solo funciona en una build de desarrollo. Los planes
+          se ven, pero no hay botón de compra.
+        </Aviso>
+      )}
       {planes.length === 0 ? (
         <Aviso>
           Todavía no hay planes de pago publicados para esta sección.
         </Aviso>
       ) : (
-        planes.map((plan) => (
-          <Tarjeta key={plan.codigo}>
+        planes.map((plan, i) => (
+          <Tarjeta key={plan.codigo} orden={i}>
             <Subtitulo>{plan.nombre}</Subtitulo>
             {plan.sinPublicidad && <Cuerpo>· Sin anuncios</Cuerpo>}
             {limitesLegibles(plan.limites as Record<string, unknown>).map((frase) => (

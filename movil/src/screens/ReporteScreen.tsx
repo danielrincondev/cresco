@@ -30,7 +30,9 @@ import type { FunctionReturnType } from "convex/server";
 
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
+import { HijoActivo } from "../components/SelectorDeHijo";
 import { Chip, Chips, EstadoVacio } from "../components/Estado";
+import { EsqueletoPagina } from "../components/Movimiento";
 import {
   Aviso,
   Boton,
@@ -99,11 +101,16 @@ function TarjetaReporte({ reporte }: { reporte: Reporte }) {
 export function ReporteDeHoy({
   estudianteId,
   nombre,
+  hijos,
+  onCambiarHijo,
   onVerAnteriores,
   onVerAcumulado,
 }: {
   estudianteId: Id<"estudiante">;
   nombre: string;
+  /** Todos los hijos aprobados, para poder cambiar sin salir de la pantalla. */
+  hijos?: { estudianteId: string; nombre: string }[];
+  onCambiarHijo?: (estudianteId: string, nombre: string) => void;
   onVerAnteriores: () => void;
   onVerAcumulado: () => void;
 }) {
@@ -111,10 +118,23 @@ export function ReporteDeHoy({
   // DP-006: abrir el reporte de un menor es una lectura sensible.
   useLecturaSensible(estudianteId, "REPORTE_ESTUDIANTE");
 
-  if (hoy === undefined) return <Cargando mensaje="Cargando el reporte..." />;
+  if (hoy === undefined) return <EsqueletoPagina etiqueta="Cargando el reporte" />;
 
   return (
     <Pagina titulo={nombre} descripcion="Lo de hoy, contado por su docente.">
+      {/* Con dos hijos, los dos reportes se parecen mucho: saber de quién es
+          lo que se lee no es un adorno. Con uno solo, esto es el nombre y
+          nada más. */}
+      {hijos && hijos.length > 0 && (
+        <HijoActivo
+          hijos={hijos}
+          activo={estudianteId}
+          onCambiar={(id) => {
+            const elegido = hijos.find((h) => h.estudianteId === id);
+            if (elegido) onCambiarHijo?.(id, elegido.nombre);
+          }}
+        />
+      )}
       {hoy.hay ? (
         <TarjetaReporte reporte={hoy.reporte} />
       ) : (
@@ -151,7 +171,7 @@ export function ReportesAnteriores({
   const datos = useQuery(api.conducta.reportesAnteriores, { estudianteId });
   useLecturaSensible(estudianteId, "REPORTE_ESTUDIANTE");
 
-  if (datos === undefined) return <Cargando mensaje="Cargando el historial..." />;
+  if (datos === undefined) return <EsqueletoPagina etiqueta="Cargando el historial" />;
 
   return (
     <Pagina titulo="Reportes anteriores" descripcion={nombre}>
@@ -203,7 +223,7 @@ export function ReporteAcumulado({
   // llena de filas repetidas.
   useLecturaSensible(estudianteId, "BITACORA_ACCIONES");
 
-  if (datos === undefined) return <Cargando mensaje="Cargando el acumulado..." />;
+  if (datos === undefined) return <EsqueletoPagina etiqueta="Cargando el acumulado" />;
 
   return (
     <Pagina titulo={`${nombre} · ${datos.periodo.nombre}`}>
@@ -232,8 +252,8 @@ export function ReporteAcumulado({
           No hay nada registrado todavía.
         </EstadoVacio>
       ) : (
-        datos.bitacora.map((accion) => (
-          <Tarjeta key={accion.id}>
+        datos.bitacora.map((accion, i) => (
+          <Tarjeta key={accion.id} orden={i}>
             {/* Cada anotacion abre su detalle, que es donde vive el derecho a
                 reclamar (P7). Enterrarlo en un submenu seria no darlo. */}
             <Chips>

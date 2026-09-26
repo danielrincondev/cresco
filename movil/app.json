@@ -5,12 +5,24 @@
     "scheme": "cresco",
     "version": "1.0.0",
     "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "icon": "./assets/icon.png",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#EBF4FA"
+    },
+    "backgroundColor": "#EBF4FA",
     "platforms": [
       "android",
       "web"
     ],
     "android": {
-      "package": "app.cresco.mobile"
+      "package": "app.cresco.mobile",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#EBF4FA"
+      }
     },
     "plugins": [
       "@clerk/expo",

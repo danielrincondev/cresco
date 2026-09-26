@@ -17,7 +17,7 @@
  */
 
 import type { PropsWithChildren } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { Animated, StyleSheet, Text, View } from "react-native";
 
 import type { Etiqueta, Tono } from "../lib/estados";
 import { Icono, type PropsIcono } from "../theme/Icono";
@@ -30,6 +30,8 @@ import {
   TonoEstado,
 } from "../theme/Theme";
 import { Boton, Cuerpo, Subtitulo } from "./NucleoUI";
+import { useEntrada } from "./Movimiento";
+import { Desplazamiento } from "../theme/Movimiento";
 
 /**
  * Chip de estado.
@@ -75,8 +77,12 @@ export function EstadoVacio({
   titulo: string;
   accion?: { texto: string; onPress: () => void };
 }>) {
+  // Se anima el propio contenedor, sin envoltorio: `e.vacio` centra a sus
+  // hijos, y meter un `View` en medio le quitaria ese centrado al contenido.
+  const entrada = useEntrada({ distancia: Desplazamiento.base });
+
   return (
-    <View style={e.vacio}>
+    <Animated.View style={[e.vacio, entrada]}>
       <Icono nombre={icono} tamano={40} color={Marca.base} decorativo />
       <Subtitulo>{titulo}</Subtitulo>
       <Cuerpo>{children}</Cuerpo>
@@ -85,7 +91,7 @@ export function EstadoVacio({
           {accion.texto}
         </Boton>
       )}
-    </View>
+    </Animated.View>
   );
 }
 

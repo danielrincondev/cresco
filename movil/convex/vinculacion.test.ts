@@ -200,8 +200,32 @@ describe("núcleo — aprobación y listas", () => {
     expect(estado.puntajes.map((p) => p.periodoAcademicoId).sort()).toEqual(s.periodoIds.slice(1).sort());
     expect(estado.auditoria).toHaveLength(1);
     expect(estado.auditoria[0]).toMatchObject({ accion: "APROBAR", perfilUsuarioId: s.perfilDocente.perfilUsuarioId, entidadId: estudianteId });
+    // El docente cambio el nombre y el documento del estudiante, y eso **tiene
+    // que quedar escrito**. Hasta el 25 de septiembre la bitacora solo guardaba
+    // el cambio de `estadoVerificacion`: un docente podia reasignar a que
+    // persona apunta el registro y el rastro decia unicamente "APROBADO".
+    expect(estado.auditoria[0].datosAntes).toMatchObject({ estadoVerificacion: "PENDIENTE", nombres: "Ana", numeroDocumento: hijo.numeroDocumento });
+    expect(estado.auditoria[0].datosDespues).toMatchObject({ estadoVerificacion: "APROBADO", nombres: "Ana María", numeroDocumento: "0900000012" });
+    expect((estado.auditoria[0].datosDespues as { camposCorregidos: string[] }).camposCorregidos.sort()).toEqual(["nombres", "numeroDocumento"]);
     expect((await s.docente.query(api.nucleo.listarPendientes, { cursoId: s.cursoId, paginationOpts: pagina })).page).toHaveLength(0);
     expect((await s.docente.query(api.nucleo.listarEstudiantes, { cursoId: s.cursoId, paginationOpts: pagina })).page[0]).toMatchObject({ estudianteId, matriculaId: aprobado.matriculaId, nombres: "Ana María" });
+  });
+
+  /**
+   * La otra mitad de la regla: una aprobacion limpia no ensucia la bitacora.
+   * Si cada aprobacion repitiera los mismos datos en `antes` y `despues`, la
+   * bitacora seria ilegible justo cuando hubiera algo que mirar -- y guardaria
+   * copias de datos personales de un menor que nadie ha pedido.
+   */
+  it("aprobar sin corregir nada no anota campos en la bitácora", async () => {
+    const s = await escenario();
+    const { estudianteId } = await canjear(s);
+    await aprobar(s, estudianteId);
+    const { auditoria } = await registros(s.t);
+    expect(auditoria[0].datosAntes).toEqual({ estadoVerificacion: "PENDIENTE" });
+    expect((auditoria[0].datosDespues as { camposCorregidos: string[] }).camposCorregidos).toEqual([]);
+    expect(auditoria[0].datosDespues).not.toHaveProperty("nombres");
+    expect(auditoria[0].datosDespues).not.toHaveProperty("numeroDocumento");
   });
 
   it("repetir aprobación concurrentemente no duplica matrícula, puntaje o auditoría ni reinicia puntos", async () => {

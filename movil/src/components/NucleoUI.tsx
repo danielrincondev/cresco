@@ -7,6 +7,7 @@ import {
 } from "react";
 import {
   ActivityIndicator,
+  Animated,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -18,6 +19,7 @@ import {
   type TextInputProps,
 } from "react-native";
 import { ConvexError } from "convex/values";
+import { Aparece, useEntrada } from "./Movimiento";
 import { Icono } from "../theme/Icono";
 import {
   AREA_TACTIL_MINIMA,
@@ -28,6 +30,7 @@ import {
   Superficie,
   Tamano,
   Texto,
+  TonoEstado,
 } from "../theme/Theme";
 
 export function mensajeError(error: unknown) {
@@ -143,8 +146,22 @@ export function Pagina({
     </KeyboardAvoidingView>
   );
 }
-export function Tarjeta({ children }: PropsWithChildren) {
-  return <View style={s.tarjeta}>{children}</View>;
+/**
+ * Tarjeta, que entra subiendo.
+ *
+ * `orden` es el índice dentro de una lista y escalona la entrada: se pasa
+ * `orden={i}` al mapear. Sin él todas entran a la vez, que es lo correcto
+ * cuando la tarjeta está sola en la pantalla.
+ *
+ * La animación vive en `Aparece` y se apaga sola con "reducir movimiento",
+ * así que aquí no hay nada que decidir.
+ */
+export function Tarjeta({ children, orden }: PropsWithChildren<{ orden?: number }>) {
+  return (
+    <Aparece orden={orden} style={s.tarjeta}>
+      {children}
+    </Aparece>
+  );
 }
 export function Cuerpo({ children }: PropsWithChildren) {
   return <Text style={s.texto}>{children}</Text>;
@@ -163,15 +180,27 @@ export function Aviso({ children }: PropsWithChildren) {
     </View>
   );
 }
+/**
+ * El mensaje de error, que entra en vez de aparecer de golpe.
+ *
+ * Un error que se materializa sin transición se lee como que algo se rompió.
+ * Entrando —corto, 200 ms— se lee como que el sistema respondió, que es lo que
+ * de verdad pasó: casi todos estos mensajes son validaciones, no averías.
+ *
+ * Se anima el propio `Text` con `Animated.Text` en lugar de envolverlo: un
+ * envoltorio cambiaría el sitio del mensaje dentro del flex de la pantalla, y
+ * el error aparece en sitios muy distintos de la aplicación.
+ */
 export function ErrorMensaje({ mensaje }: { mensaje: string | null }) {
+  const entrada = useEntrada();
   return mensaje ? (
-    <Text
+    <Animated.Text
       accessibilityRole="alert"
       accessibilityLiveRegion="polite"
-      style={s.error}
+      style={[s.error, entrada]}
     >
       {mensaje}
-    </Text>
+    </Animated.Text>
   ) : null;
 }
 /**
@@ -221,18 +250,38 @@ export function Cargando({ mensaje = "Cargando..." }: { mensaje?: string }) {
     </View>
   );
 }
+/**
+ * Botón, con un tono opcional para lo que tiene signo.
+ *
+ * `tono` pinta el texto del color del signo y, al seleccionarlo, rellena con
+ * su versión clara. Los valores salen de `TonoEstado`, **no de
+ * `Semantico`**: el tema advierte que `Semantico.negativa` da 3.7:1 sobre el
+ * fondo claro —por debajo de AA— y que no se use como texto suelto. Los de
+ * `TonoEstado` están medidos a 8.0:1 y 8.6:1 sobre su propio fondo, que es
+ * justo la combinación que hace falta aquí.
+ */
 export function Boton({
   children,
   onPress,
   secundario = false,
   pendiente = false,
   disabled = false,
+  tono,
+  seleccionado = false,
 }: PropsWithChildren<{
   onPress: () => void;
   secundario?: boolean;
   pendiente?: boolean;
   disabled?: boolean;
+  tono?: "POSITIVA" | "NEGATIVA";
+  seleccionado?: boolean;
 }>) {
+  const paleta =
+    tono === "POSITIVA"
+      ? TonoEstado.positivo
+      : tono === "NEGATIVA"
+        ? TonoEstado.negativo
+        : null;
   return (
     <Pressable
       accessibilityRole="button"
@@ -242,6 +291,8 @@ export function Boton({
       style={({ pressed }) => [
         s.boton,
         secundario && s.botonSecundario,
+        paleta && { borderColor: paleta.borde },
+        paleta && seleccionado && { backgroundColor: paleta.fondo },
         pressed && s.presionado,
         (disabled || pendiente) && s.deshabilitado,
       ]}
@@ -249,7 +300,13 @@ export function Boton({
       {pendiente ? (
         <ActivityIndicator color={secundario ? Marca.base : Texto.sobreColor} />
       ) : (
-        <Text style={[s.textoBoton, secundario && s.textoBotonSecundario]}>
+        <Text
+          style={[
+            s.textoBoton,
+            secundario && s.textoBotonSecundario,
+            paleta && { color: paleta.texto },
+          ]}
+        >
           {children}
         </Text>
       )}

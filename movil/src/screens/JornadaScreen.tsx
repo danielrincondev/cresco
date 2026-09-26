@@ -25,6 +25,7 @@ import type { FunctionReturnType } from "convex/server";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import { Chip, EstadoVacio } from "../components/Estado";
+import { EsqueletoPagina } from "../components/Movimiento";
 import {
   Aviso,
   Boton,
@@ -84,7 +85,7 @@ export function TomarAsistencia({
     setMarcas(previas);
   }, [datos]);
 
-  if (datos === undefined) return <Cargando mensaje="Cargando la lista..." />;
+  if (datos === undefined) return <EsqueletoPagina etiqueta="Cargando la lista" />;
 
   const sinMarcar = datos.estudiantes.filter((e) => !marcas[e.estudianteId]).length;
 
@@ -114,8 +115,8 @@ export function TomarAsistencia({
         </EstadoVacio>
       ) : (
         <>
-          {datos.estudiantes.map((e) => (
-            <Tarjeta key={e.estudianteId}>
+          {datos.estudiantes.map((e, i) => (
+            <Tarjeta key={e.estudianteId} orden={i}>
               <Subtitulo>
                 {e.nombres} {e.apellidos}
               </Subtitulo>
@@ -178,7 +179,7 @@ export function ReporteGeneral({
   const [aviso, setAviso] = useState<string>();
   const op = useOperacion();
 
-  if (plantilla === undefined) return <Cargando mensaje="Cargando la plantilla..." />;
+  if (plantilla === undefined) return <EsqueletoPagina etiqueta="Cargando la plantilla" />;
 
   const conTexto = plantilla.campos
     .filter((c) => (valores[c.id] ?? "").trim() !== "")

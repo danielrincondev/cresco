@@ -21,14 +21,19 @@ const estado = vi.hoisted(() => ({
   novedades: [] as { leidaEn?: number }[],
   funciones: new Map<string, (args: unknown) => Promise<unknown>>(),
 }));
-vi.mock("react-native", () => ({
-  ActivityIndicator: "ActivityIndicator", KeyboardAvoidingView: "KeyboardAvoidingView",
-  Pressable: "Pressable", ScrollView: "ScrollView", Text: "Text", TextInput: "TextInput",
-  View: "View", Modal: "Modal", Platform: { OS: "web" },
+vi.mock("react-native", async () => ({
+  ...(await import("../test/mockReactNative")).reactNative(),
+  Platform: { OS: "web" },
+  Modal: "Modal",
   BackHandler: { addEventListener: () => ({ remove() {} }) },
-  Share: { share: vi.fn() }, StyleSheet: { create: (x: unknown) => x },
+  Share: { share: vi.fn() },
 }));
-vi.mock("react-native-safe-area-context", () => ({ SafeAreaView: "SafeAreaView" }));
+vi.mock("react-native-safe-area-context", () => ({
+  SafeAreaView: "SafeAreaView",
+  // El menu lateral los usa para esquivar el recorte de camara y la barra
+  // de navegacion; en pruebas no hay pantalla, asi que van a cero.
+  useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
+}));
 vi.mock("@clerk/expo", () => ({
   useAuth: () => ({ sessionId: estado.sesion }),
   useUser: () => ({ user: { id: "usuario", firstName: "Prueba" } }),
@@ -81,6 +86,10 @@ const perfil = {
   perfilUsuarioId: "perfil" as NonNullable<Perfil>["perfilUsuarioId"],
   nombres: "Kenny",
   apellidos: "Chung",
+  // La identidad del perfil. Viaja para que la pantalla pueda enseñarla
+  // bloqueada en vez de pedir que se reescriba de memoria.
+  tipoDocumento: "CEDULA" as const,
+  numeroDocumento: "0923062384",
   docenteId: null,
   representanteId: "representante" as NonNullable<Perfil>["representanteId"],
 };

@@ -2,10 +2,8 @@ import React from "react";
 import { expect, it, vi } from "vitest";
 import { act, create } from "react-test-renderer";
 
-vi.mock("react-native", () => ({
-  ActivityIndicator: "ActivityIndicator", KeyboardAvoidingView: "KeyboardAvoidingView",
-  Pressable: "Pressable", ScrollView: "ScrollView", Text: "Text", TextInput: "TextInput",
-  View: "View", Platform: { OS: "android" }, StyleSheet: { create: (e: unknown) => e },
+vi.mock("react-native", async () => ({
+  ...(await import("../test/mockReactNative")).reactNative(),
 }));
 vi.mock("../theme/Icono", () => ({ Icono: "Icono" }));
 

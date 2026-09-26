@@ -19,6 +19,15 @@ import { randomUUID } from "expo-crypto";
 import { api } from "../../convex/_generated/api";
 import { PARENTESCO } from "../../convex/lib/enums";
 import { Icono } from "../theme/Icono";
+import { CampoFecha } from "../components/CampoFecha";
+import {
+  EncabezadoPerfil,
+  ItemMenu,
+  MenuLateral,
+  PieMenu,
+  SeccionMenu,
+  SeparadorMenu,
+} from "../components/MenuLateral";
 import {
   Espacio,
   Marca,
@@ -145,6 +154,252 @@ const documentosHijo = [
   { valor: "SIN_DOCUMENTO", texto: "Sin documento" },
 ] as const;
 
+/**
+ * El contenido del menú lateral del docente.
+ *
+ * Dos secciones y una raya entre ellas, porque son dos clases distintas de
+ * cosa: lo del curso abierto deja de existir cuando sales de él; lo de la
+ * cuenta, no. Sin esa separación "Pasar lista" y "Tu plan" parecen lo mismo.
+ *
+ * Las opciones de curso solo aparecen con un curso en contexto. **Anotaciones
+ * recientes vive arriba, en la cuenta, como pidió el diseño**, pero la
+ * consulta que la alimenta es `anotacionesRecientesDelCurso` y necesita uno:
+ * se resuelve con el curso abierto o, si el docente solo tiene uno, con ese.
+ * Sin ninguno de los dos no se ofrece, porque llevaría a una pantalla vacía.
+ */
+function MenuDocente({
+  ruta,
+  cursoActivo,
+  nombre,
+  ir,
+  onSalir,
+}: {
+  ruta: Ruta;
+  cursoActivo: Curso | undefined;
+  nombre: string;
+  ir: (ruta: Ruta) => void;
+  onSalir: () => void;
+}) {
+  const curso = "curso" in ruta ? ruta.curso : undefined;
+
+  // Dentro de un curso el menú es **del curso**: sus acciones, más las dos
+  // salidas que hacen falta para movserse — volver a la lista de cursos y las
+  // anotaciones recientes. Plan, perfil y ajustes no pintan nada aquí: se
+  // llega a ellos saliendo del curso, y meterlos convertía el menú secundario
+  // en una copia del principal con cosas de más.
+  if (curso) {
+    return (
+      <>
+        {/* Arriba del todo: es la salida del curso, y abajo del cajón no se
+            veía sin desplazarse. */}
+        <ItemMenu
+          icono="home"
+          texto="Inicio"
+          onPress={() => ir({ tipo: "inicio" })}
+        />
+        <SeccionMenu titulo={curso.nombre} />
+        <ItemMenu
+          icono="notebook"
+          texto="Anotar conducta"
+          activo={ruta.tipo === "anotar"}
+          onPress={() => ir({ tipo: "anotar", curso })}
+        />
+        <ItemMenu
+          icono="calendar-check"
+          texto="Pasar lista"
+          activo={ruta.tipo === "asistencia"}
+          onPress={() => ir({ tipo: "asistencia", curso })}
+        />
+        <ItemMenu
+          icono="file-document"
+          texto="Reporte del día"
+          activo={ruta.tipo === "reporteDia"}
+          onPress={() => ir({ tipo: "reporteDia", curso })}
+        />
+        <ItemMenu
+          icono="book-open"
+          texto="Anotaciones recientes"
+          activo={ruta.tipo === "recientes"}
+          onPress={() => ir({ tipo: "recientes", curso })}
+        />
+        <ItemMenu
+          icono="calendar-blank"
+          texto="Definir parciales"
+          activo={ruta.tipo === "periodos"}
+          onPress={() => ir({ tipo: "periodos", curso })}
+        />
+        <ItemMenu
+          icono="message-text"
+          texto="Avisar al curso"
+          activo={ruta.tipo === "comunicado"}
+          onPress={() => ir({ tipo: "comunicado", curso })}
+        />
+        <ItemMenu
+          icono="account-group"
+          texto="Atención a familias"
+          activo={ruta.tipo === "agenda"}
+          onPress={() => ir({ tipo: "agenda", curso })}
+        />
+        <ItemMenu
+          icono="alert"
+          texto="Alerta de emergencia"
+          activo={ruta.tipo === "alerta"}
+          onPress={() => ir({ tipo: "alerta", curso })}
+        />
+        <PieMenu>
+          <ItemMenu icono="logout" texto="Cerrar sesión" peligro onPress={onSalir} />
+        </PieMenu>
+      </>
+    );
+  }
+
+  return (
+    <>
+      <EncabezadoPerfil nombre={nombre} rol="Docente" />
+      <SeccionMenu titulo="Tu cuenta" />
+      <ItemMenu
+        icono="school"
+        texto="Cursos"
+        activo={ruta.tipo === "inicio"}
+        onPress={() => ir({ tipo: "inicio" })}
+      />
+      {/* `anotacionesRecientesDelCurso` necesita un curso: aquí se resuelve con
+          el único del docente cuando solo tiene uno. Sin curso no se ofrece,
+          porque llevaría a una pantalla vacía. */}
+      {cursoActivo && (
+        <ItemMenu
+          icono="book-open"
+          texto="Anotaciones recientes"
+          activo={ruta.tipo === "recientes"}
+          onPress={() => ir({ tipo: "recientes", curso: cursoActivo })}
+        />
+      )}
+      <ItemMenu
+        icono="account"
+        texto="Mi perfil profesional"
+        activo={ruta.tipo === "perfilDocente"}
+        onPress={() => ir({ tipo: "perfilDocente" })}
+      />
+      <ItemMenu
+        icono="cog"
+        texto="Mi plan"
+        activo={ruta.tipo === "plan"}
+        onPress={() => ir({ tipo: "plan" })}
+      />
+      <SeparadorMenu />
+      <ItemMenu
+        icono="account"
+        texto="Mi perfil y roles"
+        activo={ruta.tipo === "perfil"}
+        onPress={() => ir({ tipo: "perfil" })}
+      />
+      <ItemMenu
+        icono="cog"
+        texto="Ajustes"
+        activo={ruta.tipo === "ajustes"}
+        onPress={() => ir({ tipo: "ajustes" })}
+      />
+      <PieMenu>
+        <ItemMenu icono="logout" texto="Cerrar sesión" peligro onPress={onSalir} />
+      </PieMenu>
+    </>
+  );
+}
+
+/**
+ * El menú lateral de la familia.
+ *
+ * Mismo panel que el del docente, otro contenido. Aquí no hay "curso
+ * abierto": la familia trabaja siempre sobre **un hijo**, así que el hijo hace
+ * de contexto igual que allí lo hacía el curso.
+ *
+ * "Reporte diario" y "Reporte acumulado" necesitan un estudiante concreto —
+ * `reporteDelDia` y `reporteAcumulado` lo reciben— así que se resuelven con el
+ * hijo de la pantalla abierta o, si solo hay uno aprobado, con ese. Con varios
+ * hijos y ninguno abierto no se ofrecen: llevarían al reporte del hermano
+ * equivocado, que es peor que no llevar a ninguno.
+ */
+function MenuRepresentante({
+  ruta,
+  hijo,
+  nombre,
+  ir,
+  onSalir,
+}: {
+  ruta: Ruta;
+  hijo: { estudianteId: Id<"estudiante">; nombre: string } | undefined;
+  nombre: string;
+  ir: (ruta: Ruta) => void;
+  onSalir: () => void;
+}) {
+  return (
+    <>
+      <EncabezadoPerfil nombre={nombre} rol="Representante" />
+      <SeccionMenu titulo="Tu perfil" />
+      <ItemMenu
+        icono="account-group"
+        texto="Mis hijos"
+        activo={ruta.tipo === "inicio"}
+        onPress={() => ir({ tipo: "inicio" })}
+      />
+      {hijo && (
+        <>
+          <ItemMenu
+            icono="file-document"
+            texto="Reporte diario"
+            activo={ruta.tipo === "reporteHoy"}
+            onPress={() =>
+              ir({ tipo: "reporteHoy", estudianteId: hijo.estudianteId, nombre: hijo.nombre })
+            }
+          />
+          <ItemMenu
+            icono="book-open"
+            texto="Reporte acumulado"
+            activo={ruta.tipo === "acumulado"}
+            onPress={() =>
+              ir({ tipo: "acumulado", estudianteId: hijo.estudianteId, nombre: hijo.nombre })
+            }
+          />
+        </>
+      )}
+      <ItemMenu
+        icono="calendar-blank"
+        texto="Pedir una cita"
+        activo={ruta.tipo === "citas"}
+        onPress={() => ir({ tipo: "citas" })}
+      />
+      <ItemMenu
+        icono="alert"
+        texto="Alertas del curso"
+        activo={ruta.tipo === "alertas"}
+        onPress={() => ir({ tipo: "alertas" })}
+      />
+      <ItemMenu
+        icono="cog"
+        texto="Tu plan"
+        activo={ruta.tipo === "plan"}
+        onPress={() => ir({ tipo: "plan" })}
+      />
+      <SeparadorMenu />
+      <ItemMenu
+        icono="account"
+        texto="Mi perfil y roles"
+        activo={ruta.tipo === "perfil"}
+        onPress={() => ir({ tipo: "perfil" })}
+      />
+      <ItemMenu
+        icono="cog"
+        texto="Ajustes"
+        activo={ruta.tipo === "ajustes"}
+        onPress={() => ir({ tipo: "ajustes" })}
+      />
+      <PieMenu>
+        <ItemMenu icono="logout" texto="Cerrar sesión" peligro onPress={onSalir} />
+      </PieMenu>
+    </>
+  );
+}
+
 export function NucleoScreen() {
   const perfil = useQuery(api.nucleo.obtenerPerfil);
   useAuditoriaSesion(perfil === null ? null : perfil?.perfilUsuarioId);
@@ -171,12 +426,79 @@ export function NucleoScreen() {
   const sinLeer = (novedades ?? []).filter((n) => n.leidaEn === undefined).length;
   const [ruta, setRuta] = useState<Ruta>({ tipo: "inicio" });
   const [rolElegido, setRol] = useState<Rol>();
+  const [menu, setMenu] = useState(false);
   const salida = useOperacion();
   const rol = rolElegido ?? (perfil?.docenteId ? "DOCENTE" : "REPRESENTANTE");
   const volver = () => setRuta({ tipo: "inicio" });
+  /**
+   * El curso con el que trabaja el menú.
+   *
+   * El de la ruta si la ruta lleva uno; si no, el único del docente cuando
+   * tiene uno solo — que es el caso del plan gratuito. Con varios cursos y
+   * ninguno abierto no hay forma de adivinar, y el menú omite lo que necesite
+   * curso en vez de llevar a una pantalla vacía.
+   */
+  const cursos = useQuery(
+    api.nucleo.listarCursos,
+    perfil?.docenteId ? {} : "skip",
+  );
+  /**
+   * Los hijos, a nivel de la aplicación y no solo de la pantalla de inicio.
+   * El menú los necesita para resolver "Reporte diario" y "Reporte acumulado",
+   * y el arranque para saber si ya hay alguno aprobado. Convex comparte la
+   * suscripción con la pantalla de inicio: no es una consulta de más.
+   */
+  const { results: hijos } = usePaginatedQuery(
+    api.nucleo.listarMisEstudiantes,
+    perfil?.representanteId ? {} : "skip",
+    { initialNumItems: 20 },
+  );
+  const hijosAprobados = (hijos ?? [])
+    .filter((h) => h.estadoVerificacion === "APROBADO")
+    .map((h) => ({
+      estudianteId: h.estudianteId as string,
+      nombre: `${h.nombres} ${h.apellidos}`,
+    }));
+  const hijoAprobado = (hijos ?? []).find(
+    (h) => h.estadoVerificacion === "APROBADO",
+  );
+  const hijoDelMenu =
+    "estudianteId" in ruta
+      ? { estudianteId: ruta.estudianteId, nombre: ruta.nombre }
+      : hijoAprobado
+        ? {
+            estudianteId: hijoAprobado.estudianteId,
+            nombre: `${hijoAprobado.nombres} ${hijoAprobado.apellidos}`,
+          }
+        : undefined;
+  const nombreDelPerfil =
+    `${perfil?.nombres ?? ""} ${perfil?.apellidos ?? ""}`.trim() || "Tu cuenta";
+  const listaCursos = cursos?.cursos;
+  const cursoActivo =
+    "curso" in ruta
+      ? ruta.curso
+      : listaCursos?.length === 1
+        ? listaCursos[0]
+        : undefined;
+  /**
+   * Las dos pantallas desde las que no hay a dónde volver: la lista de cursos
+   * y el curso abierto. Ahí manda la hamburguesa; más adentro, la flecha.
+   */
+  const esRaizDocente = ruta.tipo === "inicio" || ruta.tipo === "curso";
+  /** Ir a un sitio desde el menú: navegar y cerrarlo, siempre juntos. */
+  const irDesdeMenu = (destino: Ruta) => {
+    setRuta(destino);
+    setMenu(false);
+  };
   useEffect(() => {
     if (Platform.OS !== "android") return;
     const listener = BackHandler.addEventListener("hardwareBackPress", () => {
+      // El menú se cierra antes que nada: si está abierto, es lo que la
+      // persona ve, y el boton de atras tiene que actuar sobre lo que ve.
+      if (menu) {
+        setMenu(false);
+        return true;
+      }
       if (ruta.tipo === "inicio") return false;
       if ("curso" in ruta && ruta.tipo !== "curso")
         setRuta({ tipo: "curso", curso: ruta.curso });
@@ -184,7 +506,7 @@ export function NucleoScreen() {
       return true;
     });
     return () => listener.remove();
-  }, [ruta]);
+  }, [ruta, menu]);
   const retroceder = () => {
     if ("curso" in ruta && ruta.tipo !== "curso")
       setRuta({ tipo: "curso", curso: ruta.curso });
@@ -193,7 +515,26 @@ export function NucleoScreen() {
   return (
     <SafeAreaView style={styles.pantalla}>
       <View style={styles.barra}>
-        {ruta.tipo !== "inicio" ? (
+        {/* **Un solo icono a la izquierda.** Hamburguesa en las dos raíces
+            del docente —la lista de cursos y el curso abierto—, flecha en las
+            pantallas de dentro. Los dos juntos apretaban la barra y no decían
+            nada: desde una raíz no hay a dónde volver, y desde dentro el menú
+            se alcanza con un toque de vuelta.
+
+            No hay gesto desde el borde: eso necesita `gesture-handler`, que es
+            nativo. La hamburguesa es la afordancia que descubre todo el mundo
+            de todas formas. */}
+        {perfil && (rol === "DOCENTE" ? esRaizDocente : ruta.tipo === "inicio") ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Abrir el menú"
+            accessibilityState={{ expanded: menu }}
+            onPress={() => setMenu(true)}
+            style={styles.iconButton}
+          >
+            <Icono nombre="menu" decorativo />
+          </Pressable>
+        ) : ruta.tipo !== "inicio" ? (
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Volver"
@@ -208,7 +549,9 @@ export function NucleoScreen() {
           </View>
         )}
         <View style={styles.marcaTexto}>
-          <Text style={styles.marca}>CRESCO</Text>
+          <Text style={styles.marca} numberOfLines={1} adjustsFontSizeToFit>
+            CRESCO
+          </Text>
           <Text style={styles.rol}>
             {perfil
               ? rol === "DOCENTE"
@@ -241,33 +584,22 @@ export function NucleoScreen() {
                 </View>
               )}
             </Pressable>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Mi perfil y roles"
-              onPress={() => setRuta({ tipo: "perfil" })}
-              style={styles.iconButton}
-            >
-              <Icono nombre="account" decorativo />
-            </Pressable>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Ajustes"
-              onPress={() => setRuta({ tipo: "ajustes" })}
-              style={styles.iconButton}
-            >
-              <Icono nombre="cog" decorativo />
-            </Pressable>
+            {/* Perfil, ajustes y salir viven en el menú cuando hay menú. La
+                campana se queda en la barra: lleva el contador de sin leer, y
+                un aviso escondido detrás de un toque es medio aviso. */}
           </>
         )}
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Cerrar sesión"
-          disabled={salida.pendiente}
-          onPress={() => void salida.ejecutar(() => signOut())}
-          style={styles.iconButton}
-        >
-          <Icono nombre="logout" decorativo />
-        </Pressable>
+        {!perfil && (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Cerrar sesión"
+            disabled={salida.pendiente}
+            onPress={() => void salida.ejecutar(() => signOut())}
+            style={styles.iconButton}
+          >
+            <Icono nombre="logout" decorativo />
+          </Pressable>
+        )}
       </View>
       <ErrorMensaje mensaje={salida.error} />
       <LimiteError key={`${ruta.tipo}-${rol}`} onVolver={volver}>
@@ -315,6 +647,7 @@ export function NucleoScreen() {
           <AnotacionesRecientes
             cursoId={ruta.curso.id}
             onVolver={() => setRuta({ tipo: "curso", curso: ruta.curso })}
+            onAnotar={() => setRuta({ tipo: "anotar", curso: ruta.curso })}
           />
         ) : ruta.tipo === "asistencia" ? (
           <TomarAsistencia
@@ -339,6 +672,10 @@ export function NucleoScreen() {
           <ReporteDeHoy
             estudianteId={ruta.estudianteId}
             nombre={ruta.nombre}
+            hijos={hijosAprobados}
+            onCambiarHijo={(estudianteId, nombre) =>
+              setRuta({ tipo: "reporteHoy", estudianteId: estudianteId as Id<"estudiante">, nombre })
+            }
             onVerAnteriores={() => setRuta({ ...ruta, tipo: "reportesAnteriores" })}
             onVerAcumulado={() => setRuta({ ...ruta, tipo: "acumulado" })}
           />
@@ -403,6 +740,36 @@ export function NucleoScreen() {
           </>
         )}
       </LimiteError>
+      {/* Al final del árbol para que pinte por encima de todo lo demás. Se
+          desmonta solo al terminar de cerrarse, así que no se queda
+          interceptando toques invisible sobre la pantalla. */}
+      {perfil && (
+        <MenuLateral abierto={menu} onCerrar={() => setMenu(false)}>
+          {rol === "REPRESENTANTE" ? (
+            <MenuRepresentante
+              ruta={ruta}
+              hijo={hijoDelMenu}
+              nombre={nombreDelPerfil}
+              ir={irDesdeMenu}
+              onSalir={() => {
+                setMenu(false);
+                void salida.ejecutar(() => signOut());
+              }}
+            />
+          ) : (
+            <MenuDocente
+              ruta={ruta}
+              cursoActivo={cursoActivo}
+              nombre={nombreDelPerfil}
+              ir={irDesdeMenu}
+              onSalir={() => {
+                setMenu(false);
+                void salida.ejecutar(() => signOut());
+              }}
+            />
+          )}
+        </MenuLateral>
+      )}
     </SafeAreaView>
   );
 }
@@ -422,8 +789,16 @@ function PerfilForm({
   // editable, no de solo lectura.
   const [nombres, setNombres] = useState(perfil?.nombres ?? user?.firstName ?? "");
   const [apellidos, setApellidos] = useState(perfil?.apellidos ?? user?.lastName ?? "");
-  const [documento, setDocumento] = useState<"CEDULA" | "PASAPORTE">("CEDULA");
-  const [numero, setNumero] = useState("");
+  // El documento se precarga del perfil y queda bloqueado: es la identidad de
+  // la cuenta y `completarPerfil` rechaza cambiarla. Antes salia vacio, asi que
+  // anadirse un rol obligaba a reescribir la cedula de memoria.
+  const identidadFijada = perfil !== null;
+  // `SIN_DOCUMENTO` existe en el esquema para estudiantes sin cedula, nunca
+  // para un adulto: `completarPerfil` solo acepta CEDULA o PASAPORTE.
+  const [documento, setDocumento] = useState<"CEDULA" | "PASAPORTE">(
+    perfil?.tipoDocumento === "PASAPORTE" ? "PASAPORTE" : "CEDULA",
+  );
+  const [numero, setNumero] = useState(perfil?.numeroDocumento ?? "");
   const [telefono, setTelefono] = useState("");
   const [docente, setDocente] = useState(!!perfil?.docenteId);
   const [representante, setRepresentante] = useState(!!perfil?.representanteId);
@@ -487,20 +862,31 @@ function PerfilForm({
           maxLength={60}
           editable={!op.pendiente}
         />
+        {/* El documento es la identidad, y `completarPerfil` rechaza cambiarlo
+            con CONFLICTO. Hasta aqui la pantalla lo pintaba editable de todas
+            formas: un formulario que ofrece algo que el servidor prohibe, y el
+            unico aviso llegaba como error despues de guardar. El nombre si se
+            corrige, porque un apellido mal escrito es una errata, no otra
+            persona. */}
         <Opciones
           valor={documento}
           opciones={documentosAdulto}
           onChange={setDocumento}
-          disabled={op.pendiente}
+          disabled={op.pendiente || identidadFijada}
         />
         <Campo
           etiqueta="Número de documento"
+          ayuda={
+            identidadFijada
+              ? "Tu documento identifica tu cuenta y no se puede cambiar. Si está mal, escríbenos."
+              : undefined
+          }
           value={numero}
           onChangeText={setNumero}
           autoCapitalize="characters"
           keyboardType={documento === "CEDULA" ? "number-pad" : "default"}
           maxLength={documento === "CEDULA" ? 10 : 30}
-          editable={!op.pendiente}
+          editable={!op.pendiente && !identidadFijada}
         />
         <Campo
           etiqueta="Teléfono (opcional)"
@@ -693,42 +1079,32 @@ function DetalleCurso({
     const r = await op.ejecutar(() => invitar({ cursoId: curso.id }));
     if (r.ok) navegar({ tipo: "invitacion", curso, invitacion: r.valor });
   }
+  // Sin parciales no se puede aprobar a nadie, asi que el curso esta a medio
+  // montar y lo unico que importa es terminarlo. Con ellos, la pantalla pasa a
+  // servir al dia a dia.
+  const sinMontar = calendario !== undefined && calendario.periodos.length === 0;
+
   return (
     <Pagina titulo={curso.nombre} descripcion={curso.institucion}>
-      <Tarjeta>
-        <Subtitulo>Calendario del curso</Subtitulo>
-        {!calendario ? (
-          <Cargando />
-        ) : calendario.periodos.length === 0 ? (
-          <>
-            <Cuerpo>Define los parciales antes de aprobar estudiantes.</Cuerpo>
-            <Boton
-              secundario
-              onPress={() => navegar({ tipo: "periodos", curso })}
-            >
-              Definir parciales
-            </Boton>
-          </>
-        ) : (
-          calendario.periodos.map((p) => (
-            <View key={p.id}>
-              <Text style={styles.etiqueta}>{p.nombre}</Text>
-              <Cuerpo>
-                {p.fechaInicio} — {p.fechaFin}
-              </Cuerpo>
-            </View>
-          ))
-        )}
-      </Tarjeta>
-      <Boton pendiente={op.pendiente} onPress={() => void invitarFamilias()}>
-        Invitar representantes
-      </Boton>
-      <ErrorMensaje mensaje={op.error} />
+      {!calendario ? (
+        <Cargando />
+      ) : sinMontar ? (
+        <>
+          <Aviso>
+            Este curso todavía no tiene parciales. Defínelos antes de aprobar
+            estudiantes: el puntaje de cada uno vive dentro de un parcial.
+          </Aviso>
+          <Boton onPress={() => navegar({ tipo: "periodos", curso })}>
+            Definir parciales
+          </Boton>
+        </>
+      ) : null}
+
+      {/* El dia a dia primero, y solo tres. Un docente hace estas tres cosas
+          cada jornada; las demas, de vez en cuando. */}
+      <Subtitulo>Hoy</Subtitulo>
       <Boton onPress={() => navegar({ tipo: "anotar", curso })}>
         Anotar conducta
-      </Boton>
-      <Boton secundario onPress={() => navegar({ tipo: "recientes", curso })}>
-        Anotaciones recientes
       </Boton>
       <Boton secundario onPress={() => navegar({ tipo: "asistencia", curso })}>
         Pasar lista
@@ -736,21 +1112,11 @@ function DetalleCurso({
       <Boton secundario onPress={() => navegar({ tipo: "reporteDia", curso })}>
         Reporte del día
       </Boton>
-      <Boton secundario onPress={() => navegar({ tipo: "comunicado", curso })}>
-        Avisar al curso
-      </Boton>
-      <Boton secundario onPress={() => navegar({ tipo: "agenda", curso })}>
-        Atención a familias
-      </Boton>
-      <Boton secundario onPress={() => navegar({ tipo: "alerta", curso })}>
-        Alerta de emergencia
-      </Boton>
-      <Boton secundario onPress={() => navegar({ tipo: "perfilDocente" })}>
-        Tu perfil profesional
-      </Boton>
-      <Boton secundario onPress={() => navegar({ tipo: "plan" })}>
-        Tu plan
-      </Boton>
+
+      {/* El contenido, no al final. Un docente entra a ver a sus estudiantes:
+          tenerlos debajo de nueve botones obligaba a recorrer la navegacion
+          entera para llegar a lo que vino a buscar. */}
+      <Subtitulo>Estudiantes</Subtitulo>
       <Opciones
         valor={pestana}
         opciones={[
@@ -767,6 +1133,17 @@ function DetalleCurso({
       ) : (
         <Estudiantes curso={curso} />
       )}
+      <Boton pendiente={op.pendiente} onPress={() => void invitarFamilias()}>
+        Invitar representantes
+      </Boton>
+      <ErrorMensaje mensaje={op.error} />
+
+      {/* Se queda en la pantalla, no solo en el menú: en una emergencia los
+          segundos cuentan y abrir un cajón primero sería cobrarlos. */}
+      <Boton secundario onPress={() => navegar({ tipo: "alerta", curso })}>
+        Alerta de emergencia
+      </Boton>
+
     </Pagina>
   );
 }
@@ -856,6 +1233,130 @@ function Mas({ status, cargar }: { status: string; cargar: () => void }) {
   ) : null;
 }
 
+/**
+ * Corregir las fechas de unos parciales ya definidos.
+ *
+ * Solo fechas: el número de parciales y su orden no se tocan, porque
+ * `puntajePeriodo` tiene una fila por parcial y por matrícula y añadir o
+ * quitar uno movería el puntaje de todo el curso.
+ *
+ * Un parcial cerrado se enseña pero no se edita: sus puntajes están
+ * congelados y las familias ya los vieron.
+ */
+function CorregirPeriodos({
+  curso,
+  periodos,
+  anio,
+  onGuardar,
+}: {
+  curso: Curso;
+  periodos: {
+    id: Id<"periodoAcademico">;
+    nombre: string;
+    fechaInicio: string;
+    fechaFin: string;
+    estado: string;
+  }[];
+  anio: { fechaInicio: string; fechaFin: string };
+  onGuardar: () => void;
+}) {
+  const corregir = useMutation(api.nucleo.corregirFechasPeriodos);
+  const [fechas, setFechas] = useState(() =>
+    periodos.map((p) => ({ fechaInicio: p.fechaInicio, fechaFin: p.fechaFin })),
+  );
+  const [listo, setListo] = useState(false);
+  const op = useOperacion();
+
+  const cambiado = fechas.some(
+    (f, i) =>
+      f.fechaInicio !== periodos[i].fechaInicio || f.fechaFin !== periodos[i].fechaFin,
+  );
+
+  async function guardar() {
+    const r = await op.ejecutar(() =>
+      corregir({
+        cursoId: curso.id,
+        fechas: periodos.map((p, i) => ({
+          periodoAcademicoId: p.id,
+          fechaInicio: fechas[i].fechaInicio,
+          fechaFin: fechas[i].fechaFin,
+        })),
+      }),
+    );
+    if (r.ok) setListo(true);
+  }
+
+  if (listo)
+    return (
+      <Pagina titulo="Fechas corregidas">
+        <Aviso>
+          Los parciales quedaron con las fechas nuevas. El puntaje de cada
+          estudiante se sigue calculando dentro del parcial que le toca.
+        </Aviso>
+        <Boton onPress={onGuardar}>Volver al curso</Boton>
+      </Pagina>
+    );
+
+  return (
+    <Pagina
+      titulo="Fechas de los parciales"
+      descripcion={`Puedes corregirlas mientras el parcial no esté cerrado. Año lectivo: ${anio.fechaInicio} a ${anio.fechaFin}.`}
+    >
+      {periodos.map((p, i) => {
+        const cerrado = p.estado === "CERRADO";
+        return (
+          <Tarjeta key={p.id} orden={i}>
+            <Subtitulo>{p.nombre}</Subtitulo>
+            {cerrado ? (
+              <>
+                <Cuerpo>{`${p.fechaInicio} — ${p.fechaFin}`}</Cuerpo>
+                <Aviso>
+                  Este parcial ya cerró. Sus puntajes están congelados y las
+                  familias ya los vieron, así que sus fechas no se mueven.
+                </Aviso>
+              </>
+            ) : (
+              <>
+                <CampoFecha
+                  etiqueta="Inicio"
+                  valor={fechas[i].fechaInicio}
+                  editable={!op.pendiente}
+                  onChange={(v) =>
+                    setFechas(
+                      fechas.map((f, n) => (n === i ? { ...f, fechaInicio: v } : f)),
+                    )
+                  }
+                />
+                <CampoFecha
+                  etiqueta="Fin"
+                  valor={fechas[i].fechaFin}
+                  editable={!op.pendiente}
+                  onChange={(v) =>
+                    setFechas(
+                      fechas.map((f, n) => (n === i ? { ...f, fechaFin: v } : f)),
+                    )
+                  }
+                />
+              </>
+            )}
+          </Tarjeta>
+        );
+      })}
+      <ErrorMensaje mensaje={op.error} />
+      <Boton
+        onPress={() => void guardar()}
+        pendiente={op.pendiente}
+        disabled={!cambiado}
+      >
+        Guardar las fechas
+      </Boton>
+      <Boton secundario disabled={op.pendiente} onPress={onGuardar}>
+        Volver al curso
+      </Boton>
+    </Pagina>
+  );
+}
+
 function PeriodosForm({
   curso,
   onGuardar,
@@ -890,12 +1391,17 @@ function PeriodosForm({
     );
     if (r.ok) onGuardar();
   }
+  // Ya definidos: la pantalla pasa a corregir, no a crear. Antes era un
+  // callejon —"el calendario ya esta guardado" y a volver— y un docente que se
+  // equivoco por tres dias al montar el año no tenia ninguna salida.
   if (calendario?.periodos.length)
     return (
-      <Pagina titulo="Parciales definidos">
-        <Aviso>El calendario ya está guardado.</Aviso>
-        <Boton onPress={onGuardar}>Volver al curso</Boton>
-      </Pagina>
+      <CorregirPeriodos
+        curso={curso}
+        periodos={calendario.periodos}
+        anio={{ fechaInicio: calendario.fechaInicio, fechaFin: calendario.fechaFin }}
+        onGuardar={onGuardar}
+      />
     );
   return (
     <Pagina
@@ -914,20 +1420,16 @@ function PeriodosForm({
             onChangeText={(v) => editar(i, "nombre", v)}
             editable={!op.pendiente}
           />
-          <Campo
+          <CampoFecha
             etiqueta={`Inicio del parcial ${i + 1}`}
-            placeholder="AAAA-MM-DD"
-            maxLength={10}
-            value={p.fechaInicio}
-            onChangeText={(v) => editar(i, "fechaInicio", v)}
+            valor={p.fechaInicio}
+            onChange={(v) => editar(i, "fechaInicio", v)}
             editable={!op.pendiente}
           />
-          <Campo
+          <CampoFecha
             etiqueta={`Fin del parcial ${i + 1}`}
-            placeholder="AAAA-MM-DD"
-            maxLength={10}
-            value={p.fechaFin}
-            onChangeText={(v) => editar(i, "fechaFin", v)}
+            valor={p.fechaFin}
+            onChange={(v) => editar(i, "fechaFin", v)}
             editable={!op.pendiente}
           />
         </Tarjeta>
@@ -1188,16 +1690,9 @@ function MisHijos({
         ))
       )}
       <Mas status={status} cargar={() => loadMore(20)} />
+      {/* Cita, alertas y plan viven en el menú lateral: no son cosas del
+          hijo, son de la cuenta, y aquí competían con lo que sí lo es. */}
       <Boton onPress={registrar}>Registrar a mi hijo</Boton>
-      <Boton secundario onPress={() => navegar({ tipo: "citas" })}>
-        Pedir una cita
-      </Boton>
-      <Boton secundario onPress={() => navegar({ tipo: "alertas" })}>
-        Alertas del curso
-      </Boton>
-      <Boton secundario onPress={() => navegar({ tipo: "plan" })}>
-        Tu plan
-      </Boton>
     </Pagina>
   );
 }
