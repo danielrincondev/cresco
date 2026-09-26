@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   BackHandler,
   Modal,
@@ -453,6 +453,12 @@ export function NucleoScreen() {
     perfil?.representanteId ? {} : "skip",
     { initialNumItems: 20 },
   );
+  const hijosAprobados = (hijos ?? [])
+    .filter((h) => h.estadoVerificacion === "APROBADO")
+    .map((h) => ({
+      estudianteId: h.estudianteId as string,
+      nombre: `${h.nombres} ${h.apellidos}`,
+    }));
   const hijoAprobado = (hijos ?? []).find(
     (h) => h.estadoVerificacion === "APROBADO",
   );
@@ -465,27 +471,6 @@ export function NucleoScreen() {
             nombre: `${hijoAprobado.nombres} ${hijoAprobado.apellidos}`,
           }
         : undefined;
-  /**
-   * Con un hijo aprobado, la aplicación abre en **su reporte de hoy**.
-   *
-   * Es a lo que una familia entra: saber qué pasó hoy. La lista de hijos es
-   * una pantalla de gestión —registrar, ver estados— y tenerla de portada
-   * obligaba a un toque de más cada tarde.
-   *
-   * Solo una vez y solo desde `inicio`: si la persona ya navegó a otro sitio,
-   * moverla sería quitarle el control de su propia sesión.
-   */
-  const yaAbrio = useRef(false);
-  useEffect(() => {
-    if (yaAbrio.current || ruta.tipo !== "inicio" || !hijoAprobado) return;
-    yaAbrio.current = true;
-    setRuta({
-      tipo: "reporteHoy",
-      estudianteId: hijoAprobado.estudianteId,
-      nombre: `${hijoAprobado.nombres} ${hijoAprobado.apellidos}`,
-    });
-  }, [hijoAprobado, ruta.tipo]);
-
   const nombreDelPerfil =
     `${perfil?.nombres ?? ""} ${perfil?.apellidos ?? ""}`.trim() || "Tu cuenta";
   const listaCursos = cursos?.cursos;
@@ -564,7 +549,9 @@ export function NucleoScreen() {
           </View>
         )}
         <View style={styles.marcaTexto}>
-          <Text style={styles.marca}>CRESCO</Text>
+          <Text style={styles.marca} numberOfLines={1} adjustsFontSizeToFit>
+            CRESCO
+          </Text>
           <Text style={styles.rol}>
             {perfil
               ? rol === "DOCENTE"
@@ -600,29 +587,9 @@ export function NucleoScreen() {
             {/* Perfil, ajustes y salir viven en el menú cuando hay menú. La
                 campana se queda en la barra: lleva el contador de sin leer, y
                 un aviso escondido detrás de un toque es medio aviso. */}
-            {rol !== "DOCENTE" && (
-              <>
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel="Mi perfil y roles"
-                  onPress={() => setRuta({ tipo: "perfil" })}
-                  style={styles.iconButton}
-                >
-                  <Icono nombre="account" decorativo />
-                </Pressable>
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel="Ajustes"
-                  onPress={() => setRuta({ tipo: "ajustes" })}
-                  style={styles.iconButton}
-                >
-                  <Icono nombre="cog" decorativo />
-                </Pressable>
-              </>
-            )}
           </>
         )}
-        {!(perfil && rol === "DOCENTE") && (
+        {!perfil && (
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Cerrar sesión"
@@ -705,6 +672,10 @@ export function NucleoScreen() {
           <ReporteDeHoy
             estudianteId={ruta.estudianteId}
             nombre={ruta.nombre}
+            hijos={hijosAprobados}
+            onCambiarHijo={(estudianteId, nombre) =>
+              setRuta({ tipo: "reporteHoy", estudianteId: estudianteId as Id<"estudiante">, nombre })
+            }
             onVerAnteriores={() => setRuta({ ...ruta, tipo: "reportesAnteriores" })}
             onVerAcumulado={() => setRuta({ ...ruta, tipo: "acumulado" })}
           />

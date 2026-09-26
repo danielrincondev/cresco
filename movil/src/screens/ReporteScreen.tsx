@@ -30,6 +30,7 @@ import type { FunctionReturnType } from "convex/server";
 
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
+import { HijoActivo } from "../components/SelectorDeHijo";
 import { Chip, Chips, EstadoVacio } from "../components/Estado";
 import { EsqueletoPagina } from "../components/Movimiento";
 import {
@@ -100,11 +101,16 @@ function TarjetaReporte({ reporte }: { reporte: Reporte }) {
 export function ReporteDeHoy({
   estudianteId,
   nombre,
+  hijos,
+  onCambiarHijo,
   onVerAnteriores,
   onVerAcumulado,
 }: {
   estudianteId: Id<"estudiante">;
   nombre: string;
+  /** Todos los hijos aprobados, para poder cambiar sin salir de la pantalla. */
+  hijos?: { estudianteId: string; nombre: string }[];
+  onCambiarHijo?: (estudianteId: string, nombre: string) => void;
   onVerAnteriores: () => void;
   onVerAcumulado: () => void;
 }) {
@@ -116,6 +122,19 @@ export function ReporteDeHoy({
 
   return (
     <Pagina titulo={nombre} descripcion="Lo de hoy, contado por su docente.">
+      {/* Con dos hijos, los dos reportes se parecen mucho: saber de quién es
+          lo que se lee no es un adorno. Con uno solo, esto es el nombre y
+          nada más. */}
+      {hijos && hijos.length > 0 && (
+        <HijoActivo
+          hijos={hijos}
+          activo={estudianteId}
+          onCambiar={(id) => {
+            const elegido = hijos.find((h) => h.estudianteId === id);
+            if (elegido) onCambiarHijo?.(id, elegido.nombre);
+          }}
+        />
+      )}
       {hoy.hay ? (
         <TarjetaReporte reporte={hoy.reporte} />
       ) : (
