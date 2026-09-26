@@ -198,7 +198,13 @@ const RECIENTE_POSITIVA = {
 };
 
 const recientes = () =>
-  pintar(<AnotacionesRecientes cursoId={"curso" as never} onVolver={() => {}} />);
+  pintar(
+    <AnotacionesRecientes
+      cursoId={"curso" as never}
+      onVolver={() => {}}
+      onAnotar={() => {}}
+    />,
+  );
 
 /**
  * El motivo queda en la bitacora como ANULAR: es lo que se le enseña a una

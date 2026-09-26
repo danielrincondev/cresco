@@ -306,9 +306,11 @@ type Reciente = FunctionReturnType<typeof api.conducta.anotacionesRecientesDelCu
 export function AnotacionesRecientes({
   cursoId,
   onVolver,
+  onAnotar,
 }: {
   cursoId: Id<"curso">;
   onVolver: () => void;
+  onAnotar: () => void;
 }) {
   const lista = useQuery(api.conducta.anotacionesRecientesDelCurso, { cursoId });
   const anular = useMutation(api.conducta.anularAccion);
@@ -373,8 +375,19 @@ export function AnotacionesRecientes({
       descripcion="Lo que se anotó en el curso esta semana. Si te equivocaste, aquí se corrige."
     >
       {lista.length === 0 ? (
-        <EstadoVacio icono="notebook" titulo="Nada anotado esta semana">
-          Las anotaciones de los últimos siete días aparecen aquí.
+        /* Un estado vacío que solo dice "no hay nada" es un callejón: no
+           explica si falta hacer algo o si la pantalla está rota. Estas dos
+           frases cubren las dos razones reales de que esté vacía —todavía no
+           has anotado, o aún no tienes estudiantes aprobados— y el botón
+           lleva al sitio donde se arregla la primera. */
+        <EstadoVacio
+          icono="notebook"
+          titulo="Nada anotado esta semana"
+          accion={{ texto: "Anotar conducta", onPress: onAnotar }}
+        >
+          Aquí aparece lo de los últimos siete días, para corregirlo si hace
+          falta. Si acabas de crear el curso, recuerda que solo se puede anotar
+          a estudiantes ya aprobados.
         </EstadoVacio>
       ) : (
         lista.map((a, i) => (

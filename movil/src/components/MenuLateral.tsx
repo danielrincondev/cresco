@@ -33,6 +33,7 @@ import {
   Espacio,
   Marca,
   Radio,
+  Semantico,
   Superficie,
   Tamano,
   Texto,
@@ -100,10 +101,62 @@ export function MenuLateral({
           },
         ]}
       >
+        {/* `flexGrow: 1` para que `PieMenu` pueda empujarse al fondo con
+            `marginTop: auto` cuando el contenido no llena el panel. */}
         <ScrollView contentContainerStyle={m.contenido}>{children}</ScrollView>
       </Animated.View>
     </View>
   );
+}
+
+/**
+ * Quién eres, arriba del todo.
+ *
+ * Un cajón que empieza directamente en "Cursos" se lee como una lista de
+ * enlaces. Con el nombre y el rol se lee como **tu** cuenta, y de paso llena
+ * el hueco que quedaba bajo la cabecera.
+ *
+ * El rol importa más de lo que parece: una misma persona puede ser docente y
+ * representante, y saber en cuál está evita anotar conducta creyendo que
+ * estás mirando a tu hijo.
+ */
+export function EncabezadoPerfil({
+  nombre,
+  rol,
+}: {
+  nombre: string;
+  rol: string;
+}) {
+  const iniciales = nombre
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((p) => p[0]?.toUpperCase() ?? "")
+    .join("");
+  return (
+    <View style={m.perfil}>
+      <View style={m.avatar}>
+        <Text style={m.avatarTexto}>{iniciales || "?"}</Text>
+      </View>
+      <View style={m.perfilTextos}>
+        <Text style={m.perfilNombre} numberOfLines={1}>
+          {nombre}
+        </Text>
+        <Text style={m.perfilRol}>{rol}</Text>
+      </View>
+    </View>
+  );
+}
+
+/**
+ * Lo que va pegado abajo del panel.
+ *
+ * Cerrar sesión no es un destino más: es la única entrada del menú de la que
+ * no se vuelve solo. Va abajo, separada, y en rojo — lejos del dedo que
+ * navega.
+ */
+export function PieMenu({ children }: PropsWithChildren) {
+  return <View style={m.pie}>{children}</View>;
 }
 
 /**
@@ -131,11 +184,14 @@ export function ItemMenu({
   icono,
   texto,
   activo = false,
+  peligro = false,
   onPress,
 }: {
   icono: PropsIcono["nombre"];
   texto: string;
   activo?: boolean;
+  /** Rojo, para lo que no se deshace solo: hoy únicamente cerrar sesión. */
+  peligro?: boolean;
   onPress: () => void;
 }) {
   return (
@@ -143,15 +199,27 @@ export function ItemMenu({
       accessibilityRole="button"
       accessibilityState={{ selected: activo }}
       onPress={onPress}
-      style={({ pressed }) => [m.item, activo && m.itemActivo, pressed && m.itemPresionado]}
+      style={({ pressed }) => [
+        m.item,
+        activo && m.itemActivo,
+        pressed && m.itemPresionado,
+      ]}
     >
       <Icono
         nombre={icono}
         activo={activo}
-        color={activo ? Marca.base : Texto.secundario}
+        color={peligro ? Semantico.error : activo ? Marca.base : Texto.secundario}
         decorativo
       />
-      <Text style={[m.itemTexto, activo && m.itemTextoActivo]}>{texto}</Text>
+      <Text
+        style={[
+          m.itemTexto,
+          activo && m.itemTextoActivo,
+          peligro && m.itemTextoPeligro,
+        ]}
+      >
+        {texto}
+      </Text>
     </Pressable>
   );
 }
@@ -184,7 +252,56 @@ const m = StyleSheet.create({
     borderRightWidth: 1,
     borderRightColor: Superficie.borde,
   },
-  contenido: { paddingVertical: Espacio.base, gap: Espacio.xs },
+  // `flexGrow` deja que el pie se empuje al fondo; el `paddingTop` largo es
+  // el aire que el menu pedia bajo la cabecera de la aplicacion.
+  contenido: {
+    flexGrow: 1,
+    paddingTop: Espacio.lg,
+    paddingBottom: Espacio.base,
+    gap: Espacio.sm,
+  },
+  perfil: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Espacio.md,
+    paddingHorizontal: Espacio.base,
+    paddingBottom: Espacio.base,
+  },
+  avatar: {
+    width: AREA_TACTIL_MINIMA,
+    height: AREA_TACTIL_MINIMA,
+    borderRadius: Radio.pill,
+    backgroundColor: Marca.claro,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  avatarTexto: {
+    color: Marca.base,
+    fontFamily: "Inter-Semibold",
+    fontSize: Tamano.base,
+  },
+  perfilTextos: { flex: 1 },
+  perfilNombre: {
+    color: Texto.primario,
+    fontFamily: "Inter-Semibold",
+    fontSize: Tamano.base,
+    lineHeight: 22,
+  },
+  perfilRol: {
+    color: Texto.secundario,
+    fontFamily: "Inter",
+    fontSize: Tamano.sm,
+    lineHeight: 20,
+  },
+  // `marginTop: auto` con el `flexGrow` de arriba: se pega al fondo cuando
+  // sobra sitio, y fluye con el contenido cuando no.
+  pie: {
+    marginTop: "auto",
+    paddingTop: Espacio.base,
+    borderTopWidth: 1,
+    borderTopColor: Superficie.borde,
+    marginHorizontal: Espacio.base,
+  },
   seccion: {
     color: Texto.secundario,
     fontFamily: "Inter-Semibold",
@@ -201,7 +318,7 @@ const m = StyleSheet.create({
     alignItems: "center",
     gap: Espacio.md,
     paddingHorizontal: Espacio.base,
-    paddingVertical: Espacio.md,
+    paddingVertical: Espacio.base,
     marginHorizontal: Espacio.sm,
     borderRadius: Radio.base,
   },
@@ -215,6 +332,7 @@ const m = StyleSheet.create({
     lineHeight: 22,
   },
   itemTextoActivo: { fontFamily: "Inter-Semibold", color: Marca.base },
+  itemTextoPeligro: { color: Semantico.error },
   separador: {
     height: 1,
     backgroundColor: Superficie.borde,

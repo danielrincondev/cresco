@@ -19,9 +19,12 @@ import { randomUUID } from "expo-crypto";
 import { api } from "../../convex/_generated/api";
 import { PARENTESCO } from "../../convex/lib/enums";
 import { Icono } from "../theme/Icono";
+import { CampoFecha } from "../components/CampoFecha";
 import {
+  EncabezadoPerfil,
   ItemMenu,
   MenuLateral,
+  PieMenu,
   SeccionMenu,
   SeparadorMenu,
 } from "../components/MenuLateral";
@@ -167,66 +170,91 @@ const documentosHijo = [
 function MenuDocente({
   ruta,
   cursoActivo,
+  nombre,
   ir,
   onSalir,
 }: {
   ruta: Ruta;
   cursoActivo: Curso | undefined;
+  nombre: string;
   ir: (ruta: Ruta) => void;
   onSalir: () => void;
 }) {
   const curso = "curso" in ruta ? ruta.curso : undefined;
+
+  // Dentro de un curso el menú es **del curso**: sus acciones, más las dos
+  // salidas que hacen falta para movserse — volver a la lista de cursos y las
+  // anotaciones recientes. Plan, perfil y ajustes no pintan nada aquí: se
+  // llega a ellos saliendo del curso, y meterlos convertía el menú secundario
+  // en una copia del principal con cosas de más.
+  if (curso) {
+    return (
+      <>
+        <SeccionMenu titulo={curso.nombre} />
+        <ItemMenu
+          icono="notebook"
+          texto="Anotar conducta"
+          activo={ruta.tipo === "anotar"}
+          onPress={() => ir({ tipo: "anotar", curso })}
+        />
+        <ItemMenu
+          icono="calendar-check"
+          texto="Pasar lista"
+          activo={ruta.tipo === "asistencia"}
+          onPress={() => ir({ tipo: "asistencia", curso })}
+        />
+        <ItemMenu
+          icono="file-document"
+          texto="Reporte del día"
+          activo={ruta.tipo === "reporteDia"}
+          onPress={() => ir({ tipo: "reporteDia", curso })}
+        />
+        <ItemMenu
+          icono="book-open"
+          texto="Anotaciones recientes"
+          activo={ruta.tipo === "recientes"}
+          onPress={() => ir({ tipo: "recientes", curso })}
+        />
+        <ItemMenu
+          icono="calendar-blank"
+          texto="Definir parciales"
+          activo={ruta.tipo === "periodos"}
+          onPress={() => ir({ tipo: "periodos", curso })}
+        />
+        <ItemMenu
+          icono="message-text"
+          texto="Avisar al curso"
+          activo={ruta.tipo === "comunicado"}
+          onPress={() => ir({ tipo: "comunicado", curso })}
+        />
+        <ItemMenu
+          icono="account-group"
+          texto="Atención a familias"
+          activo={ruta.tipo === "agenda"}
+          onPress={() => ir({ tipo: "agenda", curso })}
+        />
+        <ItemMenu
+          icono="alert"
+          texto="Alerta de emergencia"
+          activo={ruta.tipo === "alerta"}
+          onPress={() => ir({ tipo: "alerta", curso })}
+        />
+        <SeparadorMenu />
+        <ItemMenu
+          icono="school"
+          texto="Cursos"
+          onPress={() => ir({ tipo: "inicio" })}
+        />
+        <PieMenu>
+          <ItemMenu icono="logout" texto="Cerrar sesión" peligro onPress={onSalir} />
+        </PieMenu>
+      </>
+    );
+  }
+
   return (
     <>
-      {curso && (
-        <>
-          <SeccionMenu titulo={curso.nombre} />
-          <ItemMenu
-            icono="notebook"
-            texto="Anotar conducta"
-            activo={ruta.tipo === "anotar"}
-            onPress={() => ir({ tipo: "anotar", curso })}
-          />
-          <ItemMenu
-            icono="calendar-check"
-            texto="Pasar lista"
-            activo={ruta.tipo === "asistencia"}
-            onPress={() => ir({ tipo: "asistencia", curso })}
-          />
-          <ItemMenu
-            icono="file-document"
-            texto="Reporte del día"
-            activo={ruta.tipo === "reporteDia"}
-            onPress={() => ir({ tipo: "reporteDia", curso })}
-          />
-          <ItemMenu
-            icono="calendar-blank"
-            texto="Definir parciales"
-            activo={ruta.tipo === "periodos"}
-            onPress={() => ir({ tipo: "periodos", curso })}
-          />
-          <ItemMenu
-            icono="message-text"
-            texto="Avisar al curso"
-            activo={ruta.tipo === "comunicado"}
-            onPress={() => ir({ tipo: "comunicado", curso })}
-          />
-          <ItemMenu
-            icono="account-group"
-            texto="Atención a familias"
-            activo={ruta.tipo === "agenda"}
-            onPress={() => ir({ tipo: "agenda", curso })}
-          />
-          <ItemMenu
-            icono="alert"
-            texto="Alerta de emergencia"
-            activo={ruta.tipo === "alerta"}
-            onPress={() => ir({ tipo: "alerta", curso })}
-          />
-          <SeparadorMenu />
-        </>
-      )}
-
+      <EncabezadoPerfil nombre={nombre} rol="Docente" />
       <SeccionMenu titulo="Tu cuenta" />
       <ItemMenu
         icono="school"
@@ -234,6 +262,9 @@ function MenuDocente({
         activo={ruta.tipo === "inicio"}
         onPress={() => ir({ tipo: "inicio" })}
       />
+      {/* `anotacionesRecientesDelCurso` necesita un curso: aquí se resuelve con
+          el único del docente cuando solo tiene uno. Sin curso no se ofrece,
+          porque llevaría a una pantalla vacía. */}
       {cursoActivo && (
         <ItemMenu
           icono="book-open"
@@ -267,7 +298,9 @@ function MenuDocente({
         activo={ruta.tipo === "ajustes"}
         onPress={() => ir({ tipo: "ajustes" })}
       />
-      <ItemMenu icono="logout" texto="Cerrar sesión" onPress={onSalir} />
+      <PieMenu>
+        <ItemMenu icono="logout" texto="Cerrar sesión" peligro onPress={onSalir} />
+      </PieMenu>
     </>
   );
 }
@@ -490,6 +523,7 @@ export function NucleoScreen() {
           <AnotacionesRecientes
             cursoId={ruta.curso.id}
             onVolver={() => setRuta({ tipo: "curso", curso: ruta.curso })}
+            onAnotar={() => setRuta({ tipo: "anotar", curso: ruta.curso })}
           />
         ) : ruta.tipo === "asistencia" ? (
           <TomarAsistencia
@@ -586,6 +620,7 @@ export function NucleoScreen() {
           <MenuDocente
             ruta={ruta}
             cursoActivo={cursoActivo}
+            nombre={`${perfil.nombres ?? ""} ${perfil.apellidos ?? ""}`.trim() || "Tu cuenta"}
             ir={irDesdeMenu}
             onSalir={() => {
               setMenu(false);
@@ -897,7 +932,6 @@ function DetalleCurso({
   const [pestana, setPestana] = useState<"PENDIENTES" | "ESTUDIANTES">(
     "PENDIENTES",
   );
-  const [mas, setMas] = useState(false);
   const invitar = useMutation(api.nucleo.crearInvitacion);
   const op = useOperacion();
   async function invitarFamilias() {
@@ -963,56 +997,12 @@ function DetalleCurso({
       </Boton>
       <ErrorMensaje mensaje={op.error} />
 
-      {/* Fuera del plegable a proposito: en una emergencia los segundos
-          cuentan, y esconderla detras de un toque mas seria cobrarselos. */}
+      {/* Se queda en la pantalla, no solo en el menú: en una emergencia los
+          segundos cuentan y abrir un cajón primero sería cobrarlos. */}
       <Boton secundario onPress={() => navegar({ tipo: "alerta", curso })}>
         Alerta de emergencia
       </Boton>
 
-      <Boton secundario onPress={() => setMas(!mas)}>
-        {mas ? "Menos opciones" : "Más opciones"}
-      </Boton>
-      {mas && (
-        <>
-          <Boton
-            secundario
-            onPress={() => navegar({ tipo: "recientes", curso })}
-          >
-            Anotaciones recientes
-          </Boton>
-          <Boton
-            secundario
-            onPress={() => navegar({ tipo: "comunicado", curso })}
-          >
-            Avisar al curso
-          </Boton>
-          <Boton secundario onPress={() => navegar({ tipo: "agenda", curso })}>
-            Atención a familias
-          </Boton>
-          <Boton secundario onPress={() => navegar({ tipo: "periodos", curso })}>
-            Parciales del curso
-          </Boton>
-          <Boton secundario onPress={() => navegar({ tipo: "perfilDocente" })}>
-            Tu perfil profesional
-          </Boton>
-          <Boton secundario onPress={() => navegar({ tipo: "plan" })}>
-            Tu plan
-          </Boton>
-          {calendario && calendario.periodos.length > 0 && (
-            <Tarjeta>
-              <Subtitulo>Calendario del curso</Subtitulo>
-              {calendario.periodos.map((p) => (
-                <View key={p.id}>
-                  <Text style={styles.etiqueta}>{p.nombre}</Text>
-                  <Cuerpo>
-                    {p.fechaInicio} — {p.fechaFin}
-                  </Cuerpo>
-                </View>
-              ))}
-            </Tarjeta>
-          )}
-        </>
-      )}
     </Pagina>
   );
 }
@@ -1160,20 +1150,16 @@ function PeriodosForm({
             onChangeText={(v) => editar(i, "nombre", v)}
             editable={!op.pendiente}
           />
-          <Campo
+          <CampoFecha
             etiqueta={`Inicio del parcial ${i + 1}`}
-            placeholder="AAAA-MM-DD"
-            maxLength={10}
-            value={p.fechaInicio}
-            onChangeText={(v) => editar(i, "fechaInicio", v)}
+            valor={p.fechaInicio}
+            onChange={(v) => editar(i, "fechaInicio", v)}
             editable={!op.pendiente}
           />
-          <Campo
+          <CampoFecha
             etiqueta={`Fin del parcial ${i + 1}`}
-            placeholder="AAAA-MM-DD"
-            maxLength={10}
-            value={p.fechaFin}
-            onChangeText={(v) => editar(i, "fechaFin", v)}
+            valor={p.fechaFin}
+            onChange={(v) => editar(i, "fechaFin", v)}
             editable={!op.pendiente}
           />
         </Tarjeta>
