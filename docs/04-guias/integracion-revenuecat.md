@@ -110,14 +110,33 @@ el evento**. Las `httpAction` de Convex se sirven en el dominio `.site`.
 Desde el PR del SDK, la aplicación **puede cobrar**. Lo que falta para que
 funcione de verdad:
 
-1. **La clave pública de Android** del panel: *Project settings → API keys*,
-   la que empieza por `goog_`. Se pone en `movil/.env.local`:
+1. **La clave pública de Android** del panel: *Project settings → API keys*.
+   Con ADR-008 usamos el **Test Store**, así que empieza por `test_`; la de
+   producción empieza por `goog_`. Se pone en `movil/.env.local`:
 
    ```
-   EXPO_PUBLIC_REVENUECAT_API_KEY=goog_xxx
+   EXPO_PUBLIC_REVENUECAT_API_KEY=test_xxx
    ```
 
    Es pública por diseño —viaja dentro del APK— y no autoriza nada por sí sola.
+
+   > ### ⚠️ Una clave `test_` cierra la aplicación en una build de release
+   >
+   > Comprobado el 25 de septiembre, tres de tres veces: al abrir "Tu plan" en
+   > la APK de `preview`, el SDK enseña un diálogo —*«This app is using a test
+   > API key… The app will close now to protect the security of test
+   > purchases»*— y **termina el proceso**. No es un error que se pueda
+   > capturar: para cuando responde, no hay proceso al que volver.
+   >
+   > Lo hace a propósito, para que nadie publique en una tienda con una clave
+   > de pruebas. Y el perfil `preview` de EAS **es** release: no lleva
+   > `developmentClient`.
+   >
+   > `src/lib/compras.ts` lo detecta y no llama a `configure` en ese caso, así
+   > que la aplicación ya no se cierra — pero tampoco puede cobrar. **Para
+   > demostrar una compra hace falta una build del perfil `development`**, que
+   > sí es depurable. Es la única forma de grabar el video con una compra real
+   > sin tramitar Google Play Console, que es justo lo que ADR-007 evitó.
 
 2. **Una build nueva.** `react-native-purchases` es un módulo **nativo**: no
    existe en Expo Go ni en una build anterior a su instalación. Hace falta una

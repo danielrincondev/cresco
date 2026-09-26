@@ -34,7 +34,36 @@ import type { PurchasesOffering, PurchasesPackage } from "react-native-purchases
 const claveApi = process.env.EXPO_PUBLIC_REVENUECAT_API_KEY;
 
 /** Motivo por el que las compras no están disponibles, o `null` si lo están. */
-export type MotivoSinCompras = "SIN_CLAVE" | "SIN_MODULO_NATIVO";
+export type MotivoSinCompras =
+  | "SIN_CLAVE"
+  | "SIN_MODULO_NATIVO"
+  | "CLAVE_DE_PRUEBA_EN_RELEASE";
+
+/**
+ * Las claves del Test Store empiezan por `test_`; las de producción, por
+ * `goog_` en Android.
+ */
+const esClaveDePrueba = claveApi?.startsWith("test_") ?? false;
+
+/**
+ * ¿Puede este binario usar la clave que tiene?
+ *
+ * **RevenueCat mata la aplicación** si una clave del Test Store se usa en una
+ * build de release. No lanza una excepción que se pueda capturar: enseña un
+ * diálogo —"The app will close now to protect the security of test
+ * purchases"— y termina el proceso. Lo hace a propósito, para que nadie
+ * publique en una tienda con una clave de pruebas.
+ *
+ * El perfil `preview` de EAS **es** release: no lleva `developmentClient`. Así
+ * que con la clave de ADR-008 puesta, abrir "Tu plan" cerraba la aplicación,
+ * tres de tres veces. La única defensa es no llamar a `configure`, porque para
+ * cuando responde ya no hay proceso al que volver.
+ *
+ * Para **demostrar una compra de verdad** hace falta una build del perfil
+ * `development`, que sí es depurable y donde la clave de pruebas es legítima.
+ * Ver `docs/04-guias/integracion-revenuecat.md`.
+ */
+const claveUsable = !esClaveDePrueba || __DEV__;
 
 let configurado = false;
 let motivo: MotivoSinCompras | null = null;
@@ -64,6 +93,9 @@ export async function prepararCompras(
   perfilUsuarioId: string,
 ): Promise<MotivoSinCompras | null> {
   if (!claveApi) return (motivo = "SIN_CLAVE");
+  // Antes de tocar el SDK: con una clave de pruebas en release, `configure`
+  // no falla, **cierra la aplicación**. Ver `claveUsable` arriba.
+  if (!claveUsable) return (motivo = "CLAVE_DE_PRUEBA_EN_RELEASE");
   if (configurado) return motivo;
 
   const Purchases = await sdk();
