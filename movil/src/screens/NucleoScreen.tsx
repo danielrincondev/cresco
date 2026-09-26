@@ -348,6 +348,11 @@ export function NucleoScreen() {
       : listaCursos?.length === 1
         ? listaCursos[0]
         : undefined;
+  /**
+   * Las dos pantallas desde las que no hay a dónde volver: la lista de cursos
+   * y el curso abierto. Ahí manda la hamburguesa; más adentro, la flecha.
+   */
+  const esRaizDocente = ruta.tipo === "inicio" || ruta.tipo === "curso";
   /** Ir a un sitio desde el menú: navegar y cerrarlo, siempre juntos. */
   const irDesdeMenu = (destino: Ruta) => {
     setRuta(destino);
@@ -378,10 +383,16 @@ export function NucleoScreen() {
   return (
     <SafeAreaView style={styles.pantalla}>
       <View style={styles.barra}>
-        {/* El menú se abre desde aquí. No hay gesto desde el borde —eso
-            necesitaría `gesture-handler`, que es nativo— y la hamburguesa es
-            la afordancia que descubre todo el mundo de todas formas. */}
-        {perfil && rol === "DOCENTE" ? (
+        {/* **Un solo icono a la izquierda.** Hamburguesa en las dos raíces
+            del docente —la lista de cursos y el curso abierto—, flecha en las
+            pantallas de dentro. Los dos juntos apretaban la barra y no decían
+            nada: desde una raíz no hay a dónde volver, y desde dentro el menú
+            se alcanza con un toque de vuelta.
+
+            No hay gesto desde el borde: eso necesita `gesture-handler`, que es
+            nativo. La hamburguesa es la afordancia que descubre todo el mundo
+            de todas formas. */}
+        {perfil && rol === "DOCENTE" && esRaizDocente ? (
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Abrir el menú"
@@ -391,8 +402,7 @@ export function NucleoScreen() {
           >
             <Icono nombre="menu" decorativo />
           </Pressable>
-        ) : null}
-        {ruta.tipo !== "inicio" ? (
+        ) : ruta.tipo !== "inicio" ? (
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Volver"
@@ -401,7 +411,7 @@ export function NucleoScreen() {
           >
             <Icono nombre="arrow-left" decorativo />
           </Pressable>
-        ) : perfil && rol === "DOCENTE" ? null : (
+        ) : (
           <View style={styles.marcaIcono}>
             <Icono nombre="school" color={Marca.base} decorativo />
           </View>

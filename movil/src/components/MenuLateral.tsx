@@ -26,6 +26,7 @@
 
 import { useEffect, useRef, useState, type PropsWithChildren } from "react";
 import { Animated, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { Icono, type PropsIcono } from "../theme/Icono";
 import {
@@ -49,6 +50,15 @@ export function MenuLateral({
   onCerrar,
   children,
 }: PropsWithChildren<{ abierto: boolean; onCerrar: () => void }>) {
+  /**
+   * El panel cubre la pantalla entera, así que tiene que esquivar lo que el
+   * sistema pinta encima: el recorte de la cámara arriba y la barra de
+   * navegación abajo. Sin esto, "Cerrar sesión" quedaba **debajo** de los
+   * botones de Android y la cabecera de perfil chocaba con el reloj.
+   *
+   * `?? 0` porque en las pruebas el módulo va mockeado y no devuelve medidas.
+   */
+  const margenes = useSafeAreaInsets();
   const reducir = useReduceMotion();
   const progreso = useRef(new Animated.Value(0)).current;
   // `montado` sobrevive al cierre hasta que la animación termina. Sin esto el
@@ -103,7 +113,17 @@ export function MenuLateral({
       >
         {/* `flexGrow: 1` para que `PieMenu` pueda empujarse al fondo con
             `marginTop: auto` cuando el contenido no llena el panel. */}
-        <ScrollView contentContainerStyle={m.contenido}>{children}</ScrollView>
+        <ScrollView
+          contentContainerStyle={[
+            m.contenido,
+            {
+              paddingTop: (margenes?.top ?? 0) + Espacio.lg,
+              paddingBottom: (margenes?.bottom ?? 0) + Espacio.base,
+            },
+          ]}
+        >
+          {children}
+        </ScrollView>
       </Animated.View>
     </View>
   );
@@ -254,12 +274,9 @@ const m = StyleSheet.create({
   },
   // `flexGrow` deja que el pie se empuje al fondo; el `paddingTop` largo es
   // el aire que el menu pedia bajo la cabecera de la aplicacion.
-  contenido: {
-    flexGrow: 1,
-    paddingTop: Espacio.lg,
-    paddingBottom: Espacio.base,
-    gap: Espacio.sm,
-  },
+  // El relleno vertical lo pone el componente: depende de los márgenes del
+  // sistema, que solo se conocen en tiempo de ejecución.
+  contenido: { flexGrow: 1, gap: Espacio.sm },
   perfil: {
     flexDirection: "row",
     alignItems: "center",

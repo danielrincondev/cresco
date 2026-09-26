@@ -218,10 +218,16 @@ function FormularioAccion({
           catalogo.map((categoria) => (
             <View key={categoria.id} style={c.categoria}>
               <Text style={c.etiqueta}>{categoria.nombre}</Text>
+              {/* El signo se lee antes que el texto: verde lo que suma, rojo
+                  lo que resta. El elegido se rellena con la versión clara de
+                  su propio color, no con el azul de marca — así la selección
+                  confirma el signo en vez de taparlo. */}
               {categoria.tipos.map((t) => (
                 <Boton
                   key={t.id}
-                  secundario={tipo?.id !== t.id}
+                  secundario
+                  tono={t.signo}
+                  seleccionado={tipo?.id === t.id}
                   onPress={() => elegirTipo(t)}
                   disabled={op.pendiente}
                 >

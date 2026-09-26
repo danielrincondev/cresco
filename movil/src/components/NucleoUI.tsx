@@ -30,6 +30,7 @@ import {
   Superficie,
   Tamano,
   Texto,
+  TonoEstado,
 } from "../theme/Theme";
 
 export function mensajeError(error: unknown) {
@@ -249,18 +250,38 @@ export function Cargando({ mensaje = "Cargando..." }: { mensaje?: string }) {
     </View>
   );
 }
+/**
+ * Botón, con un tono opcional para lo que tiene signo.
+ *
+ * `tono` pinta el texto del color del signo y, al seleccionarlo, rellena con
+ * su versión clara. Los valores salen de `TonoEstado`, **no de
+ * `Semantico`**: el tema advierte que `Semantico.negativa` da 3.7:1 sobre el
+ * fondo claro —por debajo de AA— y que no se use como texto suelto. Los de
+ * `TonoEstado` están medidos a 8.0:1 y 8.6:1 sobre su propio fondo, que es
+ * justo la combinación que hace falta aquí.
+ */
 export function Boton({
   children,
   onPress,
   secundario = false,
   pendiente = false,
   disabled = false,
+  tono,
+  seleccionado = false,
 }: PropsWithChildren<{
   onPress: () => void;
   secundario?: boolean;
   pendiente?: boolean;
   disabled?: boolean;
+  tono?: "POSITIVA" | "NEGATIVA";
+  seleccionado?: boolean;
 }>) {
+  const paleta =
+    tono === "POSITIVA"
+      ? TonoEstado.positivo
+      : tono === "NEGATIVA"
+        ? TonoEstado.negativo
+        : null;
   return (
     <Pressable
       accessibilityRole="button"
@@ -270,6 +291,8 @@ export function Boton({
       style={({ pressed }) => [
         s.boton,
         secundario && s.botonSecundario,
+        paleta && { borderColor: paleta.borde },
+        paleta && seleccionado && { backgroundColor: paleta.fondo },
         pressed && s.presionado,
         (disabled || pendiente) && s.deshabilitado,
       ]}
@@ -277,7 +300,13 @@ export function Boton({
       {pendiente ? (
         <ActivityIndicator color={secundario ? Marca.base : Texto.sobreColor} />
       ) : (
-        <Text style={[s.textoBoton, secundario && s.textoBotonSecundario]}>
+        <Text
+          style={[
+            s.textoBoton,
+            secundario && s.textoBotonSecundario,
+            paleta && { color: paleta.texto },
+          ]}
+        >
           {children}
         </Text>
       )}

@@ -12,6 +12,11 @@ vi.mock("react-native", async () => ({
   },
 }));
 vi.mock("../theme/Icono", () => ({ Icono: "Icono" }));
+// El panel los usa para esquivar el recorte de camara y la barra de
+// navegacion. En pruebas no hay pantalla: van a cero.
+vi.mock("react-native-safe-area-context", () => ({
+  useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
+}));
 
 const { MenuLateral, ItemMenu, SeccionMenu } = await import("./MenuLateral");
 

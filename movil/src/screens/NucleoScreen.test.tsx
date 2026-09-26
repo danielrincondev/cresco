@@ -28,7 +28,12 @@ vi.mock("react-native", async () => ({
   BackHandler: { addEventListener: () => ({ remove() {} }) },
   Share: { share: vi.fn() },
 }));
-vi.mock("react-native-safe-area-context", () => ({ SafeAreaView: "SafeAreaView" }));
+vi.mock("react-native-safe-area-context", () => ({
+  SafeAreaView: "SafeAreaView",
+  // El menu lateral los usa para esquivar el recorte de camara y la barra
+  // de navegacion; en pruebas no hay pantalla, asi que van a cero.
+  useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
+}));
 vi.mock("@clerk/expo", () => ({
   useAuth: () => ({ sessionId: estado.sesion }),
   useUser: () => ({ user: { id: "usuario", firstName: "Prueba" } }),
