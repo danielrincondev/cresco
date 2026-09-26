@@ -20,6 +20,7 @@ import { api } from "../../convex/_generated/api";
 import { PARENTESCO } from "../../convex/lib/enums";
 import { Icono } from "../theme/Icono";
 import { CampoFecha } from "../components/CampoFecha";
+import { EsqueletoPagina } from "../components/Movimiento";
 import {
   ALTO_CONTENIDO_BARRA,
   BarraInferior,
@@ -458,7 +459,7 @@ export function NucleoScreen() {
    * y el arranque para saber si ya hay alguno aprobado. Convex comparte la
    * suscripción con la pantalla de inicio: no es una consulta de más.
    */
-  const { results: hijos } = usePaginatedQuery(
+  const { results: hijos, status: estadoHijos } = usePaginatedQuery(
     api.nucleo.listarMisEstudiantes,
     perfil?.representanteId ? {} : "skip",
     { initialNumItems: 20 },
@@ -479,24 +480,37 @@ export function NucleoScreen() {
    * —registrar, ver el estado de una solicitud— y obligar a pasar por ahí
    * cada vez era un toque de más para lo que de verdad se usa a diario.
    *
-   * **Solo una vez por apertura, y solo desde `inicio`.** Sin el `yaAbrio`,
+   * **Solo una vez por apertura, y solo desde `inicio`.** Sin la bandera,
    * cada vez que alguien tocara "Inicio" a propósito —desde el menú o la
    * barra inferior— la aplicación lo rebotaría de vuelta al reporte, y
    * "Inicio" dejaría de significar nada: apretarlo y no ir a ningún lado es
-   * peor que no tenerlo. El efecto solo actúa la primera vez que hay datos,
-   * justo después de abrir la app; a partir de ahí, "Inicio" vuelve a ser
-   * una decisión de quien lo toca, no una sugerencia que se deshace sola.
+   * peor que no tenerlo. La decisión solo se toma la primera vez que hay
+   * datos, justo después de abrir la app; a partir de ahí, "Inicio" vuelve a
+   * ser una decisión de quien lo toca, no una sugerencia que se deshace sola.
+   *
+   * ## Por qué es estado y no una ref, y por qué existe `decisionTomada`
+   *
+   * La primera versión usaba una `ref` y dejaba que `MisHijos` se pintara un
+   * instante mientras `listarMisEstudiantes` todavía cargaba, y el efecto
+   * recién *después* mandaba al reporte — un parpadeo real, no solo
+   * percibido: "Mis hijos" alcanza a pintarse una vez antes de que la
+   * redirección lo reemplace. `decisionTomada` es estado (no ref) justamente
+   * para poder **leerlo en el render** y no pintar "Mis hijos" hasta saber
+   * de verdad hacia dónde se va: con un representante, eso es esperar a que
+   * `estadoHijos` deje de estar en su primera carga.
    */
-  const yaAbrioEnReporte = useRef(false);
+  const [decisionTomada, setDecisionTomada] = useState(false);
+  const esperandoHijos = !!perfil?.representanteId && estadoHijos === "LoadingFirstPage";
   useEffect(() => {
-    if (yaAbrioEnReporte.current || ruta.tipo !== "inicio" || !hijoAprobado) return;
-    yaAbrioEnReporte.current = true;
+    if (decisionTomada || ruta.tipo !== "inicio" || esperandoHijos) return;
+    setDecisionTomada(true);
+    if (!hijoAprobado) return;
     setRuta({
       tipo: "reporteHoy",
       estudianteId: hijoAprobado.estudianteId,
       nombre: `${hijoAprobado.nombres} ${hijoAprobado.apellidos}`,
     });
-  }, [hijoAprobado, ruta.tipo]);
+  }, [decisionTomada, ruta.tipo, esperandoHijos, hijoAprobado]);
   const hijoDelMenu =
     "estudianteId" in ruta
       ? { estudianteId: ruta.estudianteId, nombre: ruta.nombre }
@@ -876,6 +890,12 @@ export function NucleoScreen() {
             )}
             {rol === "DOCENTE" ? (
               <Cursos nombre={user?.firstName ?? ""} navegar={setRuta} />
+            ) : !decisionTomada ? (
+              // Mientras no se sabe si hay un hijo aprobado, no se pinta
+              // "Mis hijos": es exactamente lo que dejaba ver un parpadeo
+              // real cuando esa pantalla se pintaba un instante antes de que
+              // el efecto la reemplazara por el reporte del día.
+              <EsqueletoPagina etiqueta="Cargando tu espacio" />
             ) : (
               <MisHijos
                 nombre={user?.firstName ?? ""}

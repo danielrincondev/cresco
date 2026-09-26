@@ -23,6 +23,7 @@ const estado = vi.hoisted(() => ({
   barraInferior: true,
   barraInferiorGuardada: [] as boolean[],
   hijos: [] as { estudianteId: string; nombres: string; apellidos: string; estadoVerificacion: string }[],
+  estadoHijos: "Exhausted" as "Exhausted" | "LoadingFirstPage",
 }));
 vi.mock("react-native", async () => ({
   ...(await import("../test/mockReactNative")).reactNative(),
@@ -67,7 +68,7 @@ vi.mock("convex/react", () => ({
     getFunctionName(ref) === "interaccion:misNotificaciones"
       ? estado.novedades
       : estado.perfil,
-  usePaginatedQuery: () => ({ results: estado.hijos, status: "Exhausted", loadMore: vi.fn() }),
+  usePaginatedQuery: () => ({ results: estado.hijos, status: estado.estadoHijos, loadMore: vi.fn() }),
   useMutation: (ref: Parameters<typeof getFunctionName>[0]) => {
     const nombre = getFunctionName(ref);
     if (!estado.funciones.has(nombre)) estado.funciones.set(nombre, async (args: unknown) => {
@@ -123,6 +124,7 @@ beforeEach(() => {
   estado.barraInferior = true;
   estado.barraInferiorGuardada = [];
   estado.hijos = [];
+  estado.estadoHijos = "Exhausted";
 });
 afterEach(async () => {
   if (vista) await act(async () => vista!.unmount());
@@ -409,6 +411,30 @@ it("con un hijo aprobado, la app abre en su reporte del día", async () => {
 it("sin hijos aprobados, la portada sigue siendo Mis hijos", async () => {
   await montar();
   expect(JSON.stringify(vista!.toJSON())).toContain("Acompaña a tus hijos");
+});
+
+/**
+ * El parpadeo que Kenny vio en el teléfono: "Mis hijos" se pintaba un
+ * instante, antes de que llegaran los datos, y el efecto recién *después*
+ * la reemplazaba por el reporte. Mientras `listarMisEstudiantes` sigue en su
+ * primera carga, no debe verse ninguna de las dos pantallas reales — solo el
+ * esqueleto — y al llegar los datos, pasa directo al reporte sin haber
+ * pintado "Mis hijos" ni una sola vez.
+ */
+it("mientras carga no pinta Mis hijos, y pasa directo al reporte al resolver", async () => {
+  estado.hijos = [HIJO_APROBADO];
+  estado.estadoHijos = "LoadingFirstPage";
+  await montar();
+  const t1 = JSON.stringify(vista!.toJSON());
+  expect(t1).not.toContain("Acompaña a tus hijos");
+  expect(t1).not.toContain("Lo de hoy, contado por su docente.");
+  expect(vista!.root.findByProps({ accessibilityRole: "progressbar" })).toBeTruthy();
+
+  estado.estadoHijos = "Exhausted";
+  await actualizar();
+  const t2 = JSON.stringify(vista!.toJSON());
+  expect(t2).toContain("Lo de hoy, contado por su docente.");
+  expect(t2).not.toContain("Acompaña a tus hijos");
 });
 
 /**
