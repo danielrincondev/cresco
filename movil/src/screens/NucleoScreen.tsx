@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   BackHandler,
   Modal,
@@ -306,6 +306,100 @@ function MenuDocente({
   );
 }
 
+/**
+ * El menú lateral de la familia.
+ *
+ * Mismo panel que el del docente, otro contenido. Aquí no hay "curso
+ * abierto": la familia trabaja siempre sobre **un hijo**, así que el hijo hace
+ * de contexto igual que allí lo hacía el curso.
+ *
+ * "Reporte diario" y "Reporte acumulado" necesitan un estudiante concreto —
+ * `reporteDelDia` y `reporteAcumulado` lo reciben— así que se resuelven con el
+ * hijo de la pantalla abierta o, si solo hay uno aprobado, con ese. Con varios
+ * hijos y ninguno abierto no se ofrecen: llevarían al reporte del hermano
+ * equivocado, que es peor que no llevar a ninguno.
+ */
+function MenuRepresentante({
+  ruta,
+  hijo,
+  nombre,
+  ir,
+  onSalir,
+}: {
+  ruta: Ruta;
+  hijo: { estudianteId: Id<"estudiante">; nombre: string } | undefined;
+  nombre: string;
+  ir: (ruta: Ruta) => void;
+  onSalir: () => void;
+}) {
+  return (
+    <>
+      <EncabezadoPerfil nombre={nombre} rol="Representante" />
+      <SeccionMenu titulo="Tu perfil" />
+      <ItemMenu
+        icono="account-group"
+        texto="Mis hijos"
+        activo={ruta.tipo === "inicio"}
+        onPress={() => ir({ tipo: "inicio" })}
+      />
+      {hijo && (
+        <>
+          <ItemMenu
+            icono="file-document"
+            texto="Reporte diario"
+            activo={ruta.tipo === "reporteHoy"}
+            onPress={() =>
+              ir({ tipo: "reporteHoy", estudianteId: hijo.estudianteId, nombre: hijo.nombre })
+            }
+          />
+          <ItemMenu
+            icono="book-open"
+            texto="Reporte acumulado"
+            activo={ruta.tipo === "acumulado"}
+            onPress={() =>
+              ir({ tipo: "acumulado", estudianteId: hijo.estudianteId, nombre: hijo.nombre })
+            }
+          />
+        </>
+      )}
+      <ItemMenu
+        icono="calendar-blank"
+        texto="Pedir una cita"
+        activo={ruta.tipo === "citas"}
+        onPress={() => ir({ tipo: "citas" })}
+      />
+      <ItemMenu
+        icono="alert"
+        texto="Alertas del curso"
+        activo={ruta.tipo === "alertas"}
+        onPress={() => ir({ tipo: "alertas" })}
+      />
+      <ItemMenu
+        icono="cog"
+        texto="Tu plan"
+        activo={ruta.tipo === "plan"}
+        onPress={() => ir({ tipo: "plan" })}
+      />
+      <SeparadorMenu />
+      <ItemMenu
+        icono="account"
+        texto="Mi perfil y roles"
+        activo={ruta.tipo === "perfil"}
+        onPress={() => ir({ tipo: "perfil" })}
+      />
+      <ItemMenu
+        icono="cog"
+        texto="Ajustes"
+        activo={ruta.tipo === "ajustes"}
+        onPress={() => ir({ tipo: "ajustes" })}
+      />
+      <PieMenu>
+        <ItemMenu icono="logout" texto="Cerrar sesión" peligro onPress={onSalir} />
+      </PieMenu>
+    </>
+  );
+}
+
 export function NucleoScreen() {
   const perfil = useQuery(api.nucleo.obtenerPerfil);
   useAuditoriaSesion(perfil === null ? null : perfil?.perfilUsuarioId);
@@ -342,6 +436,52 @@ export function NucleoScreen() {
     api.nucleo.listarCursos,
     perfil?.docenteId ? {} : "skip",
   );
+  /**
+   * Los hijos, a nivel de la aplicación y no solo de la pantalla de inicio.
+   * El menú los necesita para resolver "Reporte diario" y "Reporte acumulado",
+   * y el arranque para saber si ya hay alguno aprobado. Convex comparte la
+   * suscripción con la pantalla de inicio: no es una consulta de más.
+   */
+  const { results: hijos } = usePaginatedQuery(
+    api.nucleo.listarMisEstudiantes,
+    perfil?.representanteId ? {} : "skip",
+    { initialNumItems: 20 },
+  );
+  const hijoAprobado = (hijos ?? []).find(
+    (h) => h.estadoVerificacion === "APROBADO",
+  );
+  const hijoDelMenu =
+    "estudianteId" in ruta
+      ? { estudianteId: ruta.estudianteId, nombre: ruta.nombre }
+      : hijoAprobado
+        ? {
+            estudianteId: hijoAprobado.estudianteId,
+            nombre: `${hijoAprobado.nombres} ${hijoAprobado.apellidos}`,
+          }
+        : undefined;
+  /**
+   * Con un hijo aprobado, la aplicación abre en **su reporte de hoy**.
+   *
+   * Es a lo que una familia entra: saber qué pasó hoy. La lista de hijos es
+   * una pantalla de gestión —registrar, ver estados— y tenerla de portada
+   * obligaba a un toque de más cada tarde.
+   *
+   * Solo una vez y solo desde `inicio`: si la persona ya navegó a otro sitio,
+   * moverla sería quitarle el control de su propia sesión.
+   */
+  const yaAbrio = useRef(false);
+  useEffect(() => {
+    if (yaAbrio.current || ruta.tipo !== "inicio" || !hijoAprobado) return;
+    yaAbrio.current = true;
+    setRuta({
+      tipo: "reporteHoy",
+      estudianteId: hijoAprobado.estudianteId,
+      nombre: `${hijoAprobado.nombres} ${hijoAprobado.apellidos}`,
+    });
+  }, [hijoAprobado, ruta.tipo]);
+
+  const nombreDelPerfil =
+    `${perfil?.nombres ?? ""} ${perfil?.apellidos ?? ""}`.trim() || "Tu cuenta";
   const listaCursos = cursos?.cursos;
   const cursoActivo =
     "curso" in ruta
@@ -393,7 +533,7 @@ export function NucleoScreen() {
             No hay gesto desde el borde: eso necesita `gesture-handler`, que es
             nativo. La hamburguesa es la afordancia que descubre todo el mundo
             de todas formas. */}
-        {perfil && rol === "DOCENTE" && esRaizDocente ? (
+        {perfil && (rol === "DOCENTE" ? esRaizDocente : ruta.tipo === "inicio") ? (
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Abrir el menú"
@@ -626,18 +766,31 @@ export function NucleoScreen() {
       {/* Al final del árbol para que pinte por encima de todo lo demás. Se
           desmonta solo al terminar de cerrarse, así que no se queda
           interceptando toques invisible sobre la pantalla. */}
-      {perfil && rol === "DOCENTE" && (
+      {perfil && (
         <MenuLateral abierto={menu} onCerrar={() => setMenu(false)}>
-          <MenuDocente
-            ruta={ruta}
-            cursoActivo={cursoActivo}
-            nombre={`${perfil.nombres ?? ""} ${perfil.apellidos ?? ""}`.trim() || "Tu cuenta"}
-            ir={irDesdeMenu}
-            onSalir={() => {
-              setMenu(false);
-              void salida.ejecutar(() => signOut());
-            }}
-          />
+          {rol === "REPRESENTANTE" ? (
+            <MenuRepresentante
+              ruta={ruta}
+              hijo={hijoDelMenu}
+              nombre={nombreDelPerfil}
+              ir={irDesdeMenu}
+              onSalir={() => {
+                setMenu(false);
+                void salida.ejecutar(() => signOut());
+              }}
+            />
+          ) : (
+            <MenuDocente
+              ruta={ruta}
+              cursoActivo={cursoActivo}
+              nombre={nombreDelPerfil}
+              ir={irDesdeMenu}
+              onSalir={() => {
+                setMenu(false);
+                void salida.ejecutar(() => signOut());
+              }}
+            />
+          )}
         </MenuLateral>
       )}
     </SafeAreaView>
@@ -1560,16 +1713,9 @@ function MisHijos({
         ))
       )}
       <Mas status={status} cargar={() => loadMore(20)} />
+      {/* Cita, alertas y plan viven en el menú lateral: no son cosas del
+          hijo, son de la cuenta, y aquí competían con lo que sí lo es. */}
       <Boton onPress={registrar}>Registrar a mi hijo</Boton>
-      <Boton secundario onPress={() => navegar({ tipo: "citas" })}>
-        Pedir una cita
-      </Boton>
-      <Boton secundario onPress={() => navegar({ tipo: "alertas" })}>
-        Alertas del curso
-      </Boton>
-      <Boton secundario onPress={() => navegar({ tipo: "plan" })}>
-        Tu plan
-      </Boton>
     </Pagina>
   );
 }

@@ -20,7 +20,11 @@ export type CoercedEnvSchema = {
   
   /**
    * **EXPO_PUBLIC_REVENUECAT_API_KEY**  
-   * Clave publica del SDK de RevenueCat para Android (empieza por `goog_`).  
+   * Clave publica del SDK de RevenueCat para Android.  
+   * Con ADR-008 (Test Store) empieza por `test_`; la de produccion, por `goog_`.  
+   * OJO: una clave `test_` **cierra la aplicacion** en una build de release --  
+   * RevenueCat lo hace a proposito. Solo sirve en builds del perfil  
+   * `development`. Ver docs/04-guias/integracion-revenuecat.md.  
    * Es publica por diseño: va dentro del APK y no autoriza nada por si sola.  
    * Se saca del panel de RevenueCat, en Project settings -> API keys.  
    * **Opcional a proposito**: sin ella la aplicacion funciona igual, los muros de  
