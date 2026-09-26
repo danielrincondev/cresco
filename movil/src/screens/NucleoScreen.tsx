@@ -481,8 +481,13 @@ export function NucleoScreen() {
         ? listaCursos[0]
         : undefined;
   /**
-   * Las dos pantallas desde las que no hay a dónde volver: la lista de cursos
-   * y el curso abierto. Ahí manda la hamburguesa; más adentro, la flecha.
+   * Las dos pantallas del docente desde las que no hay a dónde volver: la
+   * lista de cursos y el curso abierto. Ahí manda la hamburguesa; más
+   * adentro, la flecha.
+   *
+   * El representante no tiene este dilema: un solo menú, sin "curso abierto"
+   * de por medio, así que la hamburguesa es siempre la respuesta correcta —
+   * ver `esRaizRepresentante` más abajo, donde se usa.
    */
   const esRaizDocente = ruta.tipo === "inicio" || ruta.tipo === "curso";
   /** Ir a un sitio desde el menú: navegar y cerrarlo, siempre juntos. */
@@ -515,16 +520,22 @@ export function NucleoScreen() {
   return (
     <SafeAreaView style={styles.pantalla}>
       <View style={styles.barra}>
-        {/* **Un solo icono a la izquierda.** Hamburguesa en las dos raíces
-            del docente —la lista de cursos y el curso abierto—, flecha en las
-            pantallas de dentro. Los dos juntos apretaban la barra y no decían
-            nada: desde una raíz no hay a dónde volver, y desde dentro el menú
-            se alcanza con un toque de vuelta.
+        {/* **Un solo icono a la izquierda.** Para el docente: hamburguesa en
+            las dos raíces —la lista de cursos y el curso abierto—, flecha en
+            las pantallas de dentro. Ahí sí hace falta la flecha, porque hay
+            "curso abierto" como nivel intermedio de navegación.
 
-            No hay gesto desde el borde: eso necesita `gesture-handler`, que es
-            nativo. La hamburguesa es la afordancia que descubre todo el mundo
-            de todas formas. */}
-        {perfil && (rol === "DOCENTE" ? esRaizDocente : ruta.tipo === "inicio") ? (
+            Para el representante: **siempre hamburguesa**. Solo tiene un
+            menú, sin nada intermedio como el curso del docente, así que un
+            botón de "volver" no llevaba a ningún sitio más útil que el propio
+            menú — era peor experiencia, no mejor. Salir de una pantalla se
+            hace desde el menú (eligiendo "Mis hijos" u otra opción) o con el
+            gesto/botón de atrás del sistema, que sigue funcionando igual.
+
+            No hay gesto desde el borde para abrir el menú: eso necesita
+            `gesture-handler`, que es nativo. La hamburguesa es la afordancia
+            que descubre todo el mundo de todas formas. */}
+        {perfil && (rol === "DOCENTE" ? esRaizDocente : true) ? (
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Abrir el menú"
