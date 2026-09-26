@@ -4,6 +4,7 @@ import { internalMutation, mutation, query, type MutationCtx, type QueryCtx } fr
 import { ALCANCE_COMUNICADO, ENTITLEMENTS, ESTADO_ASISTENCIA, REGLAS, TIPO_COMUNICADO } from "./lib/enums";
 import { ErrorDominio, exigirAlcanceCoherente, exigirDuracionNota, exigirFechaEvento, exigirRangoTipoAccion, exigirSignoCoherente, exigirTopeDiario, exigirVentanaComunicado, calcularPuntaje, hoyEnGuayaquil, sumarDias } from "./lib/guardas";
 import { ErrorPermiso, auditar, exigirAccesoDocenteAEstudiante, exigirDocente, exigirTitularDelCurso, exigirVinculo } from "./lib/permisos";
+import { periodoVigentePorFecha } from "./lib/periodos";
 import { tieneAccesoVigente } from "./lib/revenuecat";
 
 const estadoAsistencia = v.union(...ESTADO_ASISTENCIA.map((estado) => v.literal(estado)));
@@ -90,18 +91,12 @@ export const registrarAccion = mutation({
     const { docente, matricula } = await exigirAccesoDocenteAEstudiante(ctx, args.estudianteId);
     const { curso, anio, institucion } = await institucionDeMatricula(ctx, matricula._id);
     // La fecha se resuelve antes que el periodo, porque el periodo se elige
-    // **por la fecha**: tomar cualquiera EN_CURSO archivaba una accion fechada
+    // **por la fecha**: tomar cualquiera vigente archivaba una accion fechada
     // en 1900 o en octubre dentro del parcial de hoy.
     const fecha = args.fechaOcurrencia ?? hoyEnGuayaquil();
     const dia = exigirFechaDeCalendario(fecha);
 
-    const periodo = await ctx.db.query("periodoAcademico")
-      .withIndex("por_anio_orden", (q) => q.eq("anioLectivoId", curso.anioLectivoId))
-      .filter((q) => q.and(
-        q.eq(q.field("estado"), "EN_CURSO"),
-        q.lte(q.field("fechaInicio"), fecha),
-        q.gte(q.field("fechaFin"), fecha),
-      )).first();
+    const periodo = await periodoVigentePorFecha(ctx, curso.anioLectivoId, fecha);
     if (periodo === null) throw new ErrorDominio("PERIODO_CERRADO", "No hay un período académico en curso para registrar acciones.");
     const descripcion = args.descripcion.trim();
     if (!descripcion) throw new ErrorDominio("VALIDACION", "La descripción de la acción es obligatoria.");
@@ -270,10 +265,7 @@ export const tomarAsistencia = mutation({
     }
     const curso = await ctx.db.get(args.cursoId);
     if (curso === null) throw new ErrorDominio("NO_ENCONTRADO", "El curso no existe.");
-    const periodo = await ctx.db.query("periodoAcademico")
-      .withIndex("por_anio_orden", (q) => q.eq("anioLectivoId", curso.anioLectivoId))
-      .filter((q) => q.eq(q.field("estado"), "EN_CURSO"))
-      .first();
+    const periodo = await periodoVigentePorFecha(ctx, curso.anioLectivoId, fecha);
     if (periodo === null) throw new ErrorDominio("PERIODO_NO_VIGENTE", "No hay un parcial en curso.");
 
     let creadas = 0;
@@ -361,12 +353,14 @@ export const camposDelReporte = query({
   }),
 });
 
-async function periodoDelCurso(ctx: QueryCtx | MutationCtx, cursoId: Id<"curso">) {
+async function periodoDelCurso(
+  ctx: QueryCtx | MutationCtx,
+  cursoId: Id<"curso">,
+  fecha: string = hoyEnGuayaquil(),
+) {
   const curso = await ctx.db.get(cursoId);
   if (curso === null) throw new ErrorDominio("NO_ENCONTRADO", "El curso no existe.");
-  const periodo = await ctx.db.query("periodoAcademico")
-    .withIndex("por_anio_orden", (q) => q.eq("anioLectivoId", curso.anioLectivoId))
-    .filter((q) => q.eq(q.field("estado"), "EN_CURSO")).first();
+  const periodo = await periodoVigentePorFecha(ctx, curso.anioLectivoId, fecha);
   if (periodo === null) throw new ErrorDominio("PERIODO_NO_VIGENTE", "No hay un parcial en curso.");
   return periodo;
 }
@@ -376,7 +370,7 @@ export const guardarReporteGeneral = mutation({
   handler: (ctx, args) => conErroresPublicos(async () => {
     await exigirTitularDelCurso(ctx, args.cursoId);
     const fecha = args.fecha ?? hoyEnGuayaquil();
-    const periodo = await periodoDelCurso(ctx, args.cursoId);
+    const periodo = await periodoDelCurso(ctx, args.cursoId, fecha);
     let reporte = await ctx.db.query("reporteGeneral")
       .withIndex("por_curso_fecha", (q) => q.eq("cursoId", args.cursoId).eq("fecha", fecha)).unique();
     if (reporte !== null && reporte.estado !== "BORRADOR") {
@@ -503,7 +497,7 @@ export const publicarReporteGeneral = mutation({
   handler: (ctx, args) => conErroresPublicos(async () => {
     const docente = await exigirTitularDelCurso(ctx, args.cursoId);
     const fecha = args.fecha ?? hoyEnGuayaquil();
-    const periodo = await periodoDelCurso(ctx, args.cursoId);
+    const periodo = await periodoDelCurso(ctx, args.cursoId, fecha);
     let general = await ctx.db.query("reporteGeneral").withIndex("por_curso_fecha", (q) => q.eq("cursoId", args.cursoId).eq("fecha", fecha)).unique();
     if (general?.estado === "PUBLICADO") throw new ErrorDominio("CONFLICTO", "Ese reporte ya fue publicado.");
     if (general !== null) {
@@ -568,9 +562,7 @@ export const cierreNocturno = internalMutation({
     const cursos = await ctx.db.query("curso")
       .filter((q) => q.eq(q.field("estado"), "ACTIVO")).take(50);
     for (const curso of cursos) {
-      const periodo = await ctx.db.query("periodoAcademico")
-        .withIndex("por_anio_orden", (q) => q.eq("anioLectivoId", curso.anioLectivoId))
-        .filter((q) => q.eq(q.field("estado"), "EN_CURSO")).first();
+      const periodo = await periodoVigentePorFecha(ctx, curso.anioLectivoId, fecha);
       if (periodo === null) continue;
       const matriculas = await ctx.db.query("matricula")
         .withIndex("por_curso_estado", (q) => q.eq("cursoId", curso._id).eq("estado", "CURSANDO"))
