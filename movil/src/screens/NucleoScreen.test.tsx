@@ -64,10 +64,15 @@ vi.mock("convex/react", () => ({
   // El mock tiene que distinguir que se le pregunta: la pantalla consulta el
   // perfil **y** las novedades, y devolver el perfil para las dos hacia que
   // `sinLeer` operara sobre algo que no es una lista.
-  useQuery: (ref: Parameters<typeof getFunctionName>[0]) =>
-    getFunctionName(ref) === "interaccion:misNotificaciones"
-      ? estado.novedades
-      : estado.perfil,
+  useQuery: (ref: Parameters<typeof getFunctionName>[0]) => {
+    const nombre = getFunctionName(ref);
+    if (nombre === "interaccion:misNotificaciones") return estado.novedades;
+    // El reporte del día trae también las novedades del curso (QA del 26 de
+    // septiembre); sin esta rama, el mock genérico de abajo (`estado.perfil`,
+    // un objeto) revienta el `.map` de `NovedadesDelCurso`.
+    if (nombre === "conducta:comunicadosVigentes") return [];
+    return estado.perfil;
+  },
   usePaginatedQuery: () => ({ results: estado.hijos, status: estado.estadoHijos, loadMore: vi.fn() }),
   useMutation: (ref: Parameters<typeof getFunctionName>[0]) => {
     const nombre = getFunctionName(ref);

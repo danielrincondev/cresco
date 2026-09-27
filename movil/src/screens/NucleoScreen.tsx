@@ -81,6 +81,7 @@ import {
   AlertasFamilia,
   CitasFamilia,
   Notificaciones,
+  type Notificacion,
   ReclamosDocente,
 } from "./InteraccionScreen";
 import { parrafosLegibles } from "../lib/texto";
@@ -474,6 +475,45 @@ export function NucleoScreen() {
     (h) => h.estadoVerificacion === "APROBADO",
   );
   /**
+   * QA del 26 de septiembre: "al apretar una notificación debería enviar a
+   * la pantalla que corresponde a esa notificación". Antes solo se marcaba
+   * leída y no pasaba nada más.
+   *
+   * Se resuelve con lo que la propia notificación ya trae —`tipo`,
+   * `entidadTipo`, `entidadId`— sin pedir nada nuevo al servidor. Para lo que
+   * habla de un hijo concreto (una acción, un reporte, un comunicado),
+   * `entidadTipo` es "estudiante" y `entidadId` su id: así se decidió al
+   * emitirlas en `conducta.ts`, precisamente para que esto pudiera resolverse
+   * en el cliente. El nombre sale de `hijosAprobados` cuando está disponible;
+   * si no, se usa el propio título de la notificación antes que dejar la
+   * pantalla en blanco.
+   */
+  const navegarDesdeNotificacion = (n: Notificacion) => {
+    if (n.tipo === "ALERTA_EMERGENCIA") {
+      setRuta({ tipo: "alertas" });
+      return;
+    }
+    if (n.tipo === "CITACION" || n.tipo === "RECORDATORIO_CITA") {
+      // La bandeja de citas del docente vive dentro de un curso (D16); sin
+      // uno solo en contexto no hay a cuál ir, así que se queda en la
+      // campana en vez de adivinar.
+      if (rol === "REPRESENTANTE") setRuta({ tipo: "citas" });
+      return;
+    }
+    if (n.tipo === "RESPUESTA_INCONFORMIDAD") {
+      if (rol === "DOCENTE") setRuta({ tipo: "reclamos" });
+      return;
+    }
+    if (n.entidadTipo === "estudiante" && n.entidadId) {
+      const hijo = hijosAprobados.find((h) => h.estudianteId === n.entidadId);
+      setRuta({
+        tipo: "reporteHoy",
+        estudianteId: n.entidadId as Id<"estudiante">,
+        nombre: hijo?.nombre ?? n.titulo,
+      });
+    }
+  };
+  /**
    * Con al menos un hijo aprobado, la aplicación abre en **su reporte de
    * hoy**, no en "Mis hijos". Es a lo que una familia entra cada tarde; "Mis
    * hijos" tiene funciones que solo hacen falta al inicio del año lectivo
@@ -785,7 +825,7 @@ export function NucleoScreen() {
         ) : ruta.tipo === "registro" ? (
           <RegistroForm perfil={perfil} onGuardar={volver} />
         ) : ruta.tipo === "notificaciones" ? (
-          <Notificaciones />
+          <Notificaciones onAbrir={(n) => navegarDesdeNotificacion(n)} />
         ) : ruta.tipo === "ajustes" ? (
           <Ajustes
             esRepresentante={rol === "REPRESENTANTE"}
@@ -1255,9 +1295,23 @@ function DetalleCurso({
   const calendario = useQuery(api.nucleo.obtenerCalendarioCurso, {
     cursoId: curso.id,
   });
-  const [pestana, setPestana] = useState<"PENDIENTES" | "ESTUDIANTES">(
-    "PENDIENTES",
+  // QA del 26 de septiembre: "debería ir primero el botón de 'estudiante' en
+  // vez del botón 'por aprobar'" — es lo que un docente mira más seguido, una
+  // vez que el curso ya tiene alumnos matriculados.
+  const [pestana, setPestana] = useState<"ESTUDIANTES" | "PENDIENTES">(
+    "ESTUDIANTES",
   );
+  const [masOpciones, setMasOpciones] = useState(false);
+  // QA del 27 de septiembre: "conocer los 3 estudiantes con más acciones
+  // negativas... que no falle y salga que es por falta de conexión". Se
+  // pide en cuanto se conoce el curso, no solo cuando se despliega: así el
+  // aviso de "sin ninguna anotación" (que sí va siempre a la vista) no
+  // depende de que el docente haya abierto el desplegable primero.
+  const panorama = useQuery(
+    api.conducta.panoramaDelCurso,
+    calendario && calendario.periodos.length > 0 ? { cursoId: curso.id } : "skip",
+  );
+  const [verTop, setVerTop] = useState(false);
   const invitar = useMutation(api.nucleo.crearInvitacion);
   const op = useOperacion();
   async function invitarFamilias() {
@@ -1298,6 +1352,55 @@ function DetalleCurso({
         Reporte del día
       </Boton>
 
+      {/* QA del 27 de septiembre. Un conteo, sin nombres, y solo cuando hay
+          algo que señalar -- el silencio (todos tienen al menos una
+          anotación) no necesita un aviso. */}
+      {panorama && panorama.hayPeriodo && panorama.sinAnotaciones > 0 && (
+        <Aviso>
+          {panorama.sinAnotaciones === 1
+            ? "1 estudiante sin ninguna anotación este parcial."
+            : `${panorama.sinAnotaciones} estudiantes sin ninguna anotación este parcial.`}
+        </Aviso>
+      )}
+
+      {/* A diferencia del aviso de arriba, esto sí nombra a estudiantes
+          concretos -- por eso va detrás de un desplegable que el docente
+          elige abrir, no algo que se le presenta de entrada cada vez. */}
+      {calendario && calendario.periodos.length > 0 && (
+        <>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Quién tiene más anotaciones negativas este parcial"
+            accessibilityState={{ expanded: verTop }}
+            onPress={() => setVerTop(!verTop)}
+            style={styles.masOpciones}
+          >
+            <Text style={styles.masOpcionesTexto}>Quién tiene más anotaciones negativas</Text>
+            <Icono nombre={verTop ? "chevron-up" : "chevron-down"} decorativo />
+          </Pressable>
+          {verTop && (
+            <Tarjeta>
+              {!panorama ? (
+                <Cargando />
+              ) : !panorama.hayPeriodo ? (
+                <Cuerpo>No hay un parcial en curso todavía.</Cuerpo>
+              ) : panorama.totalEstudiantes === 0 ? (
+                <Cuerpo>Aún no hay estudiantes matriculados.</Cuerpo>
+              ) : panorama.topNegativos.length === 0 ? (
+                <Cuerpo>Nadie tiene anotaciones negativas este parcial.</Cuerpo>
+              ) : (
+                panorama.topNegativos.map((fila) => (
+                  <View key={fila.estudianteId} style={styles.filaTop}>
+                    <Text style={styles.filaTopNombre}>{fila.nombre}</Text>
+                    <Text style={styles.filaTopCantidad}>{fila.cantidad}</Text>
+                  </View>
+                ))
+              )}
+            </Tarjeta>
+          )}
+        </>
+      )}
+
       {/* El contenido, no al final. Un docente entra a ver a sus estudiantes:
           tenerlos debajo de nueve botones obligaba a recorrer la navegacion
           entera para llegar a lo que vino a buscar. */}
@@ -1305,8 +1408,8 @@ function DetalleCurso({
       <Opciones
         valor={pestana}
         opciones={[
-          { valor: "PENDIENTES", texto: "Por aprobar" },
           { valor: "ESTUDIANTES", texto: "Estudiantes" },
+          { valor: "PENDIENTES", texto: "Por aprobar" },
         ]}
         onChange={setPestana}
       />
@@ -1318,9 +1421,29 @@ function DetalleCurso({
       ) : (
         <Estudiantes curso={curso} />
       )}
-      <Boton pendiente={op.pendiente} onPress={() => void invitarFamilias()}>
-        Invitar representantes
-      </Boton>
+
+      {/*
+       * QA del 26 de septiembre: "invitar representante y alerta deberían
+       * ocultarse en 'más opciones'". Solo invitar se pliega — la alerta de
+       * emergencia se queda siempre visible (ver más abajo): ya vive también
+       * en el menú lateral, así que plegarla aquí sería redundante, y en una
+       * emergencia los segundos cuentan.
+       */}
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Más opciones"
+        accessibilityState={{ expanded: masOpciones }}
+        onPress={() => setMasOpciones(!masOpciones)}
+        style={styles.masOpciones}
+      >
+        <Text style={styles.masOpcionesTexto}>Más opciones</Text>
+        <Icono nombre={masOpciones ? "chevron-up" : "chevron-down"} decorativo />
+      </Pressable>
+      {masOpciones && (
+        <Boton pendiente={op.pendiente} onPress={() => void invitarFamilias()}>
+          Invitar representantes
+        </Boton>
+      )}
       <ErrorMensaje mensaje={op.error} />
 
       {/* Se queda en la pantalla, no solo en el menú: en una emergencia los
@@ -2196,6 +2319,36 @@ function TextoDocumento({ texto }: { texto: string }) {
 
 const styles = StyleSheet.create({
   pantalla: { flex: 1, backgroundColor: Superficie.fondo },
+  masOpciones: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: Espacio.xs,
+    minHeight: 44,
+  },
+  masOpcionesTexto: {
+    color: Marca.base,
+    fontFamily: "Inter-Semibold",
+    fontSize: Tamano.base,
+  },
+  filaTop: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: Espacio.xs,
+    borderTopWidth: 1,
+    borderTopColor: Superficie.separador,
+  },
+  filaTopNombre: {
+    color: Texto.primario,
+    fontFamily: "Inter",
+    fontSize: Tamano.base,
+  },
+  filaTopCantidad: {
+    color: Texto.primario,
+    fontFamily: "Inter-Semibold",
+    fontSize: Tamano.base,
+  },
   barra: {
     flexDirection: "row",
     alignItems: "center",

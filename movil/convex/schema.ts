@@ -456,6 +456,11 @@ export default defineSchema({
     contenido: v.string(),
     /** Solo para EVENTO. */
     fechaEvento: v.optional(v.string()),
+    /**
+     * NUEVO — un evento puede durar un plazo, no solo un día. Ausente cuando
+     * el evento es de fecha única; `fechaEvento` sigue siendo el inicio.
+     */
+    fechaEventoFin: v.optional(v.string()),
     horaEvento: v.optional(v.string()),
     visibleDesde: v.string(),
     visibleHasta: v.string(),
@@ -465,6 +470,24 @@ export default defineSchema({
   })
     .index("por_curso_ventana", ["cursoId", "activo", "visibleHasta"])
     .index("por_estudiante", ["estudianteId", "activo"]),
+
+  /**
+   * Constancia de que una familia **vio** un comunicado: de las entrevistas del
+   * 1 de septiembre, "ya no vale que yo le avisé por WhatsApp" — el docente
+   * necesita poder mostrar que avisó, no solo decirlo.
+   *
+   * "Vio", no "leyó": se registra cuando el representante abre el reporte en
+   * el que aparece el comunicado (`marcarComunicadosVistos`). Es lo que la
+   * aplicación sabe de verdad, y la pantalla del docente lo dice con esa
+   * palabra. Una fila por comunicado y representante; `estudianteId` es el
+   * hijo en cuyo reporte lo vio, y solo es informativo.
+   */
+  vistaComunicado: defineTable({
+    comunicadoCursoId: v.id("comunicadoCurso"),
+    representanteId: v.id("representante"),
+    estudianteId: v.id("estudiante"),
+    vistoEn: v.number(),
+  }).index("por_comunicado_representante", ["comunicadoCursoId", "representanteId"]),
 
   // --- Franjas y puntaje ---------------------------------------------------
 
@@ -622,7 +645,11 @@ export default defineSchema({
     .index("por_docente_fecha", ["docenteId", "fecha", "horaInicio"]) // ux_disponibilidad
     .index("por_docente_estado", ["docenteId", "fecha", "estado"]),
 
-  /** F2: nace SOLICITADA y requiere confirmación del docente. */
+  /**
+   * F2: nace SOLICITADA y requiere confirmación **de la otra parte**: del
+   * docente cuando la pide la familia, y de la familia cuando es una citación
+   * del docente (`origen: CITACION_DOCENTE`).
+   */
   cita: defineTable({
     disponibilidadDocenteId: v.optional(v.id("disponibilidadDocente")),
     docenteId: v.id("docente"),
@@ -641,6 +668,18 @@ export default defineSchema({
      * nada que no se le pueda decir a la familia a la cara.
      */
     notasDocente: v.optional(v.string()),
+    /**
+     * **Lo ve el docente.** Lo que escribe la familia al decir que no puede
+     * asistir a una citación (`responderCitacion`); ahí es obligatorio, porque
+     * una citación no se declina en silencio.
+     */
+    mensajeRepresentante: v.optional(v.string()),
+    /**
+     * Solo en CANCELADA: quién la canceló y por qué. Los dos lo ven — es lo
+     * que queda en el historial cuando alguien pregunta qué pasó con la cita.
+     */
+    canceladaPor: v.optional(v.union(v.literal("DOCENTE"), v.literal("REPRESENTANTE"))),
+    motivoCancelacion: v.optional(v.string()),
     ...actualizadoEn,
   })
     .index("por_representante", ["representanteId", "fechaHoraInicio"])

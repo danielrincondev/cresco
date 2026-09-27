@@ -12,4 +12,12 @@ crons.cron(
   {},
 );
 
+/** Sábado 09:00 Guayaquil (UTC-5): resumen de la semana a cada familia. */
+crons.cron(
+  "conducta: resumen semanal",
+  "0 14 * * 6",
+  internal.conducta.enviarResumenesSemanales,
+  {},
+);
+
 export default crons;

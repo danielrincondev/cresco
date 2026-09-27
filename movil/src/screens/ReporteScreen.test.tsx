@@ -7,6 +7,7 @@ const estado = vi.hoisted(() => ({
   hoy: undefined as unknown,
   anteriores: undefined as unknown,
   acumulado: undefined as unknown,
+  comunicados: [] as unknown,
   lecturas: [] as unknown[],
 }));
 
@@ -23,11 +24,23 @@ vi.mock("convex/react", () => ({
     const nombre = getFunctionName(ref);
     if (nombre === "conducta:reporteDeHoy") return estado.hoy;
     if (nombre === "conducta:reportesAnteriores") return estado.anteriores;
+    if (nombre === "conducta:comunicadosVigentes") return estado.comunicados;
+    if (nombre === "nucleo:obtenerPerfil") return undefined;
     return estado.acumulado;
   },
   // `useLecturaSensible` registra la lectura con una mutation al montar.
   useMutation: () => async (args: unknown) => { estado.lecturas.push(args); return null; },
 }));
+// `AnuncioBanner` (en `ReporteDeHoy`) importa `expo-crypto` y `compras.ts`
+// arriba del archivo. Sin el primer mock, `expo-modules-core` revienta con
+// "__DEV__ is not defined" -- ese global solo existe bajo Metro, no en
+// Vitest. `compras.ts` tiene el mismo problema (lee `__DEV__` al cargarse),
+// así que se mockea entero, igual que ya hace `PaywallScreen.test.tsx`.
+vi.mock("expo-crypto", () => ({ randomUUID: () => "impresion-sintetica-1234" }));
+vi.mock("../lib/compras", () => ({ prepararCompras: async () => null }));
+// El propio SDK de anuncios es nativo: `import()` dentro de `AnuncioBanner`
+// lo intenta y falla en las pruebas, y el componente ya sabe no pintar nada
+// en ese caso. No hace falta un mock más elaborado que ese fallo real.
 
 const { ReporteAcumulado, ReporteDeHoy, ReportesAnteriores } =
   await import("./ReporteScreen");
@@ -55,6 +68,7 @@ beforeEach(() => {
   estado.lecturas = [];
   estado.hoy = { fecha: "2026-09-09", hay: true, reporte: REPORTE };
   estado.anteriores = { limite: 2, premium: false, reportes: [REPORTE] };
+  estado.comunicados = [];
   estado.acumulado = {
     periodo: { nombre: "Primer parcial", fechaInicio: "2026-05-01", fechaFin: "2026-07-10" },
     puntaje: 58, puntosPositivos: 3, puntosNegativos: -5, congelado: false,
@@ -113,6 +127,81 @@ it("distingue el día sin cerrar del día sin novedades", () => {
   expect(t).not.toContain("Todavía no hay reporte de hoy");
 });
 
+/**
+ * QA del 27 de septiembre: un sábado o domingo, "todavía no hay reporte de
+ * hoy" no es cierto -- no hay clases, no es que el docente no lo publicó.
+ */
+it("un fin de semana sin reporte, muestra el resumen de la semana en vez de decir que todavía no hay reporte", () => {
+  estado.hoy = {
+    fecha: "2026-09-06", hay: false, reporte: null, finDeSemana: true,
+    resumenSemana: {
+      desde: "2026-08-31", hasta: "2026-09-06", puntosPositivos: 2, puntosNegativos: -1,
+      acciones: [{ id: "a1", categoria: "Disciplina", signo: "NEGATIVA", puntos: -1, descripcion: "Se distrajo en clase", estado: "VIGENTE", fecha: "2026-09-04" }],
+    },
+  };
+  const t = texto(hoy());
+  expect(t).toContain("Hoy no es día de clases");
+  expect(t).toContain("Se distrajo en clase");
+  expect(t).not.toContain("Todavía no hay reporte de hoy");
+});
+
+it("un fin de semana sin ninguna novedad, lo dice en vez de dejar la tarjeta vacía", () => {
+  estado.hoy = {
+    fecha: "2026-09-06", hay: false, reporte: null, finDeSemana: true,
+    resumenSemana: { desde: "2026-08-31", hasta: "2026-09-06", puntosPositivos: 0, puntosNegativos: 0, acciones: [] },
+  };
+  expect(texto(hoy())).toContain("Sin novedades de conducta esta semana");
+});
+
+it("entre semana sin reporte, sigue diciendo que todavía no hay uno, sin resumen", () => {
+  estado.hoy = { fecha: "2026-09-09", hay: false, reporte: null, finDeSemana: false, resumenSemana: null };
+  const t = texto(hoy());
+  expect(t).toContain("Todavía no hay reporte de hoy");
+  expect(t).not.toContain("Hoy no es día de clases");
+});
+
+/**
+ * QA del 26 de septiembre: "los eventos no se reflejan en el reporte
+ * diario". Van después de las acciones del estudiante, nunca antes: son
+ * avisos del curso, no lo que le pasó a él o ella hoy.
+ */
+it("muestra las notas y eventos vigentes del curso, después de las acciones del estudiante", () => {
+  estado.comunicados = [
+    { id: "c1", tipo: "NOTA_PROFESOR", titulo: "Traer materiales", contenido: "Para la clase de arte", fechaEvento: null, fechaEventoFin: null, horaEvento: null },
+    { id: "c2", tipo: "EVENTO", titulo: "Feria de ciencias", contenido: "En el patio central", fechaEvento: "2026-09-20", fechaEventoFin: null, horaEvento: "09:00" },
+  ];
+  const t = texto(hoy());
+  expect(t).toContain("Novedades del curso");
+  expect(t).toContain("Traer materiales");
+  expect(t).toContain("Feria de ciencias");
+  expect(t).toContain("09:00");
+  expect(t.indexOf("Se levantó varias veces")).toBeLessThan(t.indexOf("Novedades del curso"));
+});
+
+/**
+ * El docente necesita saber quién ya vio un aviso ("ya no vale que yo le avisé
+ * por WhatsApp"). Mostrarlos en el reporte es lo que cuenta como verlos.
+ */
+it("al mostrar los comunicados, deja constancia de que esta familia los vio", () => {
+  estado.comunicados = [
+    { id: "c2", tipo: "NOTA_PROFESOR", titulo: "B", contenido: "b", fechaEvento: null, fechaEventoFin: null, horaEvento: null },
+    { id: "c1", tipo: "NOTA_PROFESOR", titulo: "A", contenido: "a", fechaEvento: null, fechaEventoFin: null, horaEvento: null },
+  ];
+  hoy();
+  expect(estado.lecturas).toContainEqual({ estudianteId: "e1", comunicadoIds: ["c1", "c2"] });
+});
+
+it("sin comunicados no registra nada de comunicados", () => {
+  estado.comunicados = [];
+  hoy();
+  expect(estado.lecturas.some((l) => "comunicadoIds" in (l as object))).toBe(false);
+});
+
+it("sin comunicados vigentes, no muestra la sección de novedades del curso", () => {
+  estado.comunicados = [];
+  expect(texto(hoy())).not.toContain("Novedades del curso");
+});
+
 /* ---------- P5 ---------- */
 
 /**
@@ -134,6 +223,28 @@ it("dice el límite del plan gratuito, y no lo dice en premium", () => {
 });
 
 /* ---------- P6 ---------- */
+
+/**
+ * QA del 27 de septiembre: motivar el acompañamiento, no calificar dos veces.
+ * La pantalla solo pinta lo que el servidor ya calculó (lib/insights.ts) —
+ * no decide nada por su cuenta.
+ */
+it("muestra la frase de aliento cuando el servidor la manda", () => {
+  estado.acumulado = { ...(estado.acumulado as object), insight: "Subió 5 puntos desde el parcial anterior — vale la pena celebrarlo en casa." };
+  const t = texto(pintar(
+    <ReporteAcumulado estudianteId={"e1" as never} nombre="Ana Pérez" onVolver={() => {}} onVerAccion={() => {}} />,
+  ));
+  expect(t).toContain("Subió 5 puntos");
+});
+
+it("sin nada positivo que decir, no fuerza ninguna frase", () => {
+  estado.acumulado = { ...(estado.acumulado as object), insight: null };
+  const t = texto(pintar(
+    <ReporteAcumulado estudianteId={"e1" as never} nombre="Ana Pérez" onVolver={() => {}} onVerAccion={() => {}} />,
+  ));
+  expect(t).not.toContain("acompañamiento");
+  expect(t).not.toContain("celebrarlo");
+});
 
 it("avisa cuando el parcial ya cerró y el puntaje no se mueve", () => {
   const ver = () =>
@@ -173,7 +284,20 @@ it("abrir el acumulado registra la lectura de la bitácora", async () => {
 it("abrir el reporte del día registra la lectura del reporte", async () => {
   hoy();
   await act(async () => {});
-  expect(estado.lecturas).toContainEqual({ estudianteId: "e1", recurso: "REPORTE_ESTUDIANTE" });
+  expect(estado.lecturas).toContainEqual({ estudianteId: "e1", recurso: "REPORTE_ESTUDIANTE", reporteEstudianteId: "r1" });
+});
+
+/**
+ * QA del 27 de septiembre: `fraseDeLecturas` solo tiene sentido para una
+ * fotografía real -- la vista en vivo (sin publicar todavía) no tiene un
+ * `reporteEstudianteId` que marcar como leído.
+ */
+it("la vista en vivo (sin id) no manda un reporteEstudianteId a marcar como leído", async () => {
+  estado.hoy = { fecha: "2026-09-09", hay: true, reporte: { ...REPORTE, id: null } };
+  hoy();
+  await act(async () => {});
+  const lectura = estado.lecturas.find((l) => (l as { recurso: string }).recurso === "REPORTE_ESTUDIANTE");
+  expect((lectura as { reporteEstudianteId?: unknown } | undefined)?.reporteEstudianteId).toBeUndefined();
 });
 
 /**

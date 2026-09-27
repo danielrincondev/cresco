@@ -29,6 +29,12 @@ type Recurso = "FICHA_ESTUDIANTE" | "BITACORA_ACCIONES" | "REPORTE_ESTUDIANTE" |
 export function useLecturaSensible(
   estudianteId: Id<"estudiante"> | null | undefined,
   recurso: Recurso,
+  /**
+   * Solo para REPORTE_ESTUDIANTE: marca `entregaReporte.leidoEn` del reporte
+   * concreto, que es lo que cuenta `fraseDeLecturas` para reconocer al
+   * representante que ya volvió a revisar. Se ignora para los demás recursos.
+   */
+  reporteEstudianteId?: Id<"reporteEstudiante"> | null,
 ) {
   const registrar = useMutation(api.auditoria.registrarLecturaSensible);
 
@@ -37,7 +43,7 @@ export function useLecturaSensible(
     let cancelada = false;
     void (async () => {
       try {
-        await registrar({ estudianteId, recurso });
+        await registrar({ estudianteId, recurso, reporteEstudianteId: reporteEstudianteId ?? undefined });
       } catch (error) {
         if (!cancelada) console.warn("[auditoria] no se pudo registrar la lectura:", error);
       }
@@ -45,5 +51,5 @@ export function useLecturaSensible(
     return () => {
       cancelada = true;
     };
-  }, [estudianteId, recurso, registrar]);
+  }, [estudianteId, recurso, reporteEstudianteId, registrar]);
 }

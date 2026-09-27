@@ -32,6 +32,7 @@ const AVISO: Record<Doc<"notificacion">["tipo"], string> = {
   COMUNICADO: "Tu docente publicó un comunicado",
   CITACION: "Tienes una cita",
   RECORDATORIO_CITA: "Tienes una cita",
+  RESUMEN_SEMANAL: "Ya está el resumen de la semana",
   RESPUESTA_INCONFORMIDAD: "Hay novedades sobre tu reclamo",
   ALERTA_EMERGENCIA: "Alerta de emergencia — abre Cresco",
   SISTEMA: "Cresco",

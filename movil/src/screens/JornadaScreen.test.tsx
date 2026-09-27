@@ -6,17 +6,24 @@ import { getFunctionName } from "convex/server";
 const estado = vi.hoisted(() => ({
   asistencia: undefined as unknown,
   campos: undefined as unknown,
+  publicados: [] as unknown[],
   llamadas: [] as { nombre: string; args: unknown }[],
 }));
 
 vi.mock("react-native", async () => ({
   ...(await import("../test/mockReactNative")).reactNative(),
   Platform: { OS: "web" },
+  // `CampoFecha` (el calendario del evento) usa `Modal` para su rejilla.
+  Modal: "Modal",
 }));
 vi.mock("../theme/Icono", () => ({ Icono: "Icono" }));
 vi.mock("convex/react", () => ({
-  useQuery: (ref: Parameters<typeof getFunctionName>[0]) =>
-    getFunctionName(ref) === "conducta:asistenciaDelDia" ? estado.asistencia : estado.campos,
+  useQuery: (ref: Parameters<typeof getFunctionName>[0]) => {
+    const nombre = getFunctionName(ref);
+    if (nombre === "conducta:asistenciaDelDia") return estado.asistencia;
+    if (nombre === "conducta:comunicadosPublicados") return estado.publicados;
+    return estado.campos;
+  },
   useMutation: (ref: Parameters<typeof getFunctionName>[0]) => {
     const nombre = getFunctionName(ref);
     return async (args: unknown) => {
@@ -28,7 +35,7 @@ vi.mock("convex/react", () => ({
 
 const { PublicarComunicado, ReporteGeneral, TomarAsistencia } =
   await import("./JornadaScreen");
-const { Boton, Campo, Opciones } = await import("../components/NucleoUI");
+const { Boton, Campo, Casilla, Opciones } = await import("../components/NucleoUI");
 
 const pintar = (e: React.ReactElement) => {
   let v!: ReactTestRenderer;
@@ -41,6 +48,7 @@ const boton = (v: ReactTestRenderer, etiqueta: string) =>
 
 beforeEach(() => {
   estado.llamadas = [];
+  estado.publicados = [];
   estado.asistencia = {
     fecha: "2026-09-15",
     estudiantes: [
@@ -174,3 +182,85 @@ it("avisa de que no sustituye a una alerta de emergencia", () => {
   const v = pintar(<PublicarComunicado cursoId={"curso" as never} onVolver={() => {}} />);
   expect(texto(v)).toContain("No sustituye a una alerta de emergencia");
 });
+
+/**
+ * QA del 26 de septiembre: la ayuda antigua invitaba a dejar la fecha vacía,
+ * pero el servidor siempre la exige para un evento — publicar reventaba con
+ * un error de validación que se leía como "no hay conexión". Ahora el botón
+ * se desactiva antes de intentarlo.
+ */
+it("sin fecha, un evento no se puede publicar", () => {
+  const v = pintar(<PublicarComunicado cursoId={"curso" as never} onVolver={() => {}} />);
+  act(() => { v.root.findAllByType(Opciones)[0].props.onChange("EVENTO"); });
+  const campos = () => v.root.findAllByType(Campo);
+  act(() => { campos()[0].props.onChangeText("Salida"); });
+  act(() => { campos()[1].props.onChangeText("Vamos al museo"); });
+
+  expect(boton(v, "Publicar al curso").props.disabled).toBe(true);
+});
+
+/** Un evento admite fecha única o plazo (QA del 26 de septiembre): las dos. */
+it("un evento puede durar un plazo, con su fecha de fin", async () => {
+  const v = pintar(<PublicarComunicado cursoId={"curso" as never} onVolver={() => {}} />);
+  act(() => { v.root.findAllByType(Opciones)[0].props.onChange("EVENTO"); });
+  const campos = () => v.root.findAllByType(Campo);
+  act(() => { campos()[0].props.onChangeText("Feria de ciencias"); });
+  act(() => { campos()[1].props.onChangeText("Exposición de proyectos"); });
+  act(() => { campos()[2].props.onChangeText("2026-09-30"); });
+
+  expect(texto(v)).not.toContain("Hasta");
+  act(() => { v.root.findAllByType(Casilla)[0].props.onChange(); });
+  expect(texto(v)).toContain("Hasta");
+  act(() => { campos()[3].props.onChangeText("2026-10-02"); });
+
+  await act(async () => { boton(v, "Publicar al curso").props.onPress(); });
+
+  const envio = estado.llamadas[0].args as Record<string, unknown>;
+  expect(envio).toMatchObject({ fechaEvento: "2026-09-30", fechaEventoFin: "2026-10-02" });
+});
+
+/* ---------- Constancia de lo publicado ---------- */
+
+const PUBLICADO = {
+  id: "k1", tipo: "NOTA_PROFESOR", titulo: "Reunión de padres",
+  publicadoEn: Date.UTC(2026, 8, 15, 15), visibleHasta: "2099-01-01",
+  familias: 3, vistos: 1, faltan: ["Bruno Zambrano", "Luis Mora"],
+};
+
+/**
+ * "Ya no vale que yo le avisé por WhatsApp": el docente ve cuántas familias
+ * vieron cada aviso y, si lo pide, quiénes faltan.
+ */
+it("bajo el formulario, dice cuántas familias vieron cada aviso y quiénes faltan", async () => {
+  estado.publicados = [PUBLICADO];
+  const v = pintar(<PublicarComunicado cursoId={"curso" as never} onVolver={() => {}} />);
+  expect(texto(v)).toContain("Lo que ya publicaste");
+  expect(texto(v)).toContain("Lo vieron 1 de 3 familias.");
+  expect(texto(v)).not.toContain("Luis Mora");
+  await act(async () => boton(v, "Ver quiénes faltan (2)").props.onPress());
+  expect(texto(v)).toContain("Faltan: Bruno Zambrano, Luis Mora.");
+});
+
+it("no promete lectura: dice que cuenta como visto al abrir el reporte", () => {
+  estado.publicados = [PUBLICADO];
+  const t = texto(pintar(<PublicarComunicado cursoId={"curso" as never} onVolver={() => {}} />));
+  expect(t).toContain("Cuenta como visto");
+  expect(t).not.toContain("leído");
+});
+
+it("un aviso que todas las familias vieron lo dice sin lista de pendientes", () => {
+  estado.publicados = [{ ...PUBLICADO, vistos: 3, faltan: [] }];
+  const v = pintar(<PublicarComunicado cursoId={"curso" as never} onVolver={() => {}} />);
+  expect(texto(v)).toContain("Lo vieron todas las familias (3).");
+  expect(v.root.findAllByType(Boton).some((b) => String(b.props.children).startsWith("Ver quiénes faltan"))).toBe(false);
+});
+
+it("marca el aviso que ya dejó de mostrarse a las familias", () => {
+  estado.publicados = [{ ...PUBLICADO, visibleHasta: "2020-01-01" }];
+  expect(texto(pintar(<PublicarComunicado cursoId={"curso" as never} onVolver={() => {}} />))).toContain("Ya no se muestra");
+});
+
+it("sin nada publicado todavía, no muestra la sección", () => {
+  expect(texto(pintar(<PublicarComunicado cursoId={"curso" as never} onVolver={() => {}} />))).not.toContain("Lo que ya publicaste");
+});
+

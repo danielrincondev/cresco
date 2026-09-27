@@ -212,6 +212,23 @@ export function exigirFechaEvento(tipo: string, fechaEvento: string | undefined)
   exigir(!!fechaEvento, "VALIDACION", "Un evento necesita una fecha.");
 }
 
+/**
+ * Un evento puede ser de un solo día o de un plazo — las dos formas están
+ * disponibles. `fechaEventoFin` es opcional; cuando está, no puede quedar
+ * antes que el inicio.
+ */
+export function exigirRangoEventoOpcional(
+  fechaEvento: string | undefined,
+  fechaEventoFin: string | undefined,
+): void {
+  if (fechaEventoFin === undefined) return;
+  exigir(
+    fechaEvento !== undefined && fechaEventoFin >= fechaEvento,
+    "FECHAS_INVALIDAS",
+    "La fecha de fin del evento no puede ser anterior a la de inicio.",
+  );
+}
+
 /** ck_reporte_general_publicado — publicar exige la marca de publicación. */
 export function exigirPublicacionCompleta(
   estado: string,
@@ -262,4 +279,14 @@ export function sumarDias(fecha: string, dias: number): string {
   const [anio, mes, dia] = fecha.split("-").map(Number);
   const d = new Date(Date.UTC(anio, mes - 1, dia + dias));
   return d.toISOString().slice(0, 10);
+}
+
+/**
+ * ¿Cae "YYYY-MM-DD" en sábado o domingo? Misma cuenta que ya usaba
+ * `registrarAccion` para la guarda de día no lectivo, extraída aquí para que
+ * el reporte del día también pueda usarla sin duplicarla.
+ */
+export function esFinDeSemana(fecha: string): boolean {
+  const dia = new Date(`${fecha}T00:00:00Z`).getUTCDay();
+  return dia === 0 || dia === 6;
 }

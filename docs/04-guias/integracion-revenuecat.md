@@ -191,4 +191,13 @@ va a quitar el premium a alguien que todavía pagó por él.
 
 El Test Store permite demostrar una compra completa sin cuenta de Google Play
 (ADR-008). El flujo que conviene grabar es el corto: paywall → compra →
-la función desbloqueada. Con `preview` alcanza; no hace falta `production`.
+la función desbloqueada.
+
+> **Corrección del 26 de septiembre:** esta sección decía "con `preview`
+> alcanza". Ya no es cierto — es justo lo que el aviso de la §1 corrigió. Con
+> `preview` el botón de compra ni siquiera aparece (`src/lib/compras.ts` lo
+> bloquea a propósito, para evitar el cierre forzado). **Hace falta un build
+> del perfil `development`**, conectado a `npm run dev`, para que la clave de
+> prueba sea legítima y la compra se pueda completar de verdad.
+
+No hace falta `production` en ningún caso.

@@ -30,6 +30,7 @@ import type { FunctionReturnType } from "convex/server";
 
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
+import { AnuncioBanner } from "../components/AnuncioBanner";
 import { HijoActivo } from "../components/SelectorDeHijo";
 import { Chip, Chips, EstadoVacio } from "../components/Estado";
 import { EsqueletoPagina } from "../components/Movimiento";
@@ -42,15 +43,53 @@ import {
   Subtitulo,
   Tarjeta,
 } from "../components/NucleoUI";
+import { Icono } from "../theme/Icono";
 import { etiquetaAccion, etiquetaFranja } from "../lib/estados";
 import type { AccionDeLaBitacora } from "./ReclamarScreen";
 import { fechaLegible } from "../lib/fechas";
+import { useComunicadosVistos } from "../lib/useComunicadosVistos";
 import { useLecturaSensible } from "../lib/useLecturaSensible";
-import { Espacio, Franja, Radio, Superficie, Tamano, Texto } from "../theme/Theme";
+import { Espacio, Franja, Marca, Radio, Superficie, Tamano, Texto, TonoEstado } from "../theme/Theme";
 
 type Reporte = NonNullable<
   FunctionReturnType<typeof api.conducta.reporteDeHoy>["reporte"]
 >;
+type Comunicado = FunctionReturnType<typeof api.conducta.comunicadosVigentes>[number];
+
+/**
+ * Notas y eventos del curso, vigentes hoy — QA del 26 de septiembre: "los
+ * eventos no se reflejan en el reporte diario". No era que se reflejaran mal:
+ * nada del lado de la familia leía `comunicadoCurso`, así que no se veían en
+ * ningún sitio. Van después de las acciones del día, nunca antes: son avisos
+ * del curso, no lo que le pasó al estudiante.
+ */
+function NovedadesDelCurso({ comunicados }: { comunicados: Comunicado[] }) {
+  if (comunicados.length === 0) return null;
+  return (
+    <Tarjeta>
+      <Subtitulo>Novedades del curso</Subtitulo>
+      {comunicados.map((c) => (
+        <View key={c.id} style={r.comunicado}>
+          <View style={r.comunicadoEncabezado}>
+            {c.tipo === "EVENTO" && (
+              <Icono nombre="calendar-blank" color={Marca.base} decorativo />
+            )}
+            <Text style={r.comunicadoTitulo}>{c.titulo}</Text>
+          </View>
+          {c.tipo === "EVENTO" && c.fechaEvento && (
+            <Text style={r.etiqueta}>
+              {c.fechaEventoFin && c.fechaEventoFin !== c.fechaEvento
+                ? `Del ${fechaLegible(c.fechaEvento)} al ${fechaLegible(c.fechaEventoFin)}`
+                : fechaLegible(c.fechaEvento)}
+              {c.horaEvento ? ` · ${c.horaEvento}` : ""}
+            </Text>
+          )}
+          <Cuerpo>{c.contenido}</Cuerpo>
+        </View>
+      ))}
+    </Tarjeta>
+  );
+}
 
 /** La tarjeta de un reporte diario, que se reusa en P4 y en P5. */
 function TarjetaReporte({ reporte }: { reporte: Reporte }) {
@@ -64,7 +103,7 @@ function TarjetaReporte({ reporte }: { reporte: Reporte }) {
       {reporte.franja && <Cuerpo>{reporte.franja.frase}</Cuerpo>}
 
       {reporte.asistencia && (
-        <Text style={r.dato}>Asistencia: {reporte.asistencia.toLowerCase()}</Text>
+        <Text style={r.etiqueta}>Asistencia: {reporte.asistencia.toLowerCase()}</Text>
       )}
 
       {reporte.acciones.length === 0 ? (
@@ -76,7 +115,7 @@ function TarjetaReporte({ reporte }: { reporte: Reporte }) {
           <View key={accion.id} style={r.accion}>
             <Chips>
               <Chip etiqueta={etiquetaAccion(accion.estado)} />
-              <Text style={r.dato}>
+              <Text style={r.etiqueta}>
                 {accion.categoria} · {accion.puntos > 0 ? `+${accion.puntos}` : accion.puntos}
               </Text>
             </Chips>
@@ -89,10 +128,53 @@ function TarjetaReporte({ reporte }: { reporte: Reporte }) {
 
       {reporte.general.map((campo) => (
         <View key={campo.etiqueta} style={r.accion}>
-          <Text style={r.dato}>{campo.etiqueta}</Text>
+          <Text style={r.etiqueta}>{campo.etiqueta}</Text>
           <Cuerpo>{campo.texto}</Cuerpo>
         </View>
       ))}
+    </Tarjeta>
+  );
+}
+
+type ResumenSemana = NonNullable<
+  FunctionReturnType<typeof api.conducta.reporteDeHoy>["resumenSemana"]
+>;
+
+/**
+ * QA del 27 de septiembre: un sábado o domingo no hay reporte porque no hay
+ * clases, no porque el docente no lo haya publicado todavía — "todavía no
+ * hay reporte de hoy" decía algo que no era cierto. En su lugar, lo que pasó
+ * en la semana.
+ */
+function ResumenSemanal({ resumen }: { resumen: ResumenSemana }) {
+  return (
+    <Tarjeta>
+      <Subtitulo>Hoy no es día de clases</Subtitulo>
+      <Cuerpo>
+        {`Esto es lo que pasó del ${fechaLegible(resumen.desde)} al ${fechaLegible(resumen.hasta)}.`}
+      </Cuerpo>
+      {resumen.acciones.length === 0 ? (
+        // El mismo criterio que "hoy no hubo anotaciones": una semana sin
+        // novedades es la semana normal de un estudiante, no un hueco.
+        <Cuerpo>Sin novedades de conducta esta semana.</Cuerpo>
+      ) : (
+        <>
+          <Text style={r.etiqueta}>
+            {`Suma ${resumen.puntosPositivos > 0 ? `+${resumen.puntosPositivos}` : 0} · Resta ${resumen.puntosNegativos}`}
+          </Text>
+          {resumen.acciones.map((accion) => (
+            <View key={accion.id} style={r.accion}>
+              <Chips>
+                <Chip etiqueta={etiquetaAccion(accion.estado)} />
+                <Text style={r.etiqueta}>
+                  {`${fechaLegible(accion.fecha)} · ${accion.categoria} · ${accion.puntos > 0 ? `+${accion.puntos}` : accion.puntos}`}
+                </Text>
+              </Chips>
+              <Cuerpo>{accion.descripcion}</Cuerpo>
+            </View>
+          ))}
+        </>
+      )}
     </Tarjeta>
   );
 }
@@ -115,8 +197,14 @@ export function ReporteDeHoy({
   onVerAcumulado: () => void;
 }) {
   const hoy = useQuery(api.conducta.reporteDeHoy, { estudianteId });
-  // DP-006: abrir el reporte de un menor es una lectura sensible.
-  useLecturaSensible(estudianteId, "REPORTE_ESTUDIANTE");
+  const comunicados = useQuery(api.conducta.comunicadosVigentes, { estudianteId });
+  // Constancia para el docente de que esta familia ya tuvo los avisos del
+  // curso en pantalla: ver `comunicadosPublicados`.
+  useComunicadosVistos(estudianteId, comunicados);
+  // DP-006: abrir el reporte de un menor es una lectura sensible. Cuando ya
+  // es una fotografía real (no la vista en vivo, que no tiene id todavía),
+  // esto también marca el reporte como leído -- ver `fraseDeLecturas`.
+  useLecturaSensible(estudianteId, "REPORTE_ESTUDIANTE", hoy?.hay ? hoy.reporte.id : null);
 
   if (hoy === undefined) return <EsqueletoPagina etiqueta="Cargando el reporte" />;
 
@@ -137,6 +225,8 @@ export function ReporteDeHoy({
       )}
       {hoy.hay ? (
         <TarjetaReporte reporte={hoy.reporte} />
+      ) : hoy.finDeSemana && hoy.resumenSemana ? (
+        <ResumenSemanal resumen={hoy.resumenSemana} />
       ) : (
         // Distinto de "no hubo novedades": aqui el docente todavia no ha
         // cerrado el dia. Confundirlos haria que una madre creyera que a su
@@ -146,12 +236,21 @@ export function ReporteDeHoy({
         </EstadoVacio>
       )}
 
+      {/* Después de lo del estudiante, nunca antes: son avisos del curso, no
+          lo que le pasó a él o ella hoy. */}
+      <NovedadesDelCurso comunicados={comunicados ?? []} />
+
       <Boton secundario onPress={onVerAcumulado}>
         Ver el acumulado del parcial
       </Boton>
       <Boton secundario onPress={onVerAnteriores}>
         Ver reportes anteriores
       </Boton>
+
+      {/* Solo el representante llega a este componente — el docente nunca
+          importa ReporteScreen.tsx. Así la regla "los maestros no ven
+          publicidad" se cumple por construcción. */}
+      <AnuncioBanner />
     </Pagina>
   );
 }
@@ -298,9 +397,31 @@ export function ReporteAcumulado({
             una franja como cualquier otra, no una ausencia de datos. */}
         <BarraDeFranjas puntaje={datos.puntaje} />
         {datos.franja && <Cuerpo>{datos.franja.frase}</Cuerpo>}
-        <Text style={r.dato}>
+        <Text style={r.etiqueta}>
           {`Suma ${datos.puntosPositivos > 0 ? `+${datos.puntosPositivos}` : 0} · Resta ${datos.puntosNegativos}`}
         </Text>
+        {/* QA del 27 de septiembre: motivar el acompañamiento, no calificar
+            dos veces. Las tres son calculadas del lado del servidor
+            (lib/insights.ts), nunca generadas, y cada una se queda en
+            silencio en vez de forzar algo que no aplica. La del progreso
+            habla del estudiante; el consejo, de qué hacer; la de lecturas,
+            del propio representante -- por eso pueden aparecer las tres
+            juntas sin repetirse. */}
+        {datos.insight && (
+          <View style={r.aliento}>
+            <Text style={r.alientoTexto}>{datos.insight}</Text>
+          </View>
+        )}
+        {datos.consejo && (
+          <View style={r.aliento}>
+            <Text style={r.alientoTexto}>{datos.consejo}</Text>
+          </View>
+        )}
+        {datos.reconocimiento && (
+          <View style={r.aliento}>
+            <Text style={r.alientoTexto}>{datos.reconocimiento}</Text>
+          </View>
+        )}
         {!datos.periodo && (
           // Sin parcial vigente hoy -- entre dos parciales, o el docente
           // todavia no definio ninguno-- la familia sigue viendo el punto de
@@ -334,7 +455,7 @@ export function ReporteAcumulado({
                 reclamar (P7). Enterrarlo en un submenu seria no darlo. */}
             <Chips>
               <Chip etiqueta={etiquetaAccion(accion.estado)} />
-              <Text style={r.dato}>
+              <Text style={r.etiqueta}>
                 {fechaLegible(accion.fecha)} ·{" "}
                 {accion.puntos > 0 ? `+${accion.puntos}` : accion.puntos}
               </Text>
@@ -355,12 +476,52 @@ export function ReporteAcumulado({
 }
 
 const r = StyleSheet.create({
-  accion: { gap: Espacio.sm },
-  dato: {
+  // Con borde superior: separa cada anotación y cada campo general del
+  // bloque de arriba y entre sí (QA del 26 de septiembre: "dar énfasis a
+  // los subtítulos y contenedores"). Sin esto, dos anotaciones seguidas se
+  // leían como un solo bloque de texto.
+  accion: {
+    gap: Espacio.sm,
+    borderTopWidth: 1,
+    borderTopColor: Superficie.separador,
+    paddingTop: Espacio.sm,
+  },
+  // Metadato (categoría, puntos, fecha, asistencia): mayúsculas y espaciado
+  // de letras para que se lea como una etiqueta y no como una segunda línea
+  // de cuerpo — antes usaba casi el mismo tratamiento que `Cuerpo` y las dos
+  // cosas se confundían a simple vista.
+  etiqueta: {
     color: Texto.secundario,
-    fontFamily: "Inter",
+    fontFamily: "Inter-Semibold",
+    fontSize: Tamano.xs,
+    letterSpacing: 0.4,
+    textTransform: "uppercase",
+    lineHeight: 18,
+  },
+  aliento: {
+    backgroundColor: TonoEstado.positivo.fondo,
+    borderLeftWidth: 4,
+    borderLeftColor: TonoEstado.positivo.borde,
+    borderRadius: Radio.base,
+    padding: Espacio.md,
+  },
+  alientoTexto: {
+    color: TonoEstado.positivo.texto,
+    fontFamily: "Inter-Semibold",
     fontSize: Tamano.sm,
-    lineHeight: 22,
+    lineHeight: 21,
+  },
+  comunicado: {
+    gap: Espacio.xs,
+    borderTopWidth: 1,
+    borderTopColor: Superficie.separador,
+    paddingTop: Espacio.sm,
+  },
+  comunicadoEncabezado: { flexDirection: "row", alignItems: "center", gap: Espacio.xs },
+  comunicadoTitulo: {
+    color: Texto.primario,
+    fontFamily: "Inter-Semibold",
+    fontSize: Tamano.base,
   },
   barra: { paddingVertical: Espacio.sm, width: "100%" },
   barraPista: {

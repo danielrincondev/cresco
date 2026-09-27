@@ -50,7 +50,7 @@ import {
 import { avisoPrivacidad } from "../content/consentimiento";
 import {
   etiquetaAlerta,
-  etiquetaCita,
+  etiquetaCitaAl,
   etiquetaReclamo,
   reclamoRespondible,
   textoModalidad,
@@ -66,6 +66,8 @@ import {
 import { Espacio, Radio, Semantico, Superficie, Tamano, Texto } from "../theme/Theme";
 
 type Curso = FunctionReturnType<typeof api.nucleo.listarCursos>["cursos"][number];
+type CitaDocente = FunctionReturnType<typeof api.interaccion.misCitasDocente>[number];
+type CitaFamilia = FunctionReturnType<typeof api.interaccion.misCitasRepresentante>[number];
 type Reclamo = FunctionReturnType<
   typeof api.interaccion.inconformidadesDelDocente
 >[number];
@@ -236,13 +238,19 @@ export function AgendaDocente({ curso }: { curso: Curso }) {
   const citas = useQuery(api.interaccion.misCitasDocente);
   const publicar = useMutation(api.interaccion.publicarDisponibilidad);
   const responder = useMutation(api.interaccion.responderCita);
+  const registrar = useMutation(api.interaccion.registrarAsistenciaCita);
+  const cancelar = useMutation(api.interaccion.cancelarCita);
   const [fecha, setFecha] = useState(hoyISO());
   const [horaInicio, setInicio] = useState("12:30");
   const [horaFin, setFin] = useState("13:00");
   const [modalidad, setModalidad] = useState<(typeof MODALIDAD)[number]>("PRESENCIAL");
   const [lugar, setLugar] = useState("");
+  const [mostrarTodasPasadas, setMostrarTodasPasadas] = useState(false);
+  const [citando, setCitando] = useState(false);
+  const [cancelando, setCancelando] = useState<CitaDocente>();
   const publicacion = useOperacion();
   const respuesta = useOperacion();
+  const asistencia = useOperacion();
 
   const fechaValida = FORMATO_FECHA.test(fecha);
   const horasValidas = FORMATO_HORA.test(horaInicio) && FORMATO_HORA.test(horaFin);
@@ -261,25 +269,45 @@ export function AgendaDocente({ curso }: { curso: Curso }) {
     if (r.ok) setLugar("");
   }
 
+  if (citando) return <CitarFamilia curso={curso} onCerrar={() => setCitando(false)} />;
+  if (cancelando) {
+    const esCitacionPendiente =
+      cancelando.origen === "CITACION_DOCENTE" && cancelando.estado === "SOLICITADA";
+    return (
+      <PedirMotivo
+        titulo={esCitacionPendiente ? "Retirar la citación" : "Cancelar la cita"}
+        descripcion={`${cancelando.estudianteNombre ?? "Cita"} · ${fechaHoraLegible(cancelando.fechaHoraInicio)}`}
+        etiqueta="Motivo"
+        ayuda="Lo va a leer la familia, y queda en el historial de la cita."
+        placeholder="Surgió una reunión del área..."
+        textoBoton={esCitacionPendiente ? "Retirar la citación" : "Cancelar la cita"}
+        enviar={(motivo) => cancelar({ citaId: cancelando._id, como: "DOCENTE", motivo })}
+        onCerrar={() => setCancelando(undefined)}
+      />
+    );
+  }
+
   const ahora = Date.now();
-  const [mostrarTodasPasadas, setMostrarTodasPasadas] = useState(false);
+  const futura = (c: CitaDocente) => c.fechaHoraInicio > ahora;
+  const ascendente = (a: CitaDocente, b: CitaDocente) => a.fechaHoraInicio - b.fechaHoraInicio;
+  const descendente = (a: CitaDocente, b: CitaDocente) => b.fechaHoraInicio - a.fechaHoraInicio;
+  const lista = citas ?? [];
 
-  const pendientes = (citas ?? [])
-    .filter((c) => c.estado === "SOLICITADA")
-    .sort((a, b) => a.fechaHoraInicio - b.fechaHoraInicio);
-
-  const proximas = (citas ?? [])
-    .filter((c) => c.estado === "CONFIRMADA" && c.fechaHoraFin >= ahora)
-    .sort((a, b) => a.fechaHoraInicio - b.fechaHoraInicio);
-
-  const pasadas = (citas ?? [])
-    .filter(
-      (c) =>
-        c.estado !== "SOLICITADA" &&
-        !(c.estado === "CONFIRMADA" && c.fechaHoraFin >= ahora),
-    )
-    .sort((a, b) => b.fechaHoraInicio - a.fechaHoraInicio);
-
+  // Lo que pidió una familia y espera tu respuesta.
+  const pendientes = lista
+    .filter((c) => c.estado === "SOLICITADA" && c.origen !== "CITACION_DOCENTE" && futura(c))
+    .sort(ascendente);
+  // Lo que citaste tú y espera la respuesta de la familia.
+  const citaciones = lista
+    .filter((c) => c.estado === "SOLICITADA" && c.origen === "CITACION_DOCENTE" && futura(c))
+    .sort(ascendente);
+  const proximas = lista.filter((c) => c.estado === "CONFIRMADA" && futura(c)).sort(ascendente);
+  // Confirmadas cuya hora ya llegó: falta decir si la familia vino.
+  const porRegistrar = lista
+    .filter((c) => c.estado === "CONFIRMADA" && !futura(c))
+    .sort(descendente);
+  const enCurso = new Set([...pendientes, ...citaciones, ...proximas, ...porRegistrar]);
+  const pasadas = lista.filter((c) => !enCurso.has(c)).sort(descendente);
   const pasadasVisibles = mostrarTodasPasadas ? pasadas : pasadas.slice(0, 5);
 
   return (
@@ -331,6 +359,17 @@ export function AgendaDocente({ curso }: { curso: Curso }) {
         </Boton>
       </Tarjeta>
 
+      <Tarjeta>
+        <Subtitulo>Citar a una familia</Subtitulo>
+        <Cuerpo>
+          Usa uno de tus bloques libres. La familia confirma si puede asistir, y
+          la citación queda en tu historial.
+        </Cuerpo>
+        <Boton secundario onPress={() => setCitando(true)}>
+          Citar a una familia
+        </Boton>
+      </Tarjeta>
+
       <Subtitulo>Por confirmar</Subtitulo>
       <ErrorMensaje mensaje={respuesta.error} />
       {citas === undefined ? (
@@ -343,10 +382,7 @@ export function AgendaDocente({ curso }: { curso: Curso }) {
       ) : (
         pendientes.map((cita) => (
           <Tarjeta key={cita._id}>
-            <Chip etiqueta={etiquetaCita(cita.estado)} />
-            <Subtitulo>{fechaHoraLegible(cita.fechaHoraInicio)}</Subtitulo>
-            <Cuerpo>{textoModalidad(cita.modalidad)}</Cuerpo>
-            {cita.motivo && <Cuerpo>{cita.motivo}</Cuerpo>}
+            <DatosCita cita={cita} ahora={ahora} para="DOCENTE" />
             <Boton
               pendiente={respuesta.pendiente}
               onPress={() =>
@@ -372,16 +408,63 @@ export function AgendaDocente({ curso }: { curso: Curso }) {
         ))
       )}
 
+      {porRegistrar.length > 0 && (
+        <>
+          <Subtitulo>¿Vino la familia?</Subtitulo>
+          <ErrorMensaje mensaje={asistencia.error} />
+          {porRegistrar.map((cita) => (
+            <Tarjeta key={cita._id}>
+              <DatosCita cita={cita} ahora={ahora} para="DOCENTE" />
+              <Boton
+                pendiente={asistencia.pendiente}
+                onPress={() =>
+                  void asistencia.ejecutar(() =>
+                    registrar({ citaId: cita._id, asistio: true }),
+                  )
+                }
+              >
+                Sí, vino
+              </Boton>
+              <Boton
+                secundario
+                pendiente={asistencia.pendiente}
+                onPress={() =>
+                  void asistencia.ejecutar(() =>
+                    registrar({ citaId: cita._id, asistio: false }),
+                  )
+                }
+              >
+                No vino
+              </Boton>
+            </Tarjeta>
+          ))}
+        </>
+      )}
+
+      {citaciones.length > 0 && (
+        <>
+          <Subtitulo>Citaciones enviadas</Subtitulo>
+          {citaciones.map((cita) => (
+            <Tarjeta key={cita._id}>
+              <DatosCita cita={cita} ahora={ahora} para="DOCENTE" />
+              <Cuerpo>Esperando que la familia confirme.</Cuerpo>
+              <Boton secundario onPress={() => setCancelando(cita)}>
+                Retirar la citación
+              </Boton>
+            </Tarjeta>
+          ))}
+        </>
+      )}
+
       {proximas.length > 0 && (
         <>
           <Subtitulo>Próximas citas</Subtitulo>
           {proximas.map((cita) => (
             <Tarjeta key={cita._id}>
-              <Chip etiqueta={etiquetaCita(cita.estado)} />
-              <Subtitulo>{fechaHoraLegible(cita.fechaHoraInicio)}</Subtitulo>
-              <Cuerpo>{textoModalidad(cita.modalidad)}</Cuerpo>
-              {cita.motivo && <Cuerpo>{cita.motivo}</Cuerpo>}
-              {cita.notasDocente && <Cuerpo>{cita.notasDocente}</Cuerpo>}
+              <DatosCita cita={cita} ahora={ahora} para="DOCENTE" />
+              <Boton secundario onPress={() => setCancelando(cita)}>
+                Cancelar la cita
+              </Boton>
             </Tarjeta>
           ))}
         </>
@@ -392,9 +475,7 @@ export function AgendaDocente({ curso }: { curso: Curso }) {
           <Subtitulo>Historial de citas</Subtitulo>
           {pasadasVisibles.map((cita) => (
             <Tarjeta key={cita._id}>
-              <Chip etiqueta={etiquetaCita(cita.estado)} />
-              <Cuerpo>{fechaHoraLegible(cita.fechaHoraInicio)}</Cuerpo>
-              {cita.motivo && <Cuerpo>{cita.motivo}</Cuerpo>}
+              <DatosCita cita={cita} ahora={ahora} para="DOCENTE" />
             </Tarjeta>
           ))}
           {pasadas.length > 5 && (
@@ -409,6 +490,257 @@ export function AgendaDocente({ curso }: { curso: Curso }) {
           )}
         </>
       )}
+    </Pagina>
+  );
+}
+
+/**
+ * Lo que se dice de una cita en cualquier lista, del lado que sea: su estado,
+ * cuándo, de qué estudiante, y lo que cada parte escribió. Todo lo escrito lo
+ * ven las dos partes — ver `notasDocente` en el esquema —, así que aquí no
+ * hay nada que esconderle a nadie; solo cambia cómo se nombra a quién.
+ */
+function DatosCita({
+  cita,
+  ahora,
+  para,
+}: {
+  cita: CitaDocente | CitaFamilia;
+  ahora: number;
+  para: "DOCENTE" | "REPRESENTANTE";
+}) {
+  const quien = cita.estudianteNombre;
+  return (
+    <>
+      <Chip etiqueta={etiquetaCitaAl(cita.estado, cita.fechaHoraInicio, ahora)} />
+      {cita.origen === "CITACION_DOCENTE" && (
+        <Text style={i.etiqueta}>
+          {para === "DOCENTE" ? "Citación tuya" : "Citación del docente"}
+        </Text>
+      )}
+      <Subtitulo>{fechaHoraLegible(cita.fechaHoraInicio)}</Subtitulo>
+      <Cuerpo>
+        {quien ? `${quien} · ${textoModalidad(cita.modalidad)}` : textoModalidad(cita.modalidad)}
+      </Cuerpo>
+      {cita.lugarOEnlace && <Cuerpo>{cita.lugarOEnlace}</Cuerpo>}
+      {cita.motivo && <Cuerpo>{cita.motivo}</Cuerpo>}
+      {cita.notasDocente && <Cuerpo>{cita.notasDocente}</Cuerpo>}
+      {cita.mensajeRepresentante && (
+        <Cuerpo>
+          {para === "DOCENTE"
+            ? `La familia escribió: ${cita.mensajeRepresentante}`
+            : `Le escribiste: ${cita.mensajeRepresentante}`}
+        </Cuerpo>
+      )}
+      {cita.estado === "CANCELADA" && cita.motivoCancelacion && (
+        <Cuerpo>
+          {`${
+            cita.canceladaPor === para
+              ? "La cancelaste tú"
+              : cita.canceladaPor === "DOCENTE"
+                ? "La canceló el docente"
+                : "La canceló la familia"
+          }: ${cita.motivoCancelacion}`}
+        </Cuerpo>
+      )}
+    </>
+  );
+}
+
+/**
+ * Cancelar una cita y decir que no se puede asistir a una citación piden lo
+ * mismo: un texto que va a leer la otra parte. Ninguna de las dos cosas se
+ * hace en silencio, así que el botón no se habilita hasta que haya algo
+ * escrito — la misma regla que ya sigue la respuesta a un reclamo.
+ */
+function PedirMotivo({
+  titulo,
+  descripcion,
+  etiqueta,
+  ayuda,
+  placeholder,
+  textoBoton,
+  enviar,
+  onCerrar,
+}: {
+  titulo: string;
+  descripcion: string;
+  etiqueta: string;
+  ayuda: string;
+  placeholder: string;
+  textoBoton: string;
+  enviar: (texto: string) => Promise<unknown>;
+  onCerrar: () => void;
+}) {
+  const [texto, setTexto] = useState("");
+  const op = useOperacion();
+
+  async function confirmar() {
+    const r = await op.ejecutar(() => enviar(texto.trim()));
+    if (r.ok) onCerrar();
+  }
+
+  return (
+    <Pagina titulo={titulo} descripcion={descripcion} atras={{ onPress: onCerrar }}>
+      <Campo
+        etiqueta={etiqueta}
+        ayuda={ayuda}
+        multiline
+        numberOfLines={3}
+        maxLength={500}
+        value={texto}
+        onChangeText={setTexto}
+        placeholder={placeholder}
+        editable={!op.pendiente}
+      />
+      <ErrorMensaje mensaje={op.error} />
+      <Boton pendiente={op.pendiente} disabled={!texto.trim()} onPress={() => void confirmar()}>
+        {textoBoton}
+      </Boton>
+      <Boton secundario onPress={onCerrar}>
+        Volver
+      </Boton>
+    </Pagina>
+  );
+}
+
+/**
+ * El docente cita a una familia: a quién, en cuál de sus bloques libres, y
+ * por qué. El bloque sale de la franja que ya publicó — en un plantel fiscal
+ * se recibe a las familias en el horario que asigna la institución, no a
+ * cualquier hora —, y el motivo es obligatorio porque es lo primero que la
+ * familia lee y lo que queda en el historial.
+ */
+function CitarFamilia({ curso, onCerrar }: { curso: Curso; onCerrar: () => void }) {
+  const { results: estudiantes, status, loadMore } = usePaginatedQuery(
+    api.nucleo.listarEstudiantes,
+    { cursoId: curso.id },
+    { initialNumItems: 40 },
+  );
+  const bloques = useQuery(api.interaccion.misBloquesLibres, { desde: hoyISO() });
+  const citar = useMutation(api.interaccion.citarFamilia);
+  const [elegido, setElegido] = useState<{ id: Id<"estudiante">; nombre: string }>();
+  const [motivo, setMotivo] = useState("");
+  const [enviada, setEnviada] = useState(false);
+  const op = useOperacion();
+
+  if (elegido && enviada) {
+    return (
+      <Pagina titulo="Citación enviada" descripcion={elegido.nombre}>
+        <Tarjeta>
+          <Cuerpo>
+            La familia la ve en Cresco y te avisamos cuando responda. Mientras
+            tanto, ese bloque queda reservado para ella.
+          </Cuerpo>
+        </Tarjeta>
+        <Boton onPress={onCerrar}>Volver a la agenda</Boton>
+      </Pagina>
+    );
+  }
+
+  if (!elegido) {
+    return (
+      <Pagina
+        titulo="Citar a una familia"
+        descripcion={`${curso.nombre}. Elige al estudiante.`}
+        atras={{ onPress: onCerrar }}
+      >
+        {status === "LoadingFirstPage" ? (
+          <Cargando mensaje="Cargando el curso..." />
+        ) : estudiantes.length === 0 ? (
+          <EstadoVacio icono="account-group" titulo="Todavía no hay estudiantes aprobados">
+            Cuando apruebes los registros de las familias, vas a poder citarlas aquí.
+          </EstadoVacio>
+        ) : (
+          estudiantes.map((e) => (
+            <Tarjeta key={e.estudianteId}>
+              <Subtitulo>
+                {e.nombres} {e.apellidos}
+              </Subtitulo>
+              <Boton
+                secundario
+                onPress={() =>
+                  setElegido({ id: e.estudianteId, nombre: `${e.nombres} ${e.apellidos}` })
+                }
+              >
+                Citar a su familia
+              </Boton>
+            </Tarjeta>
+          ))
+        )}
+        {status === "CanLoadMore" && (
+          <Boton secundario onPress={() => loadMore(40)}>
+            Ver más estudiantes
+          </Boton>
+        )}
+        <Boton secundario onPress={onCerrar}>
+          Volver
+        </Boton>
+      </Pagina>
+    );
+  }
+
+  // Un bloque de hoy cuya hora ya pasó sigue "libre" en la base, pero el
+  // servidor lo rechazaría: mejor no ofrecerlo.
+  const ahora = Date.now();
+  const libres = (bloques ?? []).filter(
+    (b) => new Date(`${b.fecha}T${b.horaInicio}:00-05:00`).getTime() > ahora,
+  );
+
+  async function citarEn(disponibilidadDocenteId: Id<"disponibilidadDocente">) {
+    if (!elegido) return;
+    const r = await op.ejecutar(() =>
+      citar({ disponibilidadDocenteId, estudianteId: elegido.id, motivo: motivo.trim() }),
+    );
+    if (r.ok) setEnviada(true);
+  }
+
+  return (
+    <Pagina
+      titulo={`Citar a la familia de ${elegido.nombre}`}
+      descripcion="Escribe el motivo y elige uno de tus bloques libres."
+      atras={{ onPress: () => setElegido(undefined) }}
+    >
+      <Campo
+        etiqueta="Motivo"
+        ayuda="Obligatorio. Es lo primero que lee la familia, y queda en el historial de la cita."
+        multiline
+        numberOfLines={3}
+        maxLength={500}
+        value={motivo}
+        onChangeText={setMotivo}
+        placeholder="Quisiera conversar sobre..."
+        editable={!op.pendiente}
+      />
+      <ErrorMensaje mensaje={op.error} />
+      {bloques === undefined ? (
+        <Cargando />
+      ) : libres.length === 0 ? (
+        <EstadoVacio icono="calendar-remove" titulo="No tienes bloques libres">
+          La citación usa uno de tus bloques de atención. Publica primero una
+          franja desde tu agenda.
+        </EstadoVacio>
+      ) : (
+        libres.map((bloque) => (
+          <Tarjeta key={bloque.id}>
+            <Subtitulo>{fechaLegible(bloque.fecha)}</Subtitulo>
+            <Cuerpo>
+              {bloque.horaInicio} — {bloque.horaFin} · {textoModalidad(bloque.modalidad)}
+            </Cuerpo>
+            {bloque.lugarOEnlace && <Cuerpo>{bloque.lugarOEnlace}</Cuerpo>}
+            <Boton
+              pendiente={op.pendiente}
+              disabled={!motivo.trim()}
+              onPress={() => void citarEn(bloque.id)}
+            >
+              Citar en este horario
+            </Boton>
+          </Tarjeta>
+        ))
+      )}
+      <Boton secundario onPress={() => setElegido(undefined)}>
+        Elegir otro estudiante
+      </Boton>
     </Pagina>
   );
 }
@@ -594,7 +926,12 @@ export function CitasFamilia() {
     { initialNumItems: 20 },
   );
   const citas = useQuery(api.interaccion.misCitasRepresentante);
+  const responderCitacion = useMutation(api.interaccion.responderCitacion);
+  const cancelar = useMutation(api.interaccion.cancelarCita);
   const [eligiendo, setEligiendo] = useState<Id<"estudiante">>();
+  const [declinando, setDeclinando] = useState<CitaFamilia>();
+  const [cancelando, setCancelando] = useState<CitaFamilia>();
+  const respuesta = useOperacion();
 
   const hijo = hijos.find((h) => h.estudianteId === eligiendo);
   if (hijo) {
@@ -606,12 +943,81 @@ export function CitasFamilia() {
       />
     );
   }
+  if (declinando) {
+    return (
+      <PedirMotivo
+        titulo="No puedo asistir"
+        descripcion={`${declinando.estudianteNombre ?? "Citación"} · ${fechaHoraLegible(declinando.fechaHoraInicio)}`}
+        etiqueta="Tu mensaje para el docente"
+        ayuda="Obligatorio. Cuéntale por qué, y si puedes, cuándo sí podrías."
+        placeholder="Trabajo a esa hora; podría el..."
+        textoBoton="Enviar al docente"
+        enviar={(mensaje) =>
+          responderCitacion({ citaId: declinando._id, asistira: false, mensaje })
+        }
+        onCerrar={() => setDeclinando(undefined)}
+      />
+    );
+  }
+  if (cancelando) {
+    const esSolicitud = cancelando.estado === "SOLICITADA";
+    return (
+      <PedirMotivo
+        titulo={esSolicitud ? "Retirar la solicitud" : "Cancelar la cita"}
+        descripcion={`${cancelando.estudianteNombre ?? "Cita"} · ${fechaHoraLegible(cancelando.fechaHoraInicio)}`}
+        etiqueta="Motivo"
+        ayuda="Lo va a leer el docente."
+        placeholder="No voy a poder llegar porque..."
+        textoBoton={esSolicitud ? "Retirar la solicitud" : "Cancelar la cita"}
+        enviar={(motivo) =>
+          cancelar({ citaId: cancelando._id, como: "REPRESENTANTE", motivo })
+        }
+        onCerrar={() => setCancelando(undefined)}
+      />
+    );
+  }
+
+  const ahora = Date.now();
+  // Una citación sin responder va arriba de todo: es lo único de esta
+  // pantalla que alguien está esperando de la familia.
+  const citaciones = (citas ?? [])
+    .filter(
+      (c) =>
+        c.origen === "CITACION_DOCENTE" && c.estado === "SOLICITADA" && c.fechaHoraInicio > ahora,
+    )
+    .sort((a, b) => a.fechaHoraInicio - b.fechaHoraInicio);
+  const resto = (citas ?? []).filter((c) => !citaciones.includes(c));
 
   return (
     <Pagina
       titulo="Citas"
       descripcion="Reserva un momento con el docente. Él confirma si puede."
     >
+      {citaciones.length > 0 && (
+        <>
+          <Subtitulo>El docente te citó</Subtitulo>
+          <ErrorMensaje mensaje={respuesta.error} />
+          {citaciones.map((cita) => (
+            <Tarjeta key={cita._id}>
+              <DatosCita cita={cita} ahora={ahora} para="REPRESENTANTE" />
+              <Boton
+                pendiente={respuesta.pendiente}
+                onPress={() =>
+                  void respuesta.ejecutar(() =>
+                    responderCitacion({ citaId: cita._id, asistira: true }),
+                  )
+                }
+              >
+                Voy a asistir
+              </Boton>
+              <Boton secundario onPress={() => setDeclinando(cita)}>
+                No puedo asistir
+              </Boton>
+            </Tarjeta>
+          ))}
+        </>
+      )}
+
       <Subtitulo>Pedir una cita</Subtitulo>
       {status === "LoadingFirstPage" ? (
         <Cargando />
@@ -644,25 +1050,30 @@ export function CitasFamilia() {
       <Subtitulo>Tus citas, de todos tus cursos</Subtitulo>
       {citas === undefined ? (
         <Cargando />
-      ) : citas.length === 0 ? (
+      ) : resto.length === 0 ? (
         <EstadoVacio icono="calendar-blank" titulo="Sin citas por ahora">
-          Aquí van a aparecer las que pidas, con su estado.
+          Aquí van a aparecer las que pidas y las citaciones del docente, con su estado.
         </EstadoVacio>
       ) : (
-        citas.map((cita) => (
-          <Tarjeta key={cita._id}>
-            <Chip etiqueta={etiquetaCita(cita.estado)} />
-            <Subtitulo>{fechaHoraLegible(cita.fechaHoraInicio)}</Subtitulo>
-            <Cuerpo>{textoModalidad(cita.modalidad)}</Cuerpo>
-            {cita.estado === "SOLICITADA" && (
-              <Cuerpo>
-                Todavía no está confirmada. No vayas hasta que el docente
-                responda.
-              </Cuerpo>
-            )}
-            {cita.notasDocente && <Cuerpo>{cita.notasDocente}</Cuerpo>}
-          </Tarjeta>
-        ))
+        resto.map((cita) => {
+          const porVenir = cita.fechaHoraInicio > ahora;
+          return (
+            <Tarjeta key={cita._id}>
+              <DatosCita cita={cita} ahora={ahora} para="REPRESENTANTE" />
+              {cita.estado === "SOLICITADA" && porVenir && (
+                <Cuerpo>
+                  Todavía no está confirmada. No vayas hasta que el docente
+                  responda.
+                </Cuerpo>
+              )}
+              {(cita.estado === "SOLICITADA" || cita.estado === "CONFIRMADA") && porVenir && (
+                <Boton secundario onPress={() => setCancelando(cita)}>
+                  {cita.estado === "SOLICITADA" ? "Retirar la solicitud" : "Cancelar la cita"}
+                </Boton>
+              )}
+            </Tarjeta>
+          );
+        })
       )}
     </Pagina>
   );
@@ -1126,7 +1537,21 @@ export function Ajustes({
  * Bandeja de notificaciones — la usan los dos roles
  * ======================================================================= */
 
-export function Notificaciones() {
+export type Notificacion = NonNullable<
+  FunctionReturnType<typeof api.interaccion.misNotificaciones>
+>[number];
+
+export function Notificaciones({
+  onAbrir,
+}: {
+  /**
+   * Al tocar una notificación, además de marcarla leída (QA del 26 de
+   * septiembre: "al apretar una notificación debería enviar a la pantalla
+   * que corresponde"). Opcional: sin esto la campana sigue funcionando como
+   * antes, solo marcando la lectura.
+   */
+  onAbrir?: (n: Notificacion) => void;
+}) {
   const notificaciones = useQuery(api.interaccion.misNotificaciones);
   const marcar = useMutation(api.interaccion.marcarNotificacionLeida);
   const op = useOperacion();
@@ -1147,11 +1572,10 @@ export function Notificaciones() {
             key={n._id}
             accessibilityRole="button"
             accessibilityLabel={n.leidaEn ? `${n.titulo}, leída` : `${n.titulo}, sin leer`}
-            onPress={() =>
-              n.leidaEn
-                ? undefined
-                : void op.ejecutar(() => marcar({ notificacionId: n._id }))
-            }
+            onPress={() => {
+              if (!n.leidaEn) void op.ejecutar(() => marcar({ notificacionId: n._id }));
+              onAbrir?.(n);
+            }}
           >
             <View style={[i.notificacion, !n.leidaEn && i.sinLeer]}>
               <Subtitulo>{n.titulo}</Subtitulo>
