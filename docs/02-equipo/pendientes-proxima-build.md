@@ -23,38 +23,96 @@ de la build, para que no se confunda con lo que sí la espera.
 ## 1. Informe imprimible del reporte acumulado (representante)
 
 **Qué:** un PDF del reporte acumulado del parcial, listo para compartir por
-WhatsApp. En Premium se genera directo. En el plan gratis se desbloquea viendo
-un anuncio con premio (*rewarded*).
+WhatsApp.
 
-**Por qué es urgente, aunque espere a la build:** el paywall **ya lo promete**.
-`PaywallScreen.tsx` dice "Informe imprimible viendo un anuncio" (gratis) e
-"Informe imprimible cuando llegue" (Premium), leyendo `limites.exportarPdf` de
-los planes sembrados en `semillas.ts` (`CON_ANUNCIO` / `LIBRE`). Hoy esa
-función no existe: quien abra el paywall ve una promesa vacía.
+**Lo que el muro de pago ya promete, y que esto tiene que cumplir tal cual.**
+Decisión de Kenny del 27 de septiembre: el texto del muro de pago **no se
+cambia**, porque esta tanda lo vuelve cierto. Por eso este punto solo está
+terminado cuando se cumplen las dos promesas como están escritas hoy en
+`PaywallScreen.tsx` (`limitesLegibles`, que las arma con `limites.exportarPdf`
+de los planes de `semillas.ts`):
 
-**Qué ya está hecho y qué falta:**
+| Plan | Lo que dice el muro de pago | Lo que tiene que pasar |
+|---|---|---|
+| Gratuito (`CON_ANUNCIO`) | "Informe imprimible viendo un anuncio" | Mira un anuncio con premio y obtiene el PDF |
+| Premium (`LIBRE`) | "Informe imprimible cuando llegue" | Obtiene el PDF directo, sin anuncio. Al terminar, el texto pasa a "Informe imprimible": ya llegó |
 
-- Ya existe: el campo `exportarPdf` en los planes, y la tabla
-  `desbloqueoRecompensado` en el esquema ("E6 / I2: exportar el PDF acumulado
-  viendo un anuncio recompensado"), **sin ningún productor todavía**.
-- Ya existe: `react-native-google-mobile-ads` (fijado en 17.0.0, ver la guía
-  de RevenueCat), que también trae anuncios *rewarded*. No hace falta otro SDK
-  de anuncios.
-- Falta, **nativo**: `expo-print` para generar el PDF y `expo-sharing` para
-  compartirlo. Estas dos son las que obligan a la build nueva.
-- Falta, sin build: la consulta que arma el contenido del informe, la
-  mutación que registra y consume el desbloqueo, y el botón en la pantalla del
-  acumulado.
+Hasta que la build nueva esté instalada, en el teléfono donde se muestre la
+app esas dos líneas prometen algo que ahí todavía no existe.
+
+**Lo que ya está hecho**
+
+- El recurso `EXPORTAR_PDF_ACUMULADO` (`RECURSO_DESBLOQUEABLE` en `enums.ts`) y
+  la tabla `desbloqueoRecompensado` (`otorgadoEn`, `expiraEn`, `consumidoEn`),
+  **sin ningún productor todavía**.
+- `react-native-google-mobile-ads` 17.0.0 ya trae `RewardedAd`, el anuncio con
+  premio. No hace falta otro SDK de anuncios.
+- `react-native-purchases` 10.9.1 ya trae `Purchases.adTracker` (el banner lo
+  usa) y la verificación de recompensas de RevenueCat
+  (`generateRewardVerificationToken` y `pollRewardVerification`, implementadas
+  también en Android). Ver el riesgo aceptado, al final de este punto.
+
+**Parte 1 — sin build: se puede adelantar y dejar probada antes de la tanda**
+
+1. `prepararInforme({ estudianteId })` en `conducta.ts`. Es una mutation y no
+   una query, porque consume el desbloqueo y deja auditoría:
+   - `exigirVinculo`.
+   - Premium vigente (la misma regla que `reportesAnteriores`: entitlement
+     `premium` con `tieneAccesoVigente`): sigue.
+   - Gratuito: exige un `desbloqueoRecompensado` del perfil para
+     `EXPORTAR_PDF_ACUMULADO`, sin `consumidoEn` y con `expiraEn` en el futuro,
+     y lo marca consumido. Sin eso, error `SIN_DESBLOQUEO`: "Mira el anuncio
+     para desbloquear el informe".
+   - Registra `EXPORTAR` en la auditoría. DP-006 lo dejó para la v2 porque
+     nada exportaba; esto sí saca de la aplicación datos de un menor.
+   - Devuelve lo mismo que `reporteAcumulado` (parcial, puntaje, franja,
+     bitácora), más el estudiante, el curso, el docente y la fecha de
+     generación.
+2. `otorgarDesbloqueo({ recurso })`: crea el desbloqueo con una vigencia corta
+   (30 minutos, como constante nueva). Lo llama la app cuando el anuncio avisa
+   que se ganó el premio.
+3. `src/lib/informe.ts`: una función pura que arma el HTML del informe con esos
+   datos, con la advertencia de DP-009 al pie: no reemplaza el expediente del
+   plantel.
+4. Pruebas: Premium sin desbloqueo; gratuito con y sin desbloqueo; desbloqueo
+   vencido; un desbloqueo no sirve dos veces; una familia no exporta el
+   informe de un hijo ajeno; el HTML.
+
+**Parte 2 — con build**
+
+5. `npx expo install expo-print expo-sharing`, que elige las versiones de
+   Expo SDK 57. Son los dos módulos nativos que obligan a la build.
+6. En `ReporteAcumulado`, un botón "Informe imprimible (PDF)":
+   - Premium: `prepararInforme` → `Print.printToFileAsync({ html })` →
+     `Sharing.shareAsync(uri, { mimeType: "application/pdf" })`.
+   - Gratuito: `RewardedAd` con el ID de prueba de Google para anuncios con
+     premio en Android (`ca-app-pub-3940256099942544/5224354917`) hasta tener
+     cuenta de AdMob. Con `RewardedAdEventType.EARNED_REWARD`, llama a
+     `otorgarDesbloqueo` y sigue igual que Premium. Se reporta a RevenueCat con
+     `Purchases.adTracker`, como el banner, con `adFormat: "rewarded"`.
+7. En `limitesLegibles`, "Informe imprimible cuando llegue" pasa a decir
+   "Informe imprimible".
+
+**Cuándo está terminado:** en la build "Beta", con dos cuentas. La gratuita ve
+el anuncio, obtiene el PDF, y una segunda exportación le pide otro anuncio. La
+Premium obtiene el PDF directo, sin anuncio. El PDF se abre y se comparte por
+WhatsApp.
+
+**Riesgo aceptado, y cómo cerrarlo después:** así, una app modificada podría
+llamar a `otorgarDesbloqueo` sin haber visto el anuncio; lo que se llevaría es
+un PDF gratis. Lo cierra la verificación de recompensas de RevenueCat:
+`generateRewardVerificationToken` antes de mostrar el anuncio,
+`pollRewardVerification` al terminar, y el desbloqueo solo si RevenueCat
+confirma. Necesita la verificación del lado del servidor (SSV) configurada en
+una unidad de anuncio propia en la consola de AdMob, así que espera a que el
+proyecto tenga su cuenta: en los ID de prueba de Google no hay dónde
+configurarla.
 
 **Relación con DP-009:** DP-009 difiere a la v2 el informe imprimible **del
 docente** (la carpeta de evidencia para el distrito). Este es el del
 **representante**, que es otro documento y otra audiencia, pero el generador
 del PDF sirve para los dos. Vale la advertencia de DP-009: nada de este
 informe debe dar a entender que reemplaza el expediente en papel del plantel.
-
-**Mientras no haya build:** si se graba el video o se presenta la app antes de
-hacer esto, cambiar el texto del paywall para que no prometa lo que no existe.
-Es un cambio de solo JS.
 
 ---
 
