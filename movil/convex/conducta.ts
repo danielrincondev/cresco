@@ -982,6 +982,88 @@ export const comunicadosPublicados = query({
   }),
 });
 
+/** Los días de reporte que ve el docente: una semana de clases. */
+const DIAS_DE_LECTURAS = 5;
+/** "Reportes anteriores" muestra a lo sumo siete (premium); esto deja margen. */
+const REPORTES_VISTOS_POR_LLAMADA = 20;
+
+/**
+ * Quién abrió el reporte de cada uno de los últimos días, y quién falta.
+ *
+ * Lo mismo que `comunicadosPublicados`, para lo que más se usa: el reporte del
+ * día. Una familia es una entrega (`entregaReporte`): el reporte de un
+ * estudiante enviado a su representante. Si un estudiante no tuvo reporte ese
+ * día —el cierre nocturno solo lo genera cuando hubo anotaciones—, ese día no
+ * lo cuenta. "Abrió", no "leyó": se registra cuando la familia tiene el reporte
+ * en pantalla, el del día (`registrarLecturaSensible`) o después, en "Reportes
+ * anteriores" (`marcarReportesVistos`).
+ */
+export const lecturasDeReportes = query({
+  args: { cursoId: v.id("curso") },
+  handler: (ctx, args) => conErroresPublicos(async () => {
+    await exigirTitularDelCurso(ctx, args.cursoId);
+    const matriculas = await ctx.db.query("matricula")
+      .withIndex("por_curso_estado", (q) => q.eq("cursoId", args.cursoId).eq("estado", "CURSANDO")).collect();
+    const porFecha = new Map<string, { fecha: string; familias: number; abiertos: number; faltan: string[] }>();
+    for (const matricula of matriculas) {
+      const estudiante = await ctx.db.get(matricula.estudianteId);
+      const nombre = estudiante === null ? "Estudiante" : `${estudiante.nombres} ${estudiante.apellidos}`;
+      // Los días más recientes del curso están entre los últimos de cada
+      // estudiante: si alguien tuviera cinco reportes más nuevos que un día,
+      // ese día ya no sería de los cinco más recientes del curso.
+      const reportes = await ctx.db.query("reporteEstudiante")
+        .withIndex("por_matricula_fecha", (q) => q.eq("matriculaId", matricula._id))
+        .order("desc").take(DIAS_DE_LECTURAS);
+      for (const reporte of reportes) {
+        const entrega = await ctx.db.query("entregaReporte")
+          .withIndex("por_reporte_representante", (q) => q.eq("reporteEstudianteId", reporte._id)).first();
+        if (entrega === null) continue;
+        const dia = porFecha.get(reporte.fecha) ?? { fecha: reporte.fecha, familias: 0, abiertos: 0, faltan: [] };
+        dia.familias++;
+        if (entrega.leidoEn !== undefined) dia.abiertos++;
+        else dia.faltan.push(nombre);
+        porFecha.set(reporte.fecha, dia);
+      }
+    }
+    return [...porFecha.values()]
+      .sort((a, b) => b.fecha.localeCompare(a.fecha))
+      .slice(0, DIAS_DE_LECTURAS)
+      .map((dia) => ({ ...dia, faltan: dia.faltan.sort((a, b) => a.localeCompare(b, "es")) }));
+  }),
+});
+
+/**
+ * La familia tuvo estos reportes en pantalla, en "Reportes anteriores".
+ *
+ * Sin esto, un reporte publicado a las 22:00 por el cierre nocturno y leído a
+ * la mañana siguiente nunca contaba como abierto: `registrarLecturaSensible`
+ * solo lo marca desde el reporte del día, y a la mañana siguiente ese ya es
+ * otro. Solo marca reportes de este hijo, entregados a este representante, y
+ * nunca pisa la primera vez que se abrió.
+ */
+export const marcarReportesVistos = mutation({
+  args: { estudianteId: v.id("estudiante"), reporteEstudianteIds: v.array(v.id("reporteEstudiante")) },
+  handler: (ctx, args) => conErroresPublicos(async () => {
+    const vinculo = await exigirVinculo(ctx, args.estudianteId);
+    if (args.reporteEstudianteIds.length > REPORTES_VISTOS_POR_LLAMADA) {
+      throw new ErrorDominio("VALIDACION", "Son demasiados reportes de una sola vez.");
+    }
+    let marcados = 0;
+    for (const reporteId of new Set(args.reporteEstudianteIds)) {
+      const reporte = await ctx.db.get(reporteId);
+      const matricula = reporte === null ? null : await ctx.db.get(reporte.matriculaId);
+      if (matricula === null || matricula.estudianteId !== args.estudianteId) continue;
+      const entrega = await ctx.db.query("entregaReporte")
+        .withIndex("por_reporte_representante", (q) => q.eq("reporteEstudianteId", reporteId).eq("representanteId", vinculo.representanteId))
+        .unique();
+      if (entrega === null || entrega.leidoEn !== undefined) continue;
+      await ctx.db.patch(entrega._id, { leidoEn: Date.now() });
+      marcados++;
+    }
+    return marcados;
+  }),
+});
+
 /** Solo invocable por cron. Publica borradores de la fecha y evita duplicar reportes. */
 export const cierreNocturno = internalMutation({
   args: { fecha: v.optional(v.string()) },

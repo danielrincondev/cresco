@@ -205,6 +205,21 @@ it("sin comunicados vigentes, no muestra la sección de novedades del curso", ()
 /* ---------- P5 ---------- */
 
 /**
+ * Un reporte de las 22:00 casi siempre se lee al día siguiente, y ahí ya está
+ * en "Reportes anteriores": verlo en esa lista también cuenta como abierto.
+ */
+it("en Reportes anteriores, deja constancia de que la familia abrió lo que ve", () => {
+  estado.anteriores = { limite: 7, premium: true, reportes: [REPORTE, { ...REPORTE, id: "r0", fecha: "2026-09-08" }] };
+  pintar(
+    <ReportesAnteriores
+      estudianteId={"e1" as never} nombre="Ana Pérez"
+      onVolver={() => {}} onVerPlan={() => {}}
+    />,
+  );
+  expect(estado.lecturas).toContainEqual({ estudianteId: "e1", reporteEstudianteIds: ["r0", "r1"] });
+});
+
+/**
  * Una lista que se corta en silencio se lee como que no hay más. El límite del
  * plan se dice siempre, no solo al chocar con él.
  */

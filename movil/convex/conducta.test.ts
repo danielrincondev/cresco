@@ -873,10 +873,11 @@ describe("reporteAcumulado — frase de aliento", () => {
   });
 
   /**
-   * El camino completo: `registrarLecturaSensible` es lo único que escribe
+   * El camino completo: `registrarLecturaSensible` escribe
    * `entregaReporte.leidoEn`, y es exactamente lo que `ReporteDeHoy` llama al
-   * abrirse (`useLecturaSensible`). Se prueba el camino real, no el atajo de
-   * escribir `leidoEn` a mano.
+   * abrirse (`useLecturaSensible`). La otra vía, "Reportes anteriores"
+   * (`marcarReportesVistos`), tiene sus propias pruebas más abajo. Se prueba el
+   * camino real, no el atajo de escribir `leidoEn` a mano.
    */
   it("reconoce al representante que ya revisó más de un reporte diario este parcial", async () => {
     const t = convexTest(schema, modules);
@@ -1155,25 +1156,25 @@ describe("resumen semanal por push", () => {
   });
 });
 
+/** Un segundo estudiante en el mismo curso, con su propia familia. */
+async function otroEstudiante(t: ReturnType<typeof convexTest>, e: Awaited<ReturnType<typeof sembrar>>, nombres: string, familia?: string) {
+  const estudianteId = await t.run(async (ctx) => {
+    const ana = (await ctx.db.get(e.estudianteId))!;
+    const id = await ctx.db.insert("estudiante", {
+      institucionId: ana.institucionId, nombres, apellidos: "Zambrano", tipoDocumento: "CEDULA",
+      numeroDocumento: `doc-${nombres}`, origenRegistro: "REPRESENTANTE", estadoVerificacion: "APROBADO",
+      estado: "ACTIVO", actualizadoEn: Date.now(),
+    });
+    await ctx.db.insert("matricula", { estudianteId: id, cursoId: e.cursoId, fechaIngreso: "2026-01-01", estado: "CURSANDO", actualizadoEn: Date.now() });
+    return id;
+  });
+  if (familia) await conRepresentante(t, estudianteId, familia);
+  return estudianteId;
+}
+
 describe("constancia de que la familia vio un comunicado", () => {
   // Martes 15 a las 10:00 de Guayaquil.
   beforeEach(() => vi.useFakeTimers().setSystemTime(new Date("2026-09-15T15:00:00Z")));
-
-  /** Un segundo estudiante en el mismo curso, con su propia familia. */
-  async function otroEstudiante(t: ReturnType<typeof convexTest>, e: Awaited<ReturnType<typeof sembrar>>, nombres: string, familia?: string) {
-    const estudianteId = await t.run(async (ctx) => {
-      const ana = (await ctx.db.get(e.estudianteId))!;
-      const id = await ctx.db.insert("estudiante", {
-        institucionId: ana.institucionId, nombres, apellidos: "Zambrano", tipoDocumento: "CEDULA",
-        numeroDocumento: `doc-${nombres}`, origenRegistro: "REPRESENTANTE", estadoVerificacion: "APROBADO",
-        estado: "ACTIVO", actualizadoEn: Date.now(),
-      });
-      await ctx.db.insert("matricula", { estudianteId: id, cursoId: e.cursoId, fechaIngreso: "2026-01-01", estado: "CURSANDO", actualizadoEn: Date.now() });
-      return id;
-    });
-    if (familia) await conRepresentante(t, estudianteId, familia);
-    return estudianteId;
-  }
 
   const publicar = (e: Awaited<ReturnType<typeof sembrar>>, extra: Record<string, unknown> = {}) =>
     e.docente.mutation(api.conducta.publicarComunicado, {
@@ -1258,3 +1259,91 @@ describe("constancia de que la familia vio un comunicado", () => {
       .rejects.toThrow("No eres el docente titular de este curso");
   });
 });
+
+describe("quién abrió el reporte del día", () => {
+  // Martes 15 a las 10:00 de Guayaquil.
+  beforeEach(() => vi.useFakeTimers().setSystemTime(new Date("2026-09-15T15:00:00Z")));
+
+  const publicarReporte = (e: Awaited<ReturnType<typeof sembrar>>, fecha?: string) =>
+    e.docente.mutation(api.conducta.publicarReporteGeneral, { cursoId: e.cursoId, ...(fecha ? { fecha } : {}) });
+  const reporteDe = (t: Awaited<ReturnType<typeof fixture>>["t"], estudianteId: Id<"estudiante">) => t.run(async (ctx) => {
+    const matricula = await ctx.db.query("matricula").withIndex("por_estudiante_estado", (q) => q.eq("estudianteId", estudianteId).eq("estado", "CURSANDO")).unique();
+    return (await ctx.db.query("reporteEstudiante").withIndex("por_matricula_fecha", (q) => q.eq("matriculaId", matricula!._id)).collect())[0]._id;
+  });
+
+  it("recién publicado nadie lo abrió, y se dice quiénes faltan", async () => {
+    const t = convexTest(schema, modules); const e = await sembrar(t);
+    await conRepresentante(t, e.estudianteId, "familia_ana");
+    await otroEstudiante(t, e, "Bruno", "familia_bruno");
+    await publicarReporte(e);
+    expect(await e.docente.query(api.conducta.lecturasDeReportes, { cursoId: e.cursoId })).toEqual([
+      { fecha: "2026-09-15", familias: 2, abiertos: 0, faltan: ["Ana Pérez", "Bruno Zambrano"] },
+    ]);
+  });
+
+  it("cuenta el reporte abierto el mismo día y el abierto después en Reportes anteriores", async () => {
+    const t = convexTest(schema, modules); const e = await sembrar(t);
+    await conRepresentante(t, e.estudianteId, "familia_ana");
+    const brunoId = await otroEstudiante(t, e, "Bruno", "familia_bruno");
+    await publicarReporte(e);
+    // Ana lo abre el mismo día, desde el reporte del día.
+    await t.withIdentity({ subject: "familia_ana" }).mutation(api.auditoria.registrarLecturaSensible, {
+      estudianteId: e.estudianteId, recurso: "REPORTE_ESTUDIANTE", reporteEstudianteId: await reporteDe(t, e.estudianteId),
+    });
+    // Bruno, a la mañana siguiente, en "Reportes anteriores".
+    vi.setSystemTime(new Date("2026-09-16T12:00:00Z"));
+    const bruno = t.withIdentity({ subject: "familia_bruno" });
+    const suyo = await reporteDe(t, brunoId);
+    expect(await bruno.mutation(api.conducta.marcarReportesVistos, { estudianteId: brunoId, reporteEstudianteIds: [suyo] })).toBe(1);
+    expect(await bruno.mutation(api.conducta.marcarReportesVistos, { estudianteId: brunoId, reporteEstudianteIds: [suyo] })).toBe(0);
+    expect(await e.docente.query(api.conducta.lecturasDeReportes, { cursoId: e.cursoId })).toEqual([
+      { fecha: "2026-09-15", familias: 2, abiertos: 2, faltan: [] },
+    ]);
+  });
+
+  it("nadie marca el reporte de otro estudiante, ni desde el suyo ni desde el ajeno", async () => {
+    const t = convexTest(schema, modules); const e = await sembrar(t);
+    await conRepresentante(t, e.estudianteId, "familia_ana");
+    const brunoId = await otroEstudiante(t, e, "Bruno", "familia_bruno");
+    await publicarReporte(e);
+    const ana = t.withIdentity({ subject: "familia_ana" });
+    const deBruno = await reporteDe(t, brunoId);
+    // Desde su propio hijo, con el id del reporte ajeno: se ignora.
+    expect(await ana.mutation(api.conducta.marcarReportesVistos, { estudianteId: e.estudianteId, reporteEstudianteIds: [deBruno] })).toBe(0);
+    // Y pidiendo por el hijo ajeno, ni siquiera entra.
+    await expect(ana.mutation(api.conducta.marcarReportesVistos, { estudianteId: brunoId, reporteEstudianteIds: [deBruno] }))
+      .rejects.toThrow("No tienes acceso");
+    const [dia] = await e.docente.query(api.conducta.lecturasDeReportes, { cursoId: e.cursoId });
+    expect(dia.faltan).toContain("Bruno Zambrano");
+  });
+
+  it("los últimos cinco días publicados, del más reciente al más antiguo", async () => {
+    const t = convexTest(schema, modules); const e = await sembrar(t);
+    await conRepresentante(t, e.estudianteId, "familia_ana");
+    for (const fecha of ["2026-09-07", "2026-09-08", "2026-09-09", "2026-09-10", "2026-09-11", "2026-09-14"]) {
+      await publicarReporte(e, fecha);
+    }
+    const dias = await e.docente.query(api.conducta.lecturasDeReportes, { cursoId: e.cursoId });
+    expect(dias.map((d) => d.fecha)).toEqual(["2026-09-14", "2026-09-11", "2026-09-10", "2026-09-09", "2026-09-08"]);
+  });
+
+  it("un estudiante sin representante no cuenta como familia", async () => {
+    const t = convexTest(schema, modules); const e = await sembrar(t);
+    await conRepresentante(t, e.estudianteId, "familia_ana");
+    await otroEstudiante(t, e, "Bruno");
+    await publicarReporte(e);
+    const [dia] = await e.docente.query(api.conducta.lecturasDeReportes, { cursoId: e.cursoId });
+    expect(dia).toMatchObject({ familias: 1, faltan: ["Ana Pérez"] });
+  });
+
+  it("solo el titular del curso ve quién abrió", async () => {
+    const t = convexTest(schema, modules); const e = await sembrar(t);
+    await t.run(async (ctx) => {
+      const p = await ctx.db.insert("perfilUsuario", { authSubject: "docente_2", tipoDocumento: "CEDULA", numeroDocumento: "9", actualizadoEn: Date.now() });
+      await ctx.db.insert("docente", { perfilUsuarioId: p, actualizadoEn: Date.now() });
+    });
+    await expect(t.withIdentity({ subject: "docente_2" }).query(api.conducta.lecturasDeReportes, { cursoId: e.cursoId }))
+      .rejects.toThrow("No eres el docente titular de este curso");
+  });
+});
+

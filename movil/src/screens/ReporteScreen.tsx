@@ -25,7 +25,7 @@
 
 import { useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
-import { useQuery } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import type { FunctionReturnType } from "convex/server";
 
 import { api } from "../../convex/_generated/api";
@@ -47,7 +47,7 @@ import { Icono } from "../theme/Icono";
 import { etiquetaAccion, etiquetaFranja } from "../lib/estados";
 import type { AccionDeLaBitacora } from "./ReclamarScreen";
 import { fechaLegible } from "../lib/fechas";
-import { useComunicadosVistos } from "../lib/useComunicadosVistos";
+import { useRegistrarVistos } from "../lib/useRegistrarVistos";
 import { useLecturaSensible } from "../lib/useLecturaSensible";
 import { Espacio, Franja, Marca, Radio, Superficie, Tamano, Texto, TonoEstado } from "../theme/Theme";
 
@@ -200,7 +200,13 @@ export function ReporteDeHoy({
   const comunicados = useQuery(api.conducta.comunicadosVigentes, { estudianteId });
   // Constancia para el docente de que esta familia ya tuvo los avisos del
   // curso en pantalla: ver `comunicadosPublicados`.
-  useComunicadosVistos(estudianteId, comunicados);
+  const marcarComunicados = useMutation(api.conducta.marcarComunicadosVistos);
+  useRegistrarVistos(
+    estudianteId,
+    comunicados?.map((c) => c.id),
+    (comunicadoIds) => marcarComunicados({ estudianteId, comunicadoIds }),
+    "comunicados",
+  );
   // DP-006: abrir el reporte de un menor es una lectura sensible. Cuando ya
   // es una fotografía real (no la vista en vivo, que no tiene id todavía),
   // esto también marca el reporte como leído -- ver `fraseDeLecturas`.
@@ -269,6 +275,16 @@ export function ReportesAnteriores({
 }) {
   const datos = useQuery(api.conducta.reportesAnteriores, { estudianteId });
   useLecturaSensible(estudianteId, "REPORTE_ESTUDIANTE");
+  // Un reporte que sale a las 22:00 casi siempre se lee al día siguiente, y
+  // entonces ya está aquí, no en el reporte del día: sin esto, el docente
+  // vería como "sin abrir" justo los reportes que sí se leyeron.
+  const marcarReportes = useMutation(api.conducta.marcarReportesVistos);
+  useRegistrarVistos(
+    estudianteId,
+    datos?.reportes.map((r) => r.id),
+    (reporteEstudianteIds) => marcarReportes({ estudianteId, reporteEstudianteIds }),
+    "reportes",
+  );
 
   if (datos === undefined) return <EsqueletoPagina etiqueta="Cargando el historial" />;
 

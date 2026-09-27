@@ -7,6 +7,7 @@ const estado = vi.hoisted(() => ({
   asistencia: undefined as unknown,
   campos: undefined as unknown,
   publicados: [] as unknown[],
+  lecturas: [] as unknown[],
   llamadas: [] as { nombre: string; args: unknown }[],
 }));
 
@@ -22,6 +23,7 @@ vi.mock("convex/react", () => ({
     const nombre = getFunctionName(ref);
     if (nombre === "conducta:asistenciaDelDia") return estado.asistencia;
     if (nombre === "conducta:comunicadosPublicados") return estado.publicados;
+    if (nombre === "conducta:lecturasDeReportes") return estado.lecturas;
     return estado.campos;
   },
   useMutation: (ref: Parameters<typeof getFunctionName>[0]) => {
@@ -49,6 +51,7 @@ const boton = (v: ReactTestRenderer, etiqueta: string) =>
 beforeEach(() => {
   estado.llamadas = [];
   estado.publicados = [];
+  estado.lecturas = [];
   estado.asistencia = {
     fecha: "2026-09-15",
     estudiantes: [
@@ -262,5 +265,26 @@ it("marca el aviso que ya dejó de mostrarse a las familias", () => {
 
 it("sin nada publicado todavía, no muestra la sección", () => {
   expect(texto(pintar(<PublicarComunicado cursoId={"curso" as never} onVolver={() => {}} />))).not.toContain("Lo que ya publicaste");
+});
+
+/* ---------- Quién abrió los reportes ---------- */
+
+it("bajo el reporte del día, dice quién abrió los de los últimos días y quién falta", async () => {
+  estado.lecturas = [
+    { fecha: "2026-09-25", familias: 3, abiertos: 1, faltan: ["Bruno Zambrano", "Luis Mora"] },
+    { fecha: "2026-09-24", familias: 3, abiertos: 3, faltan: [] },
+  ];
+  const v = pintar(<ReporteGeneral cursoId={"curso" as never} onVolver={() => {}} />);
+  const t = texto(v);
+  expect(t).toContain("Quién abrió los reportes");
+  expect(t).toContain("Lo abrieron 1 de 3 familias.");
+  expect(t).toContain("Lo abrieron todas las familias (3).");
+  expect(t).not.toContain("leyeron");
+  await act(async () => boton(v, "Ver quiénes faltan (2)").props.onPress());
+  expect(texto(v)).toContain("Faltan: Bruno Zambrano, Luis Mora.");
+});
+
+it("sin reportes publicados todavía, no muestra la sección", () => {
+  expect(texto(pintar(<ReporteGeneral cursoId={"curso" as never} onVolver={() => {}} />))).not.toContain("Quién abrió");
 });
 

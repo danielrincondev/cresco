@@ -251,7 +251,56 @@ export function ReporteGeneral({
       >
         Publicar a las familias
       </Boton>
+
+      <LecturasDeReportes cursoId={cursoId} />
     </Pagina>
+  );
+}
+
+/**
+ * Quién abrió el reporte de cada uno de los últimos días, y quién falta.
+ *
+ * El reporte es lo que más se usa, y hasta ahora el docente lo publicaba sin
+ * saber si alguien lo abría. Dice "abrió", no "leyó", por lo mismo que los
+ * avisos dicen "vio": es lo que la aplicación sabe de verdad.
+ */
+function LecturasDeReportes({ cursoId }: { cursoId: Id<"curso"> }) {
+  const dias = useQuery(api.conducta.lecturasDeReportes, { cursoId });
+  const [abierto, setAbierto] = useState<string>();
+
+  if (dias === undefined || dias.length === 0) return null;
+
+  return (
+    <>
+      <Subtitulo>Quién abrió los reportes</Subtitulo>
+      <Cuerpo>
+        Cuenta cuando la familia ve el reporte en la aplicación: el mismo día,
+        o después en "Reportes anteriores".
+      </Cuerpo>
+      {dias.map((dia) => (
+        <Tarjeta key={dia.fecha}>
+          <Subtitulo>{fechaLegible(dia.fecha)}</Subtitulo>
+          <Cuerpo>
+            {dia.abiertos === dia.familias
+              ? `Lo abrieron todas las familias (${dia.familias}).`
+              : `Lo abrieron ${dia.abiertos} de ${dia.familias} familias.`}
+          </Cuerpo>
+          {dia.faltan.length > 0 &&
+            (abierto === dia.fecha ? (
+              <>
+                <Cuerpo>{`Faltan: ${dia.faltan.join(", ")}.`}</Cuerpo>
+                <Boton secundario onPress={() => setAbierto(undefined)}>
+                  Ocultar
+                </Boton>
+              </>
+            ) : (
+              <Boton secundario onPress={() => setAbierto(dia.fecha)}>
+                {`Ver quiénes faltan (${dia.faltan.length})`}
+              </Boton>
+            ))}
+        </Tarjeta>
+      ))}
+    </>
   );
 }
 
