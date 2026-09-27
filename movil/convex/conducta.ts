@@ -2,12 +2,12 @@ import { ConvexError, v } from "convex/values";
 import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import { internalMutation, mutation, query, type MutationCtx, type QueryCtx } from "./_generated/server";
-import { ALCANCE_COMUNICADO, ENTITLEMENTS, ESTADO_ASISTENCIA, REGLAS, TIPO_COMUNICADO } from "./lib/enums";
+import { ALCANCE_COMUNICADO, ENTITLEMENTS, ESTADO_ASISTENCIA, RECURSO_DESBLOQUEABLE, REGLAS, TIPO_COMUNICADO } from "./lib/enums";
 import { BANDERAS } from "./lib/flags";
 import { ErrorDominio, esFinDeSemana, exigirAlcanceCoherente, exigirDuracionNota, exigirFechaEvento, exigirRangoEventoOpcional, exigirRangoTipoAccion, exigirSignoCoherente, exigirTopeDiario, exigirVentanaComunicado, calcularPuntaje, hoyEnGuayaquil, sumarDias } from "./lib/guardas";
 import { consejoPorCategoria, fraseDeAliento, fraseDeLecturas } from "./lib/insights";
 import { notificar } from "./lib/notificaciones";
-import { ErrorPermiso, auditar, exigirAccesoDocenteAEstudiante, exigirDocente, exigirTitularDelCurso, exigirVinculo } from "./lib/permisos";
+import { ErrorPermiso, auditar, exigirAccesoDocenteAEstudiante, exigirDocente, exigirRepresentante, exigirTitularDelCurso, exigirVinculo } from "./lib/permisos";
 import { periodoVigentePorFecha } from "./lib/periodos";
 import { tieneAccesoVigente } from "./lib/revenuecat";
 
@@ -647,8 +647,18 @@ export const reporteDeHoy = query({
 
 export const reporteAcumulado = query({
   args: { estudianteId: v.id("estudiante") },
-  handler: (ctx, args) => conErroresPublicos(async () => {
-    const vinculo = await exigirVinculo(ctx, args.estudianteId);
+  handler: (ctx, args) => conErroresPublicos(async () =>
+    await datosDelAcumulado(ctx, args.estudianteId, await exigirVinculo(ctx, args.estudianteId))),
+});
+
+/**
+ * Lo que ve la familia en el acumulado del parcial. Vive aparte de la query
+ * porque el informe imprimible (`prepararInforme`) tiene que decir exactamente
+ * lo mismo: dos copias de este cálculo terminarían diciendo cosas distintas
+ * en la pantalla y en el papel.
+ */
+async function datosDelAcumulado(ctx: QueryCtx, estudianteId: Id<"estudiante">, vinculo: Doc<"vinculoRepresentacion">) {
+    const args = { estudianteId };
     const matricula = await ctx.db.query("matricula").withIndex("por_estudiante_estado", (q) => q.eq("estudianteId", args.estudianteId).eq("estado", "CURSANDO")).unique();
     if (matricula === null) throw new ErrorDominio("NO_ENCONTRADO", "El estudiante no tiene matrícula vigente.");
     const curso = await ctx.db.get(matricula.cursoId);
@@ -727,23 +737,33 @@ export const reporteAcumulado = query({
       consejo: consejoPorCategoria(categoriasNegativas.filter((c): c is NonNullable<typeof c> => c !== undefined)),
       reconocimiento: fraseDeLecturas(vecesLeido),
     };
-  }),
-});
+}
+
+/**
+ * ¿Tiene este representante Premium vigente? Una sola regla para todo lo que
+ * Premium incluye —más reportes anteriores, el informe sin anuncio—: el
+ * entitlement `premium` con acceso vigente según `tieneAccesoVigente`, que
+ * respeta la suscripción cancelada que todavía no expira.
+ */
+async function tienePremium(ctx: QueryCtx, representanteId: Id<"representante">): Promise<boolean> {
+  const representante = await ctx.db.get(representanteId);
+  if (representante === null) return false;
+  const suscripciones = await ctx.db.query("suscripcion")
+    .withIndex("por_usuario", (q) => q.eq("perfilUsuarioId", representante.perfilUsuarioId))
+    .collect();
+  for (const suscripcion of suscripciones) {
+    if (!tieneAccesoVigente({ estado: suscripcion.estado, expiraEn: suscripcion.expiraEn })) continue;
+    const plan = await ctx.db.get(suscripcion.planId);
+    if (plan?.entitlementRevenuecat === ENTITLEMENTS.REPRESENTANTE) return true;
+  }
+  return false;
+}
 
 export const reportesAnteriores = query({
   args: { estudianteId: v.id("estudiante") },
   handler: (ctx, args) => conErroresPublicos(async () => {
     const vinculo = await exigirVinculo(ctx, args.estudianteId);
-    const representante = await ctx.db.get(vinculo.representanteId);
-    const suscripciones = representante === null ? [] : await ctx.db.query("suscripcion")
-      .withIndex("por_usuario", (q) => q.eq("perfilUsuarioId", representante.perfilUsuarioId))
-      .collect();
-    let premium = false;
-    for (const suscripcion of suscripciones) {
-      if (!tieneAccesoVigente({ estado: suscripcion.estado, expiraEn: suscripcion.expiraEn })) continue;
-      const plan = await ctx.db.get(suscripcion.planId);
-      if (plan?.entitlementRevenuecat === ENTITLEMENTS.REPRESENTANTE) premium = true;
-    }
+    const premium = await tienePremium(ctx, vinculo.representanteId);
     const limite = premium ? REGLAS.REPORTES_PREVIOS_PREMIUM : REGLAS.REPORTES_PREVIOS_FREE;
     const matricula = await ctx.db.query("matricula").withIndex("por_estudiante_estado", (q) => q.eq("estudianteId", args.estudianteId).eq("estado", "CURSANDO")).unique();
     if (matricula === null) return { limite, premium, reportes: [] };
@@ -1061,6 +1081,115 @@ export const marcarReportesVistos = mutation({
       marcados++;
     }
     return marcados;
+  }),
+});
+
+/* ------------------------------------------------------------------ *
+ *  INFORME IMPRIMIBLE DEL ACUMULADO  (P12)
+ * ------------------------------------------------------------------ */
+
+/** Lo que dura lo que se gana viendo el anuncio: lo justo para exportar. */
+const VIGENCIA_DESBLOQUEO = 30 * 60_000;
+const recursoDesbloqueable = v.union(...RECURSO_DESBLOQUEABLE.map((r) => v.literal(r)));
+
+/** Un desbloqueo sin usar y todavía vigente, si lo hay. */
+async function desbloqueoVigente(ctx: QueryCtx, perfilUsuarioId: Id<"perfilUsuario">, recurso: Doc<"desbloqueoRecompensado">["recurso"], ahora: number) {
+  const recientes = await ctx.db.query("desbloqueoRecompensado")
+    .withIndex("por_usuario_recurso", (q) => q.eq("perfilUsuarioId", perfilUsuarioId).eq("recurso", recurso))
+    .order("desc").take(10);
+  return recientes.find((d) => d.consumidoEn === undefined && d.expiraEn > ahora) ?? null;
+}
+
+/**
+ * El representante vio completo el anuncio con premio: se le abre un informe.
+ *
+ * Lo llama la app cuando el SDK de anuncios avisa que se ganó el premio. Si ya
+ * tiene uno sin usar y vigente, devuelve ese: ver el anuncio dos veces no
+ * acumula informes. Riesgo aceptado para la v1: una app modificada podría
+ * llamar esto sin ver el anuncio y llevarse un PDF gratis. Lo cierra la
+ * verificación de recompensas de RevenueCat cuando el proyecto tenga su
+ * cuenta de AdMob (`docs/02-equipo/pendientes-proxima-build.md`).
+ */
+export const otorgarDesbloqueo = mutation({
+  args: { recurso: recursoDesbloqueable },
+  handler: (ctx, args) => conErroresPublicos(async () => {
+    const representante = await exigirRepresentante(ctx);
+    const ahora = Date.now();
+    const vigente = await desbloqueoVigente(ctx, representante.perfilUsuarioId, args.recurso, ahora);
+    if (vigente !== null) return vigente._id;
+    return await ctx.db.insert("desbloqueoRecompensado", {
+      perfilUsuarioId: representante.perfilUsuarioId, recurso: args.recurso,
+      otorgadoEn: ahora, expiraEn: ahora + VIGENCIA_DESBLOQUEO,
+    });
+  }),
+});
+
+/** El nombre del docente titular vigente de un curso, si lo hay y lo registró. */
+async function nombreDelTitular(ctx: QueryCtx, cursoId: Id<"curso">): Promise<string | null> {
+  const titulares = await ctx.db.query("asignacionDocente")
+    .withIndex("por_curso_rol", (q) => q.eq("cursoId", cursoId).eq("rol", "TITULAR")).collect();
+  const titular = titulares.find((t) => t.vigenteHasta === undefined);
+  const docente = titular === undefined ? null : await ctx.db.get(titular.docenteId);
+  const perfil = docente === null ? null : await ctx.db.get(docente.perfilUsuarioId);
+  return perfil && (perfil.nombres || perfil.apellidos)
+    ? `${perfil.nombres ?? ""} ${perfil.apellidos ?? ""}`.trim()
+    : null;
+}
+
+/**
+ * Los datos del informe imprimible del acumulado. Es una mutation y no una
+ * query porque puede consumir un desbloqueo y porque deja constancia: sacar de
+ * la aplicación los datos de un menor es `EXPORTAR`, el evento que DP-006
+ * dejó para cuando algo exportara.
+ *
+ * Cumple lo que promete el muro de pago, que arma su texto con
+ * `limites.exportarPdf` de `semillas.ts`: con Premium, directo (`LIBRE`); en el
+ * plan gratuito, a cambio de un anuncio (`CON_ANUNCIO`). Si esos límites
+ * cambian, esta regla tiene que cambiar con ellos.
+ *
+ * Devuelve lo mismo que ve la familia en el acumulado, más lo que un papel
+ * necesita para sostenerse solo: de quién es, de qué curso y cuándo se generó.
+ */
+export const prepararInforme = mutation({
+  args: { estudianteId: v.id("estudiante") },
+  handler: (ctx, args) => conErroresPublicos(async () => {
+    const vinculo = await exigirVinculo(ctx, args.estudianteId);
+    const ahora = Date.now();
+    const premium = await tienePremium(ctx, vinculo.representanteId);
+    if (!premium) {
+      const representante = await ctx.db.get(vinculo.representanteId);
+      const desbloqueo = representante === null
+        ? null
+        : await desbloqueoVigente(ctx, representante.perfilUsuarioId, "EXPORTAR_PDF_ACUMULADO", ahora);
+      if (desbloqueo === null) {
+        throw new ErrorDominio("SIN_DESBLOQUEO", "Mira el anuncio para desbloquear el informe.");
+      }
+      await ctx.db.patch(desbloqueo._id, { consumidoEn: ahora });
+    }
+
+    const acumulado = await datosDelAcumulado(ctx, args.estudianteId, vinculo);
+    const estudiante = await ctx.db.get(args.estudianteId);
+    const matricula = await ctx.db.query("matricula").withIndex("por_estudiante_estado", (q) => q.eq("estudianteId", args.estudianteId).eq("estado", "CURSANDO")).unique();
+    const curso = matricula === null ? null : await ctx.db.get(matricula.cursoId);
+    const anioLectivo = curso === null ? null : await ctx.db.get(curso.anioLectivoId);
+    const institucion = anioLectivo === null ? null : await ctx.db.get(anioLectivo.institucionId);
+
+    await auditar(ctx, {
+      accion: "EXPORTAR",
+      entidadTipo: "estudiante",
+      entidadId: args.estudianteId,
+      institucionId: institucion?._id,
+      datosDespues: { recurso: "INFORME_ACUMULADO", conAnuncio: !premium },
+    });
+
+    return {
+      ...acumulado,
+      estudiante: estudiante === null ? "Estudiante" : `${estudiante.nombres} ${estudiante.apellidos}`,
+      curso: curso?.nombre ?? null,
+      institucion: institucion?.nombreDeclarado ?? null,
+      docente: curso === null ? null : await nombreDelTitular(ctx, curso._id),
+      generadoEn: ahora,
+    };
   }),
 });
 

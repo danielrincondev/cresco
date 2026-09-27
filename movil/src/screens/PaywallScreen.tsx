@@ -86,7 +86,7 @@ function limitesLegibles(limites: Record<string, unknown>): string[] {
     frases.push(`Hasta ${porCurso} estudiantes por curso`);
   }
 
-  if (limites.exportarPdf === "LIBRE") frases.push("Informe imprimible cuando llegue");
+  if (limites.exportarPdf === "LIBRE") frases.push("Informe imprimible");
   if (limites.exportarPdf === "CON_ANUNCIO") frases.push("Informe imprimible viendo un anuncio");
 
   return frases;

@@ -298,3 +298,23 @@ it("al comprar avisa de que el plan se activa solo, sin prometer acceso inmediat
   expect(estado.comprados).toEqual(["$rc_monthly"]);
   expect(texto(v)).toContain("se activa en unos segundos");
 });
+
+/**
+ * El informe imprimible existe desde el 27 de septiembre: el plan que lo da sin
+ * anuncio ya no puede decir "cuando llegue", y el gratuito sigue diciendo que
+ * se desbloquea con un anuncio, que es exactamente lo que hace.
+ */
+it("el informe imprimible se ofrece como lo que es, en los dos planes", () => {
+  estado.suscripcion = { representante: gratuito, docente: null };
+  estado.planes = [{
+    codigo: "REP_PREMIUM_MENSUAL", nombre: "Premium mensual", audiencia: "REPRESENTANTE",
+    periodicidad: "MENSUAL", sinPublicidad: true,
+    limites: { reportesPrevios: 7, exportarPdf: "LIBRE" },
+    productoGooglePlay: "REP_PREMIUM_MENSUAL", entitlement: "premium",
+  }];
+  const t = texto(pintar(<PaywallRepresentante />));
+  expect(t).toContain("Informe imprimible viendo un anuncio");
+  expect(t).toContain("Informe imprimible");
+  expect(t).not.toContain("cuando llegue");
+});
+

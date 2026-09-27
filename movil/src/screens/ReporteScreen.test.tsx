@@ -10,6 +10,13 @@ const estado = vi.hoisted(() => ({
   comunicados: [] as unknown,
   lecturas: [] as unknown[],
   argsHoy: undefined as unknown,
+  suscripcion: undefined as unknown,
+  informe: undefined as unknown,
+  llamadas: [] as { nombre: string; args: unknown }[],
+  puedeImprimir: true,
+  anuncio: "PREMIO" as string,
+  anunciosVistos: 0,
+  impresos: [] as string[],
 }));
 
 vi.mock("react-native", async () => ({
@@ -27,13 +34,22 @@ vi.mock("convex/react", () => ({
       estado.argsHoy = args;
       return estado.hoy;
     }
+    if (nombre === "suscripciones:miSuscripcion") return estado.suscripcion;
     if (nombre === "conducta:reportesAnteriores") return estado.anteriores;
     if (nombre === "conducta:comunicadosVigentes") return estado.comunicados;
     if (nombre === "nucleo:obtenerPerfil") return undefined;
     return estado.acumulado;
   },
-  // `useLecturaSensible` registra la lectura con una mutation al montar.
-  useMutation: () => async (args: unknown) => { estado.lecturas.push(args); return null; },
+  // `useLecturaSensible` registra la lectura con una mutation al montar. Las
+  // del informe devuelven lo que devolvería el servidor.
+  useMutation: (ref: Parameters<typeof getFunctionName>[0]) => {
+    const nombre = getFunctionName(ref);
+    return async (args: unknown) => {
+      estado.lecturas.push(args);
+      estado.llamadas.push({ nombre, args });
+      return nombre === "conducta:prepararInforme" ? estado.informe : null;
+    };
+  },
 }));
 // `AnuncioBanner` (en `ReporteDeHoy`) importa `expo-crypto` y `compras.ts`
 // arriba del archivo. Sin el primer mock, `expo-modules-core` revienta con
@@ -42,6 +58,16 @@ vi.mock("convex/react", () => ({
 // así que se mockea entero, igual que ya hace `PaywallScreen.test.tsx`.
 vi.mock("expo-crypto", () => ({ randomUUID: () => "impresion-sintetica-1234" }));
 vi.mock("../lib/compras", () => ({ prepararCompras: async () => null }));
+// El PDF y el anuncio con premio son nativos: se reemplazan por lo que
+// devolverían, y el HTML sí se arma de verdad.
+vi.mock("../lib/informe", async (original) => ({
+  ...(await original<typeof import("../lib/informe")>()),
+  puedeImprimir: async () => estado.puedeImprimir,
+  imprimirYCompartir: async (html: string) => { estado.impresos.push(html); return "LISTO"; },
+}));
+vi.mock("../lib/anuncioConPremio", () => ({
+  verAnuncioConPremio: async () => { estado.anunciosVistos++; return estado.anuncio; },
+}));
 // El propio SDK de anuncios es nativo: `import()` dentro de `AnuncioBanner`
 // lo intenta y falla en las pruebas, y el componente ya sabe no pintar nada
 // en ese caso. No hace falta un mock más elaborado que ese fallo real.
@@ -71,6 +97,13 @@ const REPORTE = {
 
 beforeEach(() => {
   estado.lecturas = [];
+  estado.llamadas = [];
+  estado.suscripcion = undefined;
+  estado.informe = undefined;
+  estado.puedeImprimir = true;
+  estado.anuncio = "PREMIO";
+  estado.anunciosVistos = 0;
+  estado.impresos = [];
   estado.hoy = { fecha: "2026-09-09", hay: true, reporte: REPORTE };
   estado.anteriores = { limite: 2, premium: false, reportes: [REPORTE] };
   estado.comunicados = [];
@@ -405,3 +438,81 @@ it("con más de un hijo, ofrece el selector y avisa al cambiar", () => {
   const boton = v.root.findAll((n) => n.props.accessibilityLabel === "Viendo a Ana. Cambiar de hijo")[0];
   expect(boton).toBeTruthy();
 });
+
+/* ---------- P12: el informe imprimible ---------- */
+
+const conPlan = (exportarPdf: "LIBRE" | "CON_ANUNCIO") => ({
+  representante: { plan: { limites: { reportesPrevios: 2, exportarPdf } } },
+  docente: null,
+});
+const acumulado = () => pintar(
+  <ReporteAcumulado
+    estudianteId={"e1" as never} nombre="Ana Pérez"
+    onVolver={() => {}} onVerAccion={() => {}}
+  />,
+);
+const llamadasA = (nombre: string) => estado.llamadas.filter((l) => l.nombre === nombre);
+async function tocar(v: ReturnType<typeof pintar>, texto: string) {
+  const boton = v.root.findAllByType(Boton).find((b) => b.props.children === texto);
+  expect(boton, `no hay un botón "${texto}"`).toBeDefined();
+  await act(async () => {
+    boton!.props.onPress();
+    // El flujo encadena varias promesas: se las deja terminar.
+    for (let i = 0; i < 5; i++) await new Promise((listo) => setTimeout(listo, 0));
+  });
+}
+
+beforeEach(() => {
+  estado.informe = {
+    ...(estado.acumulado as object), bitacora: [], insight: null, consejo: null, reconocimiento: null,
+    estudiante: "Ana Pérez", curso: "Quinto A", institucion: "Piloto", docente: null,
+    generadoEn: Date.UTC(2026, 8, 15, 15),
+  };
+});
+
+it("con Premium, el informe se descarga directo, sin anuncio", async () => {
+  estado.suscripcion = conPlan("LIBRE");
+  const v = acumulado();
+  await tocar(v, "Descargar el PDF");
+  expect(estado.anunciosVistos).toBe(0);
+  expect(llamadasA("conducta:otorgarDesbloqueo")).toEqual([]);
+  expect(llamadasA("conducta:prepararInforme")).toEqual([{ nombre: "conducta:prepararInforme", args: { estudianteId: "e1" } }]);
+  expect(estado.impresos).toHaveLength(1);
+  expect(estado.impresos[0]).toContain("Ana Pérez · Quinto A · Piloto");
+});
+
+it("en el plan gratuito, ve el anuncio, se desbloquea y descarga", async () => {
+  estado.suscripcion = conPlan("CON_ANUNCIO");
+  const v = acumulado();
+  expect(texto(v)).toContain("se desbloquea viendo un anuncio");
+  await tocar(v, "Ver un anuncio y descargar el PDF");
+  expect(estado.anunciosVistos).toBe(1);
+  expect(llamadasA("conducta:otorgarDesbloqueo").map((l) => l.args)).toEqual([{ recurso: "EXPORTAR_PDF_ACUMULADO" }]);
+  expect(llamadasA("conducta:prepararInforme")).toHaveLength(1);
+  expect(estado.impresos).toHaveLength(1);
+});
+
+it("si cierra el anuncio antes de terminar, no hay informe", async () => {
+  estado.suscripcion = conPlan("CON_ANUNCIO");
+  estado.anuncio = "SIN_PREMIO";
+  const v = acumulado();
+  await tocar(v, "Ver un anuncio y descargar el PDF");
+  expect(llamadasA("conducta:otorgarDesbloqueo")).toEqual([]);
+  expect(llamadasA("conducta:prepararInforme")).toEqual([]);
+  expect(texto(v)).toContain("El informe se desbloquea al terminar el anuncio.");
+});
+
+it("en una build sin los módulos del PDF, pide actualizar y no gasta un anuncio", async () => {
+  estado.suscripcion = conPlan("CON_ANUNCIO");
+  estado.puedeImprimir = false;
+  const v = acumulado();
+  await tocar(v, "Ver un anuncio y descargar el PDF");
+  expect(estado.anunciosVistos).toBe(0);
+  expect(llamadasA("conducta:prepararInforme")).toEqual([]);
+  expect(texto(v)).toContain("Actualiza la aplicación");
+});
+
+it("mientras no se sabe el plan, no ofrece un informe", () => {
+  expect(texto(acumulado())).not.toContain("Informe imprimible");
+});
+

@@ -60,11 +60,11 @@ import { useEffect, useRef, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import { randomUUID } from "expo-crypto";
 import { useQuery } from "convex/react";
-import type { AdRevenuePrecision } from "react-native-purchases";
 import type { AdErrorPayload, PaidEvent } from "react-native-google-mobile-ads";
 
 import { api } from "../../convex/_generated/api";
 import { prepararCompras } from "../lib/compras";
+import { microsDelPago, precisionDesdeGoogle } from "../lib/publicidad";
 import { Espacio } from "../theme/Theme";
 
 /**
@@ -82,24 +82,6 @@ const ID_BANNER_DE_PRUEBA = "ca-app-pub-3940256099942544/6300978111";
 
 /** Dónde aparece el anuncio, para poder distinguirlo en el panel más adelante. */
 const UBICACION = "reporte_diario_banner";
-
-/**
- * `AdRevenuePrecision` de RevenueCat es un string; Google Mobile Ads lo da
- * como el enum numérico `RevenuePrecisions` (0–3). Sin este mapa, cualquier
- * valor que no fuera "estimado" se habría guardado sin decir nada.
- */
-function precisionDesdeGoogle(precision: number | undefined): AdRevenuePrecision {
-  switch (precision) {
-    case 3: // RevenuePrecisions.PRECISE
-      return "exact";
-    case 2: // RevenuePrecisions.PUBLISHER_PROVIDED
-      return "publisher_defined";
-    case 1: // RevenuePrecisions.ESTIMATED
-      return "estimated";
-    default:
-      return "unknown";
-  }
-}
 
 async function sdkDeAnuncios() {
   try {
@@ -187,10 +169,7 @@ export function AnuncioBanner() {
             adFormat: "banner",
             adUnitId: ID_BANNER_DE_PRUEBA,
             impressionId: impresionActual.current,
-            // RevenueCat cuenta el ingreso en micros (millonésimas). El SDK
-            // de anuncios ya lo da exacto en `valueMicros`; solo se deriva
-            // de `value` si esa cifra exacta no vino.
-            revenueMicros: evento.valueMicros ? Number(evento.valueMicros) : Math.round(evento.value * 1_000_000),
+            revenueMicros: microsDelPago(evento),
             currency: evento.currency,
             precision: precisionDesdeGoogle(evento.precision),
             placement: UBICACION,

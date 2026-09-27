@@ -39,15 +39,19 @@ import {
   Boton,
   Cargando,
   Cuerpo,
+  ErrorMensaje,
   Pagina,
   Subtitulo,
   Tarjeta,
+  useOperacion,
 } from "../components/NucleoUI";
 import { Icono } from "../theme/Icono";
 import { etiquetaAccion, etiquetaFranja } from "../lib/estados";
 import type { AccionDeLaBitacora } from "./ReclamarScreen";
 import { fechaLegible, hoyISO } from "../lib/fechas";
 import { useRegistrarVistos } from "../lib/useRegistrarVistos";
+import { htmlDelInforme, imprimirYCompartir, puedeImprimir } from "../lib/informe";
+import { verAnuncioConPremio } from "../lib/anuncioConPremio";
 import { useLecturaSensible } from "../lib/useLecturaSensible";
 import { Espacio, Franja, Marca, Radio, Superficie, Tamano, Texto, TonoEstado } from "../theme/Theme";
 
@@ -292,6 +296,68 @@ export function ReporteDeHoy({
   );
 }
 
+const ACTUALIZA =
+  "Para descargar el informe hace falta la versión nueva de Cresco. Actualiza la aplicación e inténtalo otra vez.";
+
+/**
+ * P12 — El informe imprimible del acumulado, en PDF.
+ *
+ * Cumple lo que promete el muro de pago: con Premium, directo; en el plan
+ * gratuito, viendo un anuncio. Cuál de los dos es sale del mismo campo que lee
+ * el muro de pago (`limites.exportarPdf` del plan vigente), así lo que se
+ * promete y lo que se ofrece no pueden separarse. Quien decide de verdad es
+ * `prepararInforme`, en el servidor.
+ *
+ * Antes de mostrar un anuncio se comprueba que esta build pueda generar el
+ * PDF: ver un anuncio para terminar en "actualiza la aplicación" sería
+ * cobrarle a la familia por nada.
+ */
+function InformeImprimible({ estudianteId }: { estudianteId: Id<"estudiante"> }) {
+  const suscripcion = useQuery(api.suscripciones.miSuscripcion);
+  const preparar = useMutation(api.conducta.prepararInforme);
+  const otorgar = useMutation(api.conducta.otorgarDesbloqueo);
+  const op = useOperacion();
+  const [aviso, setAviso] = useState<string>();
+
+  const limites = suscripcion?.representante?.plan.limites as { exportarPdf?: string } | undefined;
+  const exportarPdf = limites?.exportarPdf;
+  if (exportarPdf !== "LIBRE" && exportarPdf !== "CON_ANUNCIO") return null;
+  const conAnuncio = exportarPdf === "CON_ANUNCIO";
+
+  async function descargar() {
+    setAviso(undefined);
+    await op.ejecutar(async () => {
+      if (!(await puedeImprimir())) return setAviso(ACTUALIZA);
+      if (conAnuncio) {
+        const anuncio = await verAnuncioConPremio();
+        if (anuncio === "SIN_MODULOS") return setAviso(ACTUALIZA);
+        if (anuncio === "ERROR") {
+          return setAviso("No pudimos mostrar el anuncio. Inténtalo de nuevo en un momento.");
+        }
+        if (anuncio === "SIN_PREMIO") {
+          return setAviso("El informe se desbloquea al terminar el anuncio.");
+        }
+        await otorgar({ recurso: "EXPORTAR_PDF_ACUMULADO" });
+      }
+      const datos = await preparar({ estudianteId });
+      if ((await imprimirYCompartir(htmlDelInforme(datos))) === "SIN_MODULOS") setAviso(ACTUALIZA);
+    });
+  }
+
+  return (
+    <Tarjeta>
+      <Subtitulo>Informe imprimible</Subtitulo>
+      <Cuerpo>El acumulado del parcial en PDF, para guardarlo o compartirlo.</Cuerpo>
+      {conAnuncio && <Cuerpo>Con el plan gratuito se desbloquea viendo un anuncio.</Cuerpo>}
+      <ErrorMensaje mensaje={op.error} />
+      {aviso && <Aviso>{aviso}</Aviso>}
+      <Boton pendiente={op.pendiente} onPress={() => void descargar()}>
+        {conAnuncio ? "Ver un anuncio y descargar el PDF" : "Descargar el PDF"}
+      </Boton>
+    </Tarjeta>
+  );
+}
+
 /** P5 — Reportes anteriores, con el limite del plan. */
 export function ReportesAnteriores({
   estudianteId,
@@ -514,6 +580,8 @@ export function ReporteAcumulado({
           </Tarjeta>
         ))
       )}
+
+      <InformeImprimible estudianteId={estudianteId} />
 
       <Boton secundario onPress={onVolver}>
         Volver

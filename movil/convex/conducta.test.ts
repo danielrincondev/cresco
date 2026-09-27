@@ -1347,3 +1347,111 @@ describe("quién abrió el reporte del día", () => {
   });
 });
 
+describe("informe imprimible del acumulado", () => {
+  // Martes 15 a las 10:00 de Guayaquil.
+  beforeEach(() => vi.useFakeTimers().setSystemTime(new Date("2026-09-15T15:00:00Z")));
+
+  /** Premium vigente para ese perfil: el mismo entitlement que vende RevenueCat. */
+  async function hacerPremium(t: Awaited<ReturnType<typeof fixture>>["t"], perfilUsuarioId: Id<"perfilUsuario">) {
+    await t.run(async (ctx) => {
+      const planId = await ctx.db.insert("plan", {
+        codigo: "REP_PREMIUM_MENSUAL", nombre: "Representante — Premium mensual", audiencia: "REPRESENTANTE",
+        entitlementRevenuecat: "premium", periodicidad: "MENSUAL", sinPublicidad: true,
+        limites: { exportarPdf: "LIBRE" }, activo: true, actualizadoEn: Date.now(),
+      });
+      await ctx.db.insert("suscripcion", {
+        perfilUsuarioId, planId, origen: "GOOGLE_PLAY", estado: "ACTIVA", iniciaEn: Date.now(),
+        renovacionAutomatica: true, actualizadoEn: Date.now(),
+      });
+    });
+  }
+  const exportaciones = (t: Awaited<ReturnType<typeof fixture>>["t"]) => t.run(async (ctx) =>
+    (await ctx.db.query("auditoria").collect()).filter((a) => a.accion === "EXPORTAR"));
+
+  it("con Premium sale directo, dice de quién es y queda en la auditoría como EXPORTAR", async () => {
+    const t = convexTest(schema, modules); const e = await sembrar(t);
+    await hacerPremium(t, await conRepresentante(t, e.estudianteId, "familia_informe_1"));
+    const informe = await t.withIdentity({ subject: "familia_informe_1" })
+      .mutation(api.conducta.prepararInforme, { estudianteId: e.estudianteId });
+    expect(informe).toMatchObject({
+      estudiante: "Ana Pérez", curso: "5A", institucion: "Piloto", puntaje: 60, generadoEn: Date.now(),
+    });
+    const [exportacion, ...otras] = await exportaciones(t);
+    expect(otras).toEqual([]);
+    expect(exportacion).toMatchObject({
+      entidadTipo: "estudiante", entidadId: e.estudianteId,
+      datosDespues: { recurso: "INFORME_ACUMULADO", conAnuncio: false },
+    });
+  });
+
+  it("en el plan gratuito, sin ver el anuncio no hay informe ni exportación", async () => {
+    const t = convexTest(schema, modules); const e = await sembrar(t);
+    await conRepresentante(t, e.estudianteId, "familia_informe_2");
+    await expect(t.withIdentity({ subject: "familia_informe_2" })
+      .mutation(api.conducta.prepararInforme, { estudianteId: e.estudianteId }))
+      .rejects.toThrow("Mira el anuncio para desbloquear el informe");
+    expect(await exportaciones(t)).toEqual([]);
+  });
+
+  it("ver el anuncio desbloquea un informe, y uno solo", async () => {
+    const t = convexTest(schema, modules); const e = await sembrar(t);
+    await conRepresentante(t, e.estudianteId, "familia_informe_3");
+    const familia = t.withIdentity({ subject: "familia_informe_3" });
+    const primero = await familia.mutation(api.conducta.otorgarDesbloqueo, { recurso: "EXPORTAR_PDF_ACUMULADO" });
+    // Ver el anuncio dos veces antes de exportar no acumula informes.
+    expect(await familia.mutation(api.conducta.otorgarDesbloqueo, { recurso: "EXPORTAR_PDF_ACUMULADO" })).toBe(primero);
+    await familia.mutation(api.conducta.prepararInforme, { estudianteId: e.estudianteId });
+    await expect(familia.mutation(api.conducta.prepararInforme, { estudianteId: e.estudianteId }))
+      .rejects.toThrow("Mira el anuncio para desbloquear el informe");
+    const [exportacion] = await exportaciones(t);
+    expect(exportacion.datosDespues).toEqual({ recurso: "INFORME_ACUMULADO", conAnuncio: true });
+  });
+
+  it("lo que se gana con el anuncio vence a los 30 minutos", async () => {
+    const t = convexTest(schema, modules); const e = await sembrar(t);
+    await conRepresentante(t, e.estudianteId, "familia_informe_4");
+    const familia = t.withIdentity({ subject: "familia_informe_4" });
+    await familia.mutation(api.conducta.otorgarDesbloqueo, { recurso: "EXPORTAR_PDF_ACUMULADO" });
+    vi.setSystemTime(new Date("2026-09-15T15:31:00Z"));
+    await expect(familia.mutation(api.conducta.prepararInforme, { estudianteId: e.estudianteId }))
+      .rejects.toThrow("Mira el anuncio para desbloquear el informe");
+  });
+
+  it("nadie exporta el informe de un hijo ajeno, ni con Premium", async () => {
+    const t = convexTest(schema, modules); const e = await sembrar(t);
+    await conRepresentante(t, e.estudianteId, "familia_informe_5");
+    const ajena = await t.run(async (ctx) => {
+      const perfilUsuarioId = await ctx.db.insert("perfilUsuario", {
+        authSubject: "familia_ajena", tipoDocumento: "CEDULA", numeroDocumento: "familia_ajena", actualizadoEn: Date.now(),
+      });
+      await ctx.db.insert("representante", { perfilUsuarioId, actualizadoEn: Date.now() });
+      return perfilUsuarioId;
+    });
+    await hacerPremium(t, ajena);
+    await expect(t.withIdentity({ subject: "familia_ajena" })
+      .mutation(api.conducta.prepararInforme, { estudianteId: e.estudianteId }))
+      .rejects.toThrow("No tienes acceso");
+  });
+
+  it("el informe dice lo mismo que el acumulado de la pantalla", async () => {
+    const t = convexTest(schema, modules); const e = await sembrar(t);
+    await hacerPremium(t, await conRepresentante(t, e.estudianteId, "familia_informe_6"));
+    await e.docente.mutation(api.conducta.registrarAccion, {
+      estudianteId: e.estudianteId, tipoAccionId: e.negativaId, descripcion: "Interrumpe", puntosAplicados: -2,
+    });
+    const familia = t.withIdentity({ subject: "familia_informe_6" });
+    const pantalla = await familia.query(api.conducta.reporteAcumulado, { estudianteId: e.estudianteId });
+    const informe = await familia.mutation(api.conducta.prepararInforme, { estudianteId: e.estudianteId });
+    expect(informe).toMatchObject({
+      periodo: pantalla.periodo, puntaje: pantalla.puntaje, franja: pantalla.franja, bitacora: pantalla.bitacora,
+    });
+    expect(informe.bitacora).toHaveLength(1);
+  });
+
+  it("el premio del anuncio es solo para representantes", async () => {
+    const t = convexTest(schema, modules); const e = await sembrar(t);
+    await expect(e.docente.mutation(api.conducta.otorgarDesbloqueo, { recurso: "EXPORTAR_PDF_ACUMULADO" }))
+      .rejects.toThrow("solo para representantes");
+  });
+});
+
