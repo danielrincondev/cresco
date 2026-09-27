@@ -41,6 +41,25 @@ export const BANDERAS = {
    * el tiempo no alcanza: se entrega sin activarla, sin deshacer trabajo.
    */
   IA_REPORTE: false,
+
+  /**
+   * QA de fin de semana antes de la entrega — quedan sábado y domingo, y
+   * `registrarAccion` rechaza cualquier fecha de sábado o domingo con
+   * `DIA_NO_LECTIVO`: nadie anota conducta un día en que el estudiante no
+   * estuvo en clase. Correcto en producción, un estorbo real para terminar
+   * las pruebas antes del lunes.
+   *
+   * `true` **no borra la regla**: solo hace que `registrarAccion` ignore el
+   * fin de semana al decidir si hoy se puede anotar. Un `diaNoLectivo`
+   * declarado explícitamente en la tabla sigue bloqueando igual — eso no es
+   * "es sábado", es "la institución dijo que este día no hay clase", y esta
+   * bandera no toca esa segunda razón.
+   *
+   * **Apagar el lunes**, o en cuanto termine el QA del fin de semana: es
+   * exactamente la regla #1 de este archivo — una bandera se borra cuando el
+   * trabajo que protege termina, no se deja en `true` de forma permanente.
+   */
+  PERMITIR_ANOTAR_FIN_DE_SEMANA: true,
 } as const;
 
 export type Bandera = keyof typeof BANDERAS;

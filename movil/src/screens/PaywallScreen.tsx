@@ -23,6 +23,7 @@
  */
 
 import { useEffect, useState } from "react";
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
 import { useQuery } from "convex/react";
 
 import { api } from "../../convex/_generated/api";
@@ -46,6 +47,8 @@ import {
   restaurarCompras,
   type PaqueteComprable,
 } from "../lib/compras";
+import { Icono } from "../theme/Icono";
+import { AREA_TACTIL_MINIMA, Espacio, Marca, Radio, Tamano } from "../theme/Theme";
 
 type Audiencia = "DOCENTE" | "REPRESENTANTE";
 
@@ -89,6 +92,26 @@ function limitesLegibles(limites: Record<string, unknown>): string[] {
   return frases;
 }
 
+/**
+ * Cómo se lee cada ciclo de cobro.
+ *
+ * ⚠️ Hasta el 26 de septiembre todo lo que no era `ANUAL` se leía "Cobro
+ * mensual.", así que el plan bimestral del representante (H3, $2.99 cada dos
+ * meses) decía que cobraba cada mes. `PERPETUO` no aparece aquí: es el plan
+ * gratuito, y `planesDisponibles` ya lo filtra —solo llegan planes con
+ * `entitlementRevenuecat`, que el gratuito no tiene.
+ */
+function textoCiclo(periodicidad: "MENSUAL" | "BIMESTRAL" | "ANUAL" | "PERPETUO") {
+  switch (periodicidad) {
+    case "ANUAL":
+      return "Cobro anual.";
+    case "BIMESTRAL":
+      return "Cobro cada dos meses.";
+    default:
+      return "Cobro mensual.";
+  }
+}
+
 function Paywall({ audiencia, titulo, descripcion }: {
   audiencia: Audiencia;
   titulo: string;
@@ -108,6 +131,12 @@ function Paywall({ audiencia, titulo, descripcion }: {
    * El SDK se ata al perfil de Convex, que es como el webhook sabe a quien
    * aplicar el cobro. Con la clave ausente esto no hace nada y la pantalla
    * sigue siendo informativa, igual que antes.
+   *
+   * El motivo exacto (`MotivoSinCompras`) no se guarda: a quien mira esta
+   * pantalla —sea el docente, la familia, o un juez del Shipaton— no le hace
+   * falta saber si falta la clave, si es el módulo nativo, o si es una clave
+   * de prueba en un build de release. Lo único que importa se ve solo:
+   * `paquetes` sigue vacío, y el aviso de abajo se dispara con eso.
    */
   useEffect(() => {
     if (!perfil?.perfilUsuarioId) return;
@@ -201,30 +230,52 @@ function Paywall({ audiencia, titulo, descripcion }: {
           Todavía no hay planes de pago publicados para esta sección.
         </Aviso>
       ) : (
-        planes.map((plan, i) => (
-          <Tarjeta key={plan.codigo} orden={i}>
-            <Subtitulo>{plan.nombre}</Subtitulo>
-            {plan.sinPublicidad && <Cuerpo>· Sin anuncios</Cuerpo>}
-            {limitesLegibles(plan.limites as Record<string, unknown>).map((frase) => (
-              <Cuerpo key={frase}>· {frase}</Cuerpo>
-            ))}
-            <Cuerpo>
-              {plan.periodicidad === "ANUAL" ? "Cobro anual." : "Cobro mensual."}
-            </Cuerpo>
-            {/* El precio lo pone RevenueCat en la moneda de la persona
-                (ADR-006). Si el SDK no esta disponible no hay paquete, y
-                entonces no hay boton: nunca se ofrece comprar algo que no se
-                puede cobrar. */}
-            {paquetes.find((p) => p.productoId === plan.productoGooglePlay) ? (
-              <Boton
-                onPress={() => void comprarPlan(plan.productoGooglePlay!)}
-                pendiente={comprando === plan.productoGooglePlay}
-              >
-                {`Suscribirme por ${paquetes.find((p) => p.productoId === plan.productoGooglePlay)!.precio}`}
-              </Boton>
-            ) : null}
-          </Tarjeta>
-        ))
+        planes.map((plan, i) => {
+          const paquete = paquetes.find((p) => p.productoId === plan.productoGooglePlay);
+          return (
+            <Tarjeta key={plan.codigo} orden={i}>
+              <Subtitulo>{plan.nombre}</Subtitulo>
+              {plan.sinPublicidad && <Cuerpo>· Sin anuncios</Cuerpo>}
+              {limitesLegibles(plan.limites as Record<string, unknown>).map((frase) => (
+                <Cuerpo key={frase}>· {frase}</Cuerpo>
+              ))}
+              <Cuerpo>{textoCiclo(plan.periodicidad)}</Cuerpo>
+              {/* El precio lo pone RevenueCat en la moneda de la persona
+                  (ADR-006): se enseña tal cual llega, nunca recortado ni
+                  reformateado. Si el SDK no esta disponible no hay paquete, y
+                  entonces no hay chip: nunca se ofrece comprar algo que no se
+                  puede cobrar.
+
+                  Es su propia fila, alineada a la derecha -- lo unico
+                  "accionable" de la tarjeta, así que es lo último que el ojo
+                  encuentra y queda solo en su esquina, sin competir con el
+                  texto de arriba. */}
+              {paquete && (
+                <View style={p.precioFila}>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={`Suscribirme a ${plan.nombre} por ${paquete.precio}`}
+                    disabled={comprando === plan.productoGooglePlay}
+                    onPress={() => void comprarPlan(plan.productoGooglePlay!)}
+                    style={({ pressed }) => [
+                      p.precioChip,
+                      pressed && p.precioChipPresionado,
+                    ]}
+                  >
+                    {comprando === plan.productoGooglePlay ? (
+                      <ActivityIndicator color={Marca.base} />
+                    ) : (
+                      <>
+                        <Icono nombre="currency-usd" color={Marca.base} tamano={18} decorativo />
+                        <Text style={p.precioTexto}>{paquete.precio}</Text>
+                      </>
+                    )}
+                  </Pressable>
+                </View>
+              )}
+            </Tarjeta>
+          );
+        })
       )}
 
       {aviso && <Aviso>{aviso}</Aviso>}
@@ -244,15 +295,39 @@ function Paywall({ audiencia, titulo, descripcion }: {
           Restaurar una compra anterior
         </Boton>
       ) : (
+        // Un solo aviso, resumido: a quien mira esta pantalla -incluido un
+        // juez del Shipaton- no le hace falta saber si falta la clave, si es
+        // el modulo nativo o si es una clave de prueba en release. Le hace
+        // falta saber que el producto cobra de verdad y que hoy, en esta
+        // build concreta, el boton no esta activo.
         <Aviso>
-          La compra dentro de la aplicación todavía no está disponible en esta
-          versión. Cuando lo esté, el precio lo vas a ver aquí en tu moneda, con
-          el cobro gestionado por Google Play.
+          Producto en fase MVP: no se puede comprar directamente desde aquí
+          todavía, pero el SDK de pagos de RevenueCat ya está instalado.
         </Aviso>
       )}
     </Pagina>
   );
 }
+
+const p = StyleSheet.create({
+  precioFila: { flexDirection: "row", justifyContent: "flex-end" },
+  precioChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Espacio.xs,
+    minHeight: AREA_TACTIL_MINIMA,
+    paddingHorizontal: Espacio.md,
+    borderRadius: Radio.pill,
+    borderWidth: 1,
+    borderColor: Marca.claro,
+  },
+  precioChipPresionado: { backgroundColor: Marca.claro },
+  precioTexto: {
+    color: Marca.base,
+    fontFamily: "Inter-Semibold",
+    fontSize: Tamano.base,
+  },
+});
 
 /** D19 — Paywall del docente. */
 export function PaywallDocente() {

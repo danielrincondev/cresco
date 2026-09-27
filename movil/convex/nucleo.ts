@@ -12,6 +12,7 @@ import type { Doc, Id } from "./_generated/dataModel";
 import { mutation, query, type QueryCtx } from "./_generated/server";
 import { JORNADA, PARENTESCO, REGLAS, TIPO_DOCUMENTO } from "./lib/enums";
 import { ErrorDominio, exigirRangoFechas, hoyEnGuayaquil } from "./lib/guardas";
+import { esVigentePorFecha } from "./lib/periodos";
 import { auditar, ErrorPermiso, exigirDocente, exigirRepresentante, exigirTitularDelCurso, exigirVinculo, perfilActual } from "./lib/permisos";
 import { tieneAccesoVigente } from "./lib/revenuecat";
 
@@ -309,7 +310,9 @@ async function presentarCurso(ctx: QueryCtx, curso: Doc<"curso">) {
         .withIndex("por_anio_orden", (q) => q.eq("anioLectivoId", anioLectivo._id))
         .collect()
     : [];
-  const periodoVigente = periodos.find((p) => p.estado === "EN_CURSO");
+  // Por fecha, no por `estado`: ver la cabecera de `lib/periodos.ts` para el
+  // porqué -- nada en la aplicación transiciona ese campo a "EN_CURSO".
+  const periodoVigente = periodos.find((p) => esVigentePorFecha(p, hoyEnGuayaquil()));
 
   return {
     id: curso._id,

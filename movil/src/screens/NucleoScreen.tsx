@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   BackHandler,
   Modal,
@@ -9,7 +9,7 @@ import {
   Text,
   View,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { useClerk, useUser } from "@clerk/expo";
 import { useMutation, usePaginatedQuery, useQuery } from "convex/react";
 import { ConvexError } from "convex/values";
@@ -20,6 +20,12 @@ import { api } from "../../convex/_generated/api";
 import { PARENTESCO } from "../../convex/lib/enums";
 import { Icono } from "../theme/Icono";
 import { CampoFecha } from "../components/CampoFecha";
+import { EsqueletoPagina } from "../components/Movimiento";
+import {
+  ALTO_CONTENIDO_BARRA,
+  BarraInferior,
+  type PestanaInferior,
+} from "../components/BarraInferior";
 import {
   EncabezadoPerfil,
   ItemMenu,
@@ -43,6 +49,7 @@ import {
   Campo,
   Cargando,
   Casilla,
+  ContextoBarraInferior,
   Cuerpo,
   ErrorMensaje,
   LimiteError,
@@ -90,6 +97,10 @@ import {
   recuperarRegistro,
   type SolicitudRegistro,
 } from "../lib/registroPendiente";
+import {
+  guardarBarraInferior,
+  leerBarraInferior,
+} from "../lib/preferenciasFamilia";
 
 type Rol = "DOCENTE" | "REPRESENTANTE";
 type Curso = FunctionReturnType<
@@ -448,7 +459,7 @@ export function NucleoScreen() {
    * y el arranque para saber si ya hay alguno aprobado. Convex comparte la
    * suscripción con la pantalla de inicio: no es una consulta de más.
    */
-  const { results: hijos } = usePaginatedQuery(
+  const { results: hijos, status: estadoHijos } = usePaginatedQuery(
     api.nucleo.listarMisEstudiantes,
     perfil?.representanteId ? {} : "skip",
     { initialNumItems: 20 },
@@ -462,6 +473,44 @@ export function NucleoScreen() {
   const hijoAprobado = (hijos ?? []).find(
     (h) => h.estadoVerificacion === "APROBADO",
   );
+  /**
+   * Con al menos un hijo aprobado, la aplicación abre en **su reporte de
+   * hoy**, no en "Mis hijos". Es a lo que una familia entra cada tarde; "Mis
+   * hijos" tiene funciones que solo hacen falta al inicio del año lectivo
+   * —registrar, ver el estado de una solicitud— y obligar a pasar por ahí
+   * cada vez era un toque de más para lo que de verdad se usa a diario.
+   *
+   * **Solo una vez por apertura, y solo desde `inicio`.** Sin la bandera,
+   * cada vez que alguien tocara "Inicio" a propósito —desde el menú o la
+   * barra inferior— la aplicación lo rebotaría de vuelta al reporte, y
+   * "Inicio" dejaría de significar nada: apretarlo y no ir a ningún lado es
+   * peor que no tenerlo. La decisión solo se toma la primera vez que hay
+   * datos, justo después de abrir la app; a partir de ahí, "Inicio" vuelve a
+   * ser una decisión de quien lo toca, no una sugerencia que se deshace sola.
+   *
+   * ## Por qué es estado y no una ref, y por qué existe `decisionTomada`
+   *
+   * La primera versión usaba una `ref` y dejaba que `MisHijos` se pintara un
+   * instante mientras `listarMisEstudiantes` todavía cargaba, y el efecto
+   * recién *después* mandaba al reporte — un parpadeo real, no solo
+   * percibido: "Mis hijos" alcanza a pintarse una vez antes de que la
+   * redirección lo reemplace. `decisionTomada` es estado (no ref) justamente
+   * para poder **leerlo en el render** y no pintar "Mis hijos" hasta saber
+   * de verdad hacia dónde se va: con un representante, eso es esperar a que
+   * `estadoHijos` deje de estar en su primera carga.
+   */
+  const [decisionTomada, setDecisionTomada] = useState(false);
+  const esperandoHijos = !!perfil?.representanteId && estadoHijos === "LoadingFirstPage";
+  useEffect(() => {
+    if (decisionTomada || ruta.tipo !== "inicio" || esperandoHijos) return;
+    setDecisionTomada(true);
+    if (!hijoAprobado) return;
+    setRuta({
+      tipo: "reporteHoy",
+      estudianteId: hijoAprobado.estudianteId,
+      nombre: `${hijoAprobado.nombres} ${hijoAprobado.apellidos}`,
+    });
+  }, [decisionTomada, ruta.tipo, esperandoHijos, hijoAprobado]);
   const hijoDelMenu =
     "estudianteId" in ruta
       ? { estudianteId: ruta.estudianteId, nombre: ruta.nombre }
@@ -473,6 +522,101 @@ export function NucleoScreen() {
         : undefined;
   const nombreDelPerfil =
     `${perfil?.nombres ?? ""} ${perfil?.apellidos ?? ""}`.trim() || "Tu cuenta";
+  /**
+   * Las tres pestañas de la familia. Orden pedido: cita, inicio, reporte —
+   * el reporte del día queda a la derecha, más cerca del pulgar de quien
+   * sostiene el teléfono con una mano, porque es la que más se toca.
+   *
+   * "Reporte diario" se deshabilita sin `hijoDelMenu`: antes de tener un hijo
+   * aprobado no hay a qué reporte ir, y llevaría a una pantalla vacía en vez
+   * de a nada.
+   */
+  const pestanasFamilia: PestanaInferior[] = [
+    { clave: "citas", icono: "calendar-blank", etiqueta: "Pedir una cita" },
+    { clave: "inicio", icono: "home", etiqueta: "Inicio" },
+    {
+      clave: "reporteHoy",
+      icono: "file-document",
+      etiqueta: "Reporte diario",
+      disponible: hijoDelMenu !== undefined,
+    },
+  ];
+  const pestanaActiva =
+    ruta.tipo === "citas" || ruta.tipo === "inicio" || ruta.tipo === "reporteHoy"
+      ? ruta.tipo
+      : "";
+  const irAPestana = (clave: string) => {
+    if (clave === "reporteHoy") {
+      if (!hijoDelMenu) return;
+      setRuta({ tipo: "reporteHoy", estudianteId: hijoDelMenu.estudianteId, nombre: hijoDelMenu.nombre });
+      return;
+    }
+    setRuta({ tipo: clave as "citas" | "inicio" });
+  };
+
+  /**
+   * La preferencia de la familia: si quiere la barra o la apagó desde
+   * Ajustes. Vive en el teléfono (`preferenciasFamilia.ts`), no en Convex —
+   * ver ahí por qué. Empieza en `true` porque es el valor con el que llega
+   * toda cuenta nueva y porque la lectura es casi instantánea: el parpadeo de
+   * quien la apagó, entre montar y que la lectura resuelva, es imperceptible
+   * frente a que todo el mundo vea la pantalla sin barra un instante en cada
+   * apertura.
+   */
+  const [barraInferiorActiva, setBarraInferiorActiva] = useState(true);
+  useEffect(() => {
+    if (!perfil?.perfilUsuarioId) return;
+    let vivo = true;
+    void leerBarraInferior(perfil.perfilUsuarioId).then((activa) => {
+      if (vivo) setBarraInferiorActiva(activa);
+    });
+    return () => { vivo = false; };
+  }, [perfil?.perfilUsuarioId]);
+  const cambiarBarraInferior = (activa: boolean) => {
+    setBarraInferiorActiva(activa);
+    if (perfil?.perfilUsuarioId) void guardarBarraInferior(perfil.perfilUsuarioId, activa);
+  };
+
+  /**
+   * Esconderse al leer, aparecer al volver hacia arriba.
+   *
+   * `ultimoY` no es estado: cambia en cada evento de scroll, y ponerlo en
+   * `useState` forzaría un re-render por cada uno de ellos. `UMBRAL` evita que
+   * el temblor normal de un dedo parado cuente como "cambié de dirección" y
+   * la barra parpadee; `CERCA_DEL_TOPE` la mantiene siempre visible al
+   * principio de la pantalla, donde ocultarla a los dos primeros píxeles se
+   * sentiría roto en vez de útil.
+   */
+  const [barraVisible, setBarraVisible] = useState(true);
+  const ultimoY = useRef(0);
+  const manejarScrollPagina = (y: number) => {
+    const UMBRAL = 10;
+    const CERCA_DEL_TOPE = 24;
+    const delta = y - ultimoY.current;
+    ultimoY.current = y;
+    if (y < CERCA_DEL_TOPE) setBarraVisible(true);
+    else if (delta > UMBRAL) setBarraVisible(false);
+    else if (delta < -UMBRAL) setBarraVisible(true);
+  };
+  /**
+   * El mismo número que `BarraInferior` usa para su propio alto: `Pagina`
+   * necesita saber cuánto reservar de sitio para que la barra, cuando está
+   * visible, no tape el último elemento de la pantalla que esté abierta.
+   */
+  const margenesSistema = useSafeAreaInsets();
+  const rellenoBarraInferior =
+    ALTO_CONTENIDO_BARRA + Math.max(margenesSistema?.bottom ?? 0, Espacio.sm);
+  const contextoBarra =
+    perfil && rol === "REPRESENTANTE" && barraInferiorActiva
+      ? { onScroll: manejarScrollPagina, relleno: rellenoBarraInferior }
+      : null;
+  // Al cambiar de pantalla, la barra vuelve a mostrarse y el rastro de scroll
+  // se reinicia: si no, llegar a una pantalla nueva "escondido" porque la
+  // anterior habia quedado scrolleada hacia abajo se sentiria como un fallo.
+  useEffect(() => {
+    setBarraVisible(true);
+    ultimoY.current = 0;
+  }, [ruta]);
   const listaCursos = cursos?.cursos;
   const cursoActivo =
     "curso" in ruta
@@ -481,8 +625,13 @@ export function NucleoScreen() {
         ? listaCursos[0]
         : undefined;
   /**
-   * Las dos pantallas desde las que no hay a dónde volver: la lista de cursos
-   * y el curso abierto. Ahí manda la hamburguesa; más adentro, la flecha.
+   * Las dos pantallas del docente desde las que no hay a dónde volver: la
+   * lista de cursos y el curso abierto. Ahí manda la hamburguesa; más
+   * adentro, la flecha.
+   *
+   * El representante no tiene este dilema: un solo menú, sin "curso abierto"
+   * de por medio, así que la hamburguesa es siempre la respuesta correcta —
+   * ver `esRaizRepresentante` más abajo, donde se usa.
    */
   const esRaizDocente = ruta.tipo === "inicio" || ruta.tipo === "curso";
   /** Ir a un sitio desde el menú: navegar y cerrarlo, siempre juntos. */
@@ -515,16 +664,22 @@ export function NucleoScreen() {
   return (
     <SafeAreaView style={styles.pantalla}>
       <View style={styles.barra}>
-        {/* **Un solo icono a la izquierda.** Hamburguesa en las dos raíces
-            del docente —la lista de cursos y el curso abierto—, flecha en las
-            pantallas de dentro. Los dos juntos apretaban la barra y no decían
-            nada: desde una raíz no hay a dónde volver, y desde dentro el menú
-            se alcanza con un toque de vuelta.
+        {/* **Un solo icono a la izquierda.** Para el docente: hamburguesa en
+            las dos raíces —la lista de cursos y el curso abierto—, flecha en
+            las pantallas de dentro. Ahí sí hace falta la flecha, porque hay
+            "curso abierto" como nivel intermedio de navegación.
 
-            No hay gesto desde el borde: eso necesita `gesture-handler`, que es
-            nativo. La hamburguesa es la afordancia que descubre todo el mundo
-            de todas formas. */}
-        {perfil && (rol === "DOCENTE" ? esRaizDocente : ruta.tipo === "inicio") ? (
+            Para el representante: **siempre hamburguesa**. Solo tiene un
+            menú, sin nada intermedio como el curso del docente, así que un
+            botón de "volver" no llevaba a ningún sitio más útil que el propio
+            menú — era peor experiencia, no mejor. Salir de una pantalla se
+            hace desde el menú (eligiendo "Mis hijos" u otra opción) o con el
+            gesto/botón de atrás del sistema, que sigue funcionando igual.
+
+            No hay gesto desde el borde para abrir el menú: eso necesita
+            `gesture-handler`, que es nativo. La hamburguesa es la afordancia
+            que descubre todo el mundo de todas formas. */}
+        {perfil && (rol === "DOCENTE" ? esRaizDocente : true) ? (
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Abrir el menú"
@@ -602,6 +757,7 @@ export function NucleoScreen() {
         )}
       </View>
       <ErrorMensaje mensaje={salida.error} />
+      <ContextoBarraInferior.Provider value={contextoBarra}>
       <LimiteError key={`${ruta.tipo}-${rol}`} onVolver={volver}>
         {perfil === undefined ? (
           <Cargando mensaje="Cargando tu espacio..." />
@@ -631,7 +787,11 @@ export function NucleoScreen() {
         ) : ruta.tipo === "notificaciones" ? (
           <Notificaciones />
         ) : ruta.tipo === "ajustes" ? (
-          <Ajustes />
+          <Ajustes
+            esRepresentante={rol === "REPRESENTANTE"}
+            barraInferiorActiva={barraInferiorActiva}
+            onCambiarBarraInferior={cambiarBarraInferior}
+          />
         ) : ruta.tipo === "reclamos" ? (
           <ReclamosDocente />
         ) : ruta.tipo === "agenda" ? (
@@ -690,6 +850,10 @@ export function NucleoScreen() {
           <ReporteAcumulado
             estudianteId={ruta.estudianteId}
             nombre={ruta.nombre}
+            hijos={hijosAprobados}
+            onCambiarHijo={(estudianteId, nombre) =>
+              setRuta({ tipo: "acumulado", estudianteId: estudianteId as Id<"estudiante">, nombre })
+            }
             onVolver={() => setRuta({ ...ruta, tipo: "reporteHoy" })}
             onVerAccion={(accion) => setRuta({ ...ruta, tipo: "detalleAccion", accion })}
           />
@@ -730,6 +894,12 @@ export function NucleoScreen() {
             )}
             {rol === "DOCENTE" ? (
               <Cursos nombre={user?.firstName ?? ""} navegar={setRuta} />
+            ) : !decisionTomada ? (
+              // Mientras no se sabe si hay un hijo aprobado, no se pinta
+              // "Mis hijos": es exactamente lo que dejaba ver un parpadeo
+              // real cuando esa pantalla se pintaba un instante antes de que
+              // el efecto la reemplazara por el reporte del día.
+              <EsqueletoPagina etiqueta="Cargando tu espacio" />
             ) : (
               <MisHijos
                 nombre={user?.firstName ?? ""}
@@ -740,6 +910,21 @@ export function NucleoScreen() {
           </>
         )}
       </LimiteError>
+      </ContextoBarraInferior.Provider>
+      {/* Fuera de `LimiteError` y como hermana del contenido, no dentro: es
+          navegación fija, tiene que sobrevivir aunque la pantalla de arriba
+          reviente. Absoluta a propósito -- ver la cabecera de
+          `BarraInferior.tsx` para por qué, y por qué eso es lo que le permite
+          esconderse al leer sin dejar un hueco donde estaba. Se apaga del
+          todo (ni se monta) cuando la familia la desactivó desde Ajustes. */}
+      {perfil && rol === "REPRESENTANTE" && barraInferiorActiva && (
+        <BarraInferior
+          pestanas={pestanasFamilia}
+          activa={pestanaActiva}
+          visible={barraVisible}
+          onCambiar={irAPestana}
+        />
+      )}
       {/* Al final del árbol para que pinte por encima de todo lo demás. Se
           desmonta solo al terminar de cerrarse, así que no se queda
           interceptando toques invisible sobre la pantalla. */}

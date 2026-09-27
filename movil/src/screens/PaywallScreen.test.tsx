@@ -18,6 +18,10 @@ vi.mock("react-native", async () => ({
   Platform: { OS: "web" },
 }));
 vi.mock("../theme/Icono", () => ({ Icono: "Icono" }));
+
+// Theme.ts no lleva mock: son constantes, y comparar contra el mismo token
+// que usa el componente evita fijar el hex a mano en la prueba.
+const { Marca } = await import("../theme/Theme");
 vi.mock("../lib/compras", () => ({
   prepararCompras: async () => estado.motivoSinCompras,
   paquetesDisponibles: async () => estado.paquetes,
@@ -70,7 +74,7 @@ it("no escribe ningun precio en la pantalla", () => {
   }];
   const t = texto(pintar(<PaywallRepresentante />));
   expect(t).not.toMatch(/\$|USD|\d+[,.]\d{2}/);
-  expect(t).toContain("el precio lo vas a ver aquí en tu moneda");
+  expect(t).toContain("fase MVP");
 });
 
 /**
@@ -196,15 +200,16 @@ it("sin paquetes no ofrece comprar, y lo dice", async () => {
   const v = pintar(<PaywallRepresentante />);
   await act(async () => {});
   const t = texto(v);
-  expect(t).toContain("todavía no está disponible");
+  expect(t).toContain("fase MVP");
   expect(t).not.toContain("Suscribirme");
 });
 
 /**
  * ADR-006: el precio lo pone RevenueCat en la moneda de la persona. La
- * pantalla lo muestra tal cual llega, sin formatearlo ni traducirlo.
+ * pantalla lo muestra tal cual llega, sin formatearlo ni traducirlo -- ni
+ * siquiera para quitarle el símbolo de moneda y ponerlo aparte.
  */
-it("con paquete, el botón lleva el precio que puso RevenueCat", async () => {
+it("con paquete, el chip de precio lleva el precio que puso RevenueCat", async () => {
   estado.suscripcion = { representante: gratuito, docente: null };
   estado.planes = [PLAN_PREMIUM];
   estado.motivoSinCompras = null;
@@ -215,7 +220,54 @@ it("con paquete, el botón lleva el precio que puso RevenueCat", async () => {
 
   const v = pintar(<PaywallRepresentante />);
   await act(async () => {});
-  expect(texto(v)).toContain("Suscribirme por US$1.99");
+  expect(texto(v)).toContain("US$1.99");
+});
+
+/**
+ * Hasta el 26 de septiembre todo lo que no era ANUAL decía "Cobro mensual.",
+ * así que el plan bimestral del representante (H3: $2.99 cada dos meses)
+ * mentía sobre su propio ciclo de cobro.
+ */
+it("el plan bimestral no dice que cobra cada mes", async () => {
+  estado.suscripcion = { representante: gratuito, docente: null };
+  estado.planes = [{
+    ...PLAN_PREMIUM, codigo: "REP_PREMIUM_BIMESTRAL", periodicidad: "BIMESTRAL",
+  }];
+
+  const v = pintar(<PaywallRepresentante />);
+  await act(async () => {});
+  const t = texto(v);
+  expect(t).toContain("Cobro cada dos meses.");
+  expect(t).not.toContain("Cobro mensual.");
+});
+
+/**
+ * El chip de precio es a la vez el único elemento accionable de la tarjeta,
+ * así que necesita su propio feedback táctil -- el mismo tono claro de marca
+ * que usa el resto del sistema para "esto se está tocando".
+ */
+it("el chip de precio se tiñe de azul claro al presionarlo", async () => {
+  estado.suscripcion = { representante: gratuito, docente: null };
+  estado.planes = [PLAN_PREMIUM];
+  estado.motivoSinCompras = null;
+  estado.paquetes = [{
+    identificador: "$rc_monthly", productoId: "REP_PREMIUM_MENSUAL",
+    precio: "US$1.99", titulo: "Premium mensual",
+  }];
+
+  const v = pintar(<PaywallRepresentante />);
+  await act(async () => {});
+  const chip = v.root.findAll((n) =>
+    typeof n.props.accessibilityLabel === "string" &&
+    n.props.accessibilityLabel.startsWith("Suscribirme a"))[0];
+
+  const enReposo = [chip.props.style({ pressed: false })].flat(Infinity);
+  const presionado = [chip.props.style({ pressed: true })].flat(Infinity);
+
+  const conFondoClaro = (estilos: unknown[]) =>
+    estilos.some((s) => !!s && (s as { backgroundColor?: string }).backgroundColor === Marca.claro);
+  expect(conFondoClaro(enReposo)).toBe(false);
+  expect(conFondoClaro(presionado)).toBe(true);
 });
 
 /**
@@ -235,8 +287,12 @@ it("al comprar avisa de que el plan se activa solo, sin prometer acceso inmediat
 
   const v = pintar(<PaywallRepresentante />);
   await act(async () => {});
-  const boton = v.root.findAll((n) => typeof n.props.children === "string" &&
-    String(n.props.children).startsWith("Suscribirme"))[0];
+  // El precio ES el botón de compra ahora: no hay un "Suscribirme por..." de
+  // texto plano, así que se busca por la etiqueta de accesibilidad, que sigue
+  // diciendo qué hace y por cuánto -- un lector de pantalla no ve el chip.
+  const boton = v.root.findAll((n) =>
+    typeof n.props.accessibilityLabel === "string" &&
+    n.props.accessibilityLabel.startsWith("Suscribirme a"))[0];
   await act(async () => { boton.props.onPress(); });
 
   expect(estado.comprados).toEqual(["$rc_monthly"]);

@@ -7,7 +7,7 @@ vi.mock("react-native", async () => ({
 }));
 vi.mock("../theme/Icono", () => ({ Icono: "Icono" }));
 
-const { Campo, Pagina } = await import("./NucleoUI");
+const { Campo, ContextoBarraInferior, Interruptor, Pagina } = await import("./NucleoUI");
 
 const pintar = (elemento: React.ReactElement) => {
   let vista!: ReturnType<typeof create>;
@@ -92,4 +92,65 @@ it("sin atras ni accion, la pantalla no dibuja barra de encabezado", () => {
     </Pagina>,
   );
   expect(vista.root.findAllByProps({ accessibilityLabel: "Volver" })).toHaveLength(0);
+});
+
+/* ---------- Interruptor ---------- */
+
+it("el interruptor dice si está encendido, no solo lo pinta", () => {
+  const vista = pintar(
+    <Interruptor etiqueta="Mostrar la barra" encendido onChange={() => {}} />,
+  );
+  const boton = vista.root.findByProps({ accessibilityLabel: "Mostrar la barra" });
+  expect(boton.props.accessibilityRole).toBe("switch");
+  expect(boton.props.accessibilityState.checked).toBe(true);
+});
+
+it("tocar el interruptor avisa del cambio; no decide el valor por su cuenta", () => {
+  const cambios: number[] = [];
+  const vista = pintar(
+    <Interruptor
+      etiqueta="Mostrar la barra"
+      encendido={false}
+      onChange={() => cambios.push(Date.now())}
+    />,
+  );
+  act(() => vista.root.findByProps({ accessibilityLabel: "Mostrar la barra" }).props.onPress());
+  expect(cambios).toHaveLength(1);
+});
+
+/* ---------- ContextoBarraInferior en Pagina ---------- */
+
+it("sin proveedor, Pagina no reserva relleno ni reporta scroll", () => {
+  const vista = pintar(
+    <Pagina titulo="Inicio">
+      <React.Fragment />
+    </Pagina>,
+  );
+  const scroll = vista.root.findByType("ScrollView" as never);
+  expect(scroll.props.onScroll).toBeUndefined();
+});
+
+/**
+ * `Pagina` es la que decide reservar sitio y avisar del scroll -- pero solo
+ * cuando alguien puso el contexto por encima. Es justo lo que hace posible
+ * que `BarraInferior` funcione sin que las ~25 pantallas que usan `Pagina`
+ * tengan que declarar un prop nuevo cada una.
+ */
+it("con proveedor, Pagina reserva el relleno pedido y reenvía el scroll", () => {
+  const scrolls: number[] = [];
+  const vista = pintar(
+    <ContextoBarraInferior.Provider value={{ onScroll: (y) => scrolls.push(y), relleno: 88 }}>
+      <Pagina titulo="Inicio">
+        <React.Fragment />
+      </Pagina>
+    </ContextoBarraInferior.Provider>,
+  );
+  const scroll = vista.root.findByType("ScrollView" as never);
+  expect(
+    [scroll.props.contentContainerStyle].flat(Infinity).some(
+      (s: unknown) => (s as { paddingBottom?: number })?.paddingBottom === 88,
+    ),
+  ).toBe(true);
+  act(() => scroll.props.onScroll({ nativeEvent: { contentOffset: { y: 42 } } }));
+  expect(scrolls).toEqual([42]);
 });

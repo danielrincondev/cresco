@@ -13,6 +13,9 @@ const estado = vi.hoisted(() => ({
 vi.mock("react-native", async () => ({
   ...(await import("../test/mockReactNative")).reactNative(),
   Platform: { OS: "web" },
+  // `HijoActivo` (el selector de hijo con más de uno) usa `Modal` para su
+  // lista desplegable.
+  Modal: "Modal",
 }));
 vi.mock("../theme/Icono", () => ({ Icono: "Icono" }));
 vi.mock("convex/react", () => ({
@@ -171,4 +174,53 @@ it("abrir el reporte del día registra la lectura del reporte", async () => {
   hoy();
   await act(async () => {});
   expect(estado.lecturas).toContainEqual({ estudianteId: "e1", recurso: "REPORTE_ESTUDIANTE" });
+});
+
+/**
+ * El bug que Kenny encontró: sin parcial vigente hoy, el servidor devuelve
+ * `periodo: null` en vez de reventar. La pantalla tiene que sostener eso —
+ * título sin el nombre del parcial, y un aviso que explique la situación en
+ * vez de "No pudimos cargar esta vista".
+ */
+it("sin parcial vigente no revienta: título sin parcial, y lo dice", () => {
+  estado.acumulado = { ...(estado.acumulado as object), periodo: null };
+  const v = pintar(
+    <ReporteAcumulado estudianteId={"e1" as never} nombre="Ana Pérez" onVolver={() => {}} onVerAccion={() => {}} />,
+  );
+  expect(texto(v)).toContain("Hoy no hay un parcial en curso");
+  expect(texto(v)).not.toContain("undefined");
+});
+
+/**
+ * El punto de partida (51-60) es una franja como cualquier otra, no una
+ * ausencia de datos: la barra tiene que verse incluso sin una sola acción.
+ */
+it("la barra de franjas se pinta con el puntaje aunque la bitácora esté vacía", () => {
+  estado.acumulado = { ...(estado.acumulado as object), bitacora: [], puntaje: 60 };
+  const v = pintar(
+    <ReporteAcumulado estudianteId={"e1" as never} nombre="Ana Pérez" onVolver={() => {}} onVerAccion={() => {}} />,
+  );
+  const marcador = v.root.findAll((n) =>
+    Array.isArray(n.props.style) &&
+    n.props.style.some((s: unknown) => !!s && typeof s === "object" && "left" in (s as object)),
+  );
+  expect(marcador.length).toBeGreaterThan(0);
+  expect((marcador[0].props.style as { left: string }[]).find((s) => "left" in s)?.left).toBe("60%");
+});
+
+/** Con dos hijos, cambiar desde el acumulado no debería obligar a salir a Mis hijos. */
+it("con más de un hijo, ofrece el selector y avisa al cambiar", () => {
+  const cambios: [string, string][] = [];
+  const v = pintar(
+    <ReporteAcumulado
+      estudianteId={"e1" as never}
+      nombre="Ana Pérez"
+      hijos={[{ estudianteId: "e1", nombre: "Ana" }, { estudianteId: "e2", nombre: "Luis" }]}
+      onCambiarHijo={(id, nombre) => cambios.push([id, nombre])}
+      onVolver={() => {}}
+      onVerAccion={() => {}}
+    />,
+  );
+  const boton = v.root.findAll((n) => n.props.accessibilityLabel === "Viendo a Ana. Cambiar de hijo")[0];
+  expect(boton).toBeTruthy();
 });
