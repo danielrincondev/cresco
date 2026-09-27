@@ -630,6 +630,67 @@ describe("interaccion — cancelar una cita y registrar si la familia vino", () 
     expect(await avisosDe(segunda.e.representante)).toHaveLength(antes2);
   });
 
+  it("los acuerdos de una reunión atendida llegan a la familia y quedan en la cita", async () => {
+    const t = convexTest(schema, modules);
+    const { e, citaId } = await citaConfirmada(t);
+    vi.setSystemTime(INICIO + 20 * 60_000);
+    await e.docente.mutation(api.interaccion.registrarAsistenciaCita, { citaId, asistio: true });
+    await e.docente.mutation(api.interaccion.anotarAcuerdos, {
+      citaId, acuerdos: "  Revisar la agenda cada noche; volver a conversar en dos semanas.  ",
+    });
+
+    expect((await t.run((ctx) => ctx.db.get(citaId)))?.acuerdos)
+      .toBe("Revisar la agenda cada noche; volver a conversar en dos semanas.");
+    const aviso = (await avisosDe(e.representante)).find((n) => n.titulo === "Acuerdos de la reunión");
+    expect(aviso?.cuerpo).toBe(
+      "Reunión por Ana Pérez del jueves 10 de septiembre a las 12:30: " +
+        "Revisar la agenda cada noche; volver a conversar en dos semanas.",
+    );
+    const [deLaFamilia] = await e.representante.query(api.interaccion.misCitasRepresentante);
+    expect(deLaFamilia.acuerdos).toBe("Revisar la agenda cada noche; volver a conversar en dos semanas.");
+  });
+
+  it("los acuerdos se anotan una sola vez, y no vacíos", async () => {
+    const t = convexTest(schema, modules);
+    const { e, citaId } = await citaConfirmada(t);
+    vi.setSystemTime(INICIO + 20 * 60_000);
+    await e.docente.mutation(api.interaccion.registrarAsistenciaCita, { citaId, asistio: true });
+    await expect(e.docente.mutation(api.interaccion.anotarAcuerdos, { citaId, acuerdos: "  " }))
+      .rejects.toThrow("Lo que acordaron es obligatorio");
+    await e.docente.mutation(api.interaccion.anotarAcuerdos, { citaId, acuerdos: "Primera versión" });
+    await expect(e.docente.mutation(api.interaccion.anotarAcuerdos, { citaId, acuerdos: "Otra versión" }))
+      .rejects.toThrow("ya quedaron registrados");
+    expect((await t.run((ctx) => ctx.db.get(citaId)))?.acuerdos).toBe("Primera versión");
+  });
+
+  it("no hay acuerdos de una reunión que no ocurrió", async () => {
+    const t = convexTest(schema, modules);
+    const { e, citaId } = await citaConfirmada(t);
+    await expect(e.docente.mutation(api.interaccion.anotarAcuerdos, { citaId, acuerdos: "Algo" }))
+      .rejects.toThrow("a la que la familia asistió");
+    vi.setSystemTime(INICIO + 20 * 60_000);
+    await e.docente.mutation(api.interaccion.registrarAsistenciaCita, { citaId, asistio: false });
+    await expect(e.docente.mutation(api.interaccion.anotarAcuerdos, { citaId, acuerdos: "Algo" }))
+      .rejects.toThrow("a la que la familia asistió");
+  });
+
+  it("otro docente no anota acuerdos en una cita ajena", async () => {
+    const t = convexTest(schema, modules);
+    const { e, citaId } = await citaConfirmada(t);
+    vi.setSystemTime(INICIO + 20 * 60_000);
+    await e.docente.mutation(api.interaccion.registrarAsistenciaCita, { citaId, asistio: true });
+    await t.run(async (ctx) => {
+      const perfil = await ctx.db.insert("perfilUsuario", {
+        authSubject: "https://convex.test|docente_2", tipoDocumento: "CEDULA", numeroDocumento: "0900000009",
+        actualizadoEn: Date.now(),
+      });
+      await ctx.db.insert("docente", { perfilUsuarioId: perfil, actualizadoEn: Date.now() });
+    });
+    await expect(t.withIdentity({ subject: "docente_2" }).mutation(api.interaccion.anotarAcuerdos, {
+      citaId, acuerdos: "Algo",
+    })).rejects.toThrow("Esa cita no es tuya");
+  });
+
   it("el docente no confirma una solicitud cuya hora ya pasó", async () => {
     const t = convexTest(schema, modules);
     const e = await sembrarEscenario(t);

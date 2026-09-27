@@ -240,6 +240,7 @@ export function AgendaDocente({ curso }: { curso: Curso }) {
   const responder = useMutation(api.interaccion.responderCita);
   const registrar = useMutation(api.interaccion.registrarAsistenciaCita);
   const cancelar = useMutation(api.interaccion.cancelarCita);
+  const anotar = useMutation(api.interaccion.anotarAcuerdos);
   const [fecha, setFecha] = useState(hoyISO());
   const [horaInicio, setInicio] = useState("12:30");
   const [horaFin, setFin] = useState("13:00");
@@ -248,6 +249,7 @@ export function AgendaDocente({ curso }: { curso: Curso }) {
   const [mostrarTodasPasadas, setMostrarTodasPasadas] = useState(false);
   const [citando, setCitando] = useState(false);
   const [cancelando, setCancelando] = useState<CitaDocente>();
+  const [acordando, setAcordando] = useState<CitaDocente>();
   const publicacion = useOperacion();
   const respuesta = useOperacion();
   const asistencia = useOperacion();
@@ -270,6 +272,22 @@ export function AgendaDocente({ curso }: { curso: Curso }) {
   }
 
   if (citando) return <CitarFamilia curso={curso} onCerrar={() => setCitando(false)} />;
+  if (acordando) {
+    return (
+      <PedirMotivo
+        titulo="¿Qué acordaron?"
+        descripcion={`${acordando.estudianteNombre ?? "Reunión"} · ${fechaHoraLegible(acordando.fechaHoraInicio)}`}
+        etiqueta="Acuerdos"
+        ayuda="Lo recibe la familia y queda en el historial de la cita. Una vez guardados, no se cambian."
+        placeholder="Revisar la agenda cada noche; volver a conversar en dos semanas."
+        textoBoton="Guardar acuerdos"
+        textoVolver="Ahora no"
+        maxLength={1000}
+        enviar={(acuerdos) => anotar({ citaId: acordando._id, acuerdos })}
+        onCerrar={() => setAcordando(undefined)}
+      />
+    );
+  }
   if (cancelando) {
     const esCitacionPendiente =
       cancelando.origen === "CITACION_DOCENTE" && cancelando.estado === "SOLICITADA";
@@ -417,11 +435,14 @@ export function AgendaDocente({ curso }: { curso: Curso }) {
               <DatosCita cita={cita} ahora={ahora} para="DOCENTE" />
               <Boton
                 pendiente={asistencia.pendiente}
-                onPress={() =>
-                  void asistencia.ejecutar(() =>
+                onPress={async () => {
+                  const r = await asistencia.ejecutar(() =>
                     registrar({ citaId: cita._id, asistio: true }),
-                  )
-                }
+                  );
+                  // Justo después de la reunión es cuando mejor se recuerda
+                  // qué se acordó: se pregunta ahí, sin obligar.
+                  if (r.ok) setAcordando(cita);
+                }}
               >
                 Sí, vino
               </Boton>
@@ -476,6 +497,11 @@ export function AgendaDocente({ curso }: { curso: Curso }) {
           {pasadasVisibles.map((cita) => (
             <Tarjeta key={cita._id}>
               <DatosCita cita={cita} ahora={ahora} para="DOCENTE" />
+              {cita.estado === "ATENDIDA" && cita.acuerdos === undefined && (
+                <Boton secundario onPress={() => setAcordando(cita)}>
+                  Anotar acuerdos
+                </Boton>
+              )}
             </Tarjeta>
           ))}
           {pasadas.length > 5 && (
@@ -532,6 +558,7 @@ function DatosCita({
             : `Le escribiste: ${cita.mensajeRepresentante}`}
         </Cuerpo>
       )}
+      {cita.acuerdos && <Cuerpo>{`Acuerdos de la reunión: ${cita.acuerdos}`}</Cuerpo>}
       {cita.estado === "CANCELADA" && cita.motivoCancelacion && (
         <Cuerpo>
           {`${
@@ -548,10 +575,10 @@ function DatosCita({
 }
 
 /**
- * Cancelar una cita y decir que no se puede asistir a una citación piden lo
- * mismo: un texto que va a leer la otra parte. Ninguna de las dos cosas se
- * hace en silencio, así que el botón no se habilita hasta que haya algo
- * escrito — la misma regla que ya sigue la respuesta a un reclamo.
+ * Cancelar una cita, decir que no se puede asistir a una citación y anotar los
+ * acuerdos de una reunión piden lo mismo: un texto que va a leer la otra
+ * parte. Nada de eso se envía vacío, así que el botón no se habilita hasta que
+ * haya algo escrito — la misma regla que ya sigue la respuesta a un reclamo.
  */
 function PedirMotivo({
   titulo,
@@ -560,6 +587,8 @@ function PedirMotivo({
   ayuda,
   placeholder,
   textoBoton,
+  textoVolver = "Volver",
+  maxLength = 500,
   enviar,
   onCerrar,
 }: {
@@ -569,6 +598,8 @@ function PedirMotivo({
   ayuda: string;
   placeholder: string;
   textoBoton: string;
+  textoVolver?: string;
+  maxLength?: number;
   enviar: (texto: string) => Promise<unknown>;
   onCerrar: () => void;
 }) {
@@ -587,7 +618,7 @@ function PedirMotivo({
         ayuda={ayuda}
         multiline
         numberOfLines={3}
-        maxLength={500}
+        maxLength={maxLength}
         value={texto}
         onChangeText={setTexto}
         placeholder={placeholder}
@@ -598,7 +629,7 @@ function PedirMotivo({
         {textoBoton}
       </Boton>
       <Boton secundario onPress={onCerrar}>
-        Volver
+        {textoVolver}
       </Boton>
     </Pagina>
   );

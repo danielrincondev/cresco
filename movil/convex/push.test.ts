@@ -37,7 +37,7 @@ function mensajesEnviados(fetchFalso: ReturnType<typeof vi.fn>, peticion = 0) {
 async function sembrar(
   t: ReturnType<typeof convexTest>,
   opciones: {
-    tipo?: "ACCION_NEGATIVA" | "ACCION_POSITIVA" | "ALERTA_EMERGENCIA" | "REPORTE_DIARIO";
+    tipo?: "ACCION_NEGATIVA" | "ACCION_POSITIVA" | "ALERTA_EMERGENCIA" | "REPORTE_DIARIO" | "CITACION" | "RESUMEN_SEMANAL";
     tokens?: string[];
     enviadaEn?: number;
   } = {},
@@ -131,6 +131,24 @@ describe("push — lo que se le cuenta a Expo", () => {
       sound: null,
       priority: "normal",
     });
+  });
+});
+
+describe("push — lo que dice cada aviso nuevo", () => {
+  it("un aviso de cita no promete una cita: por ahí también llegan cancelaciones", async () => {
+    const t = convexTest(schema, modules);
+    const { notificacionId } = await sembrar(t, { tipo: "CITACION" });
+    const fetchCita = respondeExpo(ok);
+    await t.action(internal.push.enviar, { notificacionId });
+    expect(mensajesEnviados(fetchCita)[0].body).toBe("Hay novedades sobre una cita");
+  });
+
+  it("el resumen del sábado se anuncia sin nombrar a nadie", async () => {
+    const t = convexTest(schema, modules);
+    const { notificacionId } = await sembrar(t, { tipo: "RESUMEN_SEMANAL" });
+    const fetchResumen = respondeExpo(ok);
+    await t.action(internal.push.enviar, { notificacionId });
+    expect(mensajesEnviados(fetchResumen)[0].body).toBe("Ya está el resumen de la semana");
   });
 });
 

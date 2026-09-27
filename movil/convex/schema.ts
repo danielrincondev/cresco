@@ -680,6 +680,13 @@ export default defineSchema({
      */
     canceladaPor: v.optional(v.union(v.literal("DOCENTE"), v.literal("REPRESENTANTE"))),
     motivoCancelacion: v.optional(v.string()),
+    /**
+     * Solo en ATENDIDA: lo que se acordó en la reunión, escrito por el docente
+     * y visible para la familia. Se escribe **una vez** (`anotarAcuerdos`):
+     * es el acta de la reunión, y un acta que puede cambiar en silencio no
+     * sirve de constancia en ninguna carpeta.
+     */
+    acuerdos: v.optional(v.string()),
     ...actualizadoEn,
   })
     .index("por_representante", ["representanteId", "fechaHoraInicio"])

@@ -292,6 +292,48 @@ it("una cita confirmada cuya hora llegó pregunta si la familia vino, y lo regis
   expect(estado.mutaciones["interaccion:registrarAsistenciaCita"]).toHaveBeenCalledWith({ citaId: "c1", asistio: false });
 });
 
+it("tras 'Sí, vino' pregunta qué acordaron, y guarda los acuerdos", async () => {
+  estado.citas = [cita({ fechaHoraInicio: Date.now() - HORA, fechaHoraFin: Date.now() - HORA + 900000 })];
+  await act(async () => { vista = create(<AgendaDocente curso={curso} />); });
+  await tocar("Sí, vino");
+  expect(estado.mutaciones["interaccion:registrarAsistenciaCita"]).toHaveBeenCalledWith({ citaId: "c1", asistio: true });
+  expect(JSON.stringify(vista.toJSON())).toContain("¿Qué acordaron?");
+  expect(botonQueDice("Guardar acuerdos")!.props.disabled).toBe(true);
+  await escribir("Acuerdos", "Revisar la agenda cada noche");
+  await tocar("Guardar acuerdos");
+  expect(estado.mutaciones["interaccion:anotarAcuerdos"]).toHaveBeenCalledWith({
+    citaId: "c1", acuerdos: "Revisar la agenda cada noche",
+  });
+});
+
+it("los acuerdos se pueden dejar para después sin perder la asistencia", async () => {
+  estado.citas = [cita({ fechaHoraInicio: Date.now() - HORA, fechaHoraFin: Date.now() - HORA + 900000 })];
+  await act(async () => { vista = create(<AgendaDocente curso={curso} />); });
+  await tocar("Sí, vino");
+  await tocar("Ahora no");
+  expect(estado.mutaciones["interaccion:anotarAcuerdos"]).not.toHaveBeenCalled();
+  expect(JSON.stringify(vista.toJSON())).toContain("Atención a familias");
+});
+
+it("en el historial, una reunión sin acuerdos ofrece anotarlos y una con acuerdos los muestra", async () => {
+  estado.citas = [
+    cita({ _id: "sin", estado: "ATENDIDA", fechaHoraInicio: Date.now() - 2 * HORA }),
+    cita({ _id: "con", estado: "ATENDIDA", fechaHoraInicio: Date.now() - 3 * HORA, acuerdos: "Volver a conversar en dos semanas" }),
+  ];
+  await act(async () => { vista = create(<AgendaDocente curso={curso} />); });
+  expect(JSON.stringify(vista.toJSON())).toContain("Acuerdos de la reunión: Volver a conversar en dos semanas");
+  expect(vista.root.findAllByType(Boton).filter((b) => b.props.children === "Anotar acuerdos")).toHaveLength(1);
+  await tocar("Anotar acuerdos");
+  expect(JSON.stringify(vista.toJSON())).toContain("¿Qué acordaron?");
+});
+
+it("la familia lee los acuerdos en su lista de citas", async () => {
+  estado.status = "Exhausted";
+  estado.citas = [cita({ estado: "ATENDIDA", fechaHoraInicio: Date.now() - HORA, acuerdos: "Revisar la agenda" })];
+  await act(async () => { vista = create(<CitasFamilia />); });
+  expect(JSON.stringify(vista.toJSON())).toContain("Acuerdos de la reunión: Revisar la agenda");
+});
+
 it("el docente cancela una próxima cita solo después de escribir el motivo", async () => {
   estado.citas = [cita({})];
   await act(async () => { vista = create(<AgendaDocente curso={curso} />); });

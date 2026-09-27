@@ -721,6 +721,60 @@ export const registrarAsistenciaCita = mutation({
   }),
 });
 
+/** Unas líneas, no un informe: es lo que se acordó, no la reunión entera. */
+const ACUERDOS_MAX = 1000;
+
+/**
+ * El docente deja escrito lo que se acordó en una reunión a la que la familia
+ * asistió, y la familia lo recibe.
+ *
+ * De las entrevistas del 1 de septiembre: lo que pide el distrito es "una
+ * carpeta de todas las citaciones, informes... lo que más vale es el informe
+ * escrito". Una cita marcada como atendida prueba que hubo reunión; esto
+ * prueba **qué se habló**. Es también lo que un informe imprimible (DP-009)
+ * tendría que imprimir.
+ *
+ * Una sola vez: ver `acuerdos` en el esquema.
+ */
+export const anotarAcuerdos = mutation({
+  args: { citaId: v.id("cita"), acuerdos: v.string() },
+  handler: (ctx, args) => conErroresPublicos(async () => {
+    const docente = await exigirDocente(ctx);
+    const cita = await ctx.db.get(args.citaId);
+    if (cita === null) throw new ErrorDominio("NO_ENCONTRADO", "La cita no existe.");
+    if (cita.docenteId !== docente._id) {
+      throw new ErrorDominio("SIN_PERMISO", "Esa cita no es tuya.");
+    }
+    if (cita.estado !== "ATENDIDA") {
+      throw new ErrorDominio("CONFLICTO", "Solo se anotan acuerdos de una reunión a la que la familia asistió.");
+    }
+    if (cita.acuerdos !== undefined) {
+      throw new ErrorDominio("CONFLICTO", "Los acuerdos de esta reunión ya quedaron registrados.");
+    }
+    const acuerdos = exigirTexto(args.acuerdos, "Lo que acordaron");
+    if (acuerdos.length > ACUERDOS_MAX) {
+      throw new ErrorDominio("VALIDACION", `Los acuerdos no pueden pasar de ${ACUERDOS_MAX} caracteres.`);
+    }
+
+    await ctx.db.patch(cita._id, { acuerdos, actualizadoEn: Date.now() });
+
+    const representante = await ctx.db.get(cita.representanteId);
+    if (representante !== null) {
+      const nombre = (await nombreDelEstudiante(ctx, cita.estudianteId)) ?? "tu representado";
+      await notificar(
+        ctx,
+        representante.perfilUsuarioId,
+        "CITACION",
+        "Acuerdos de la reunión",
+        `Reunión por ${nombre} del ${cuandoEnTexto(cita.fechaHoraInicio)}: ${acuerdos}`,
+        "cita",
+        cita._id,
+      );
+    }
+    return cita._id;
+  }),
+});
+
 /**
  * Los bloques libres del propio docente, para elegir uno al citar a una
  * familia. `desde` lo manda la pantalla y no sale del reloj del servidor: una
