@@ -7,7 +7,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 
 import { api, internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
-import { momentosDeRecordatorio } from "./interaccion";
+import { momentoRecordatorioCitacion, momentosDeRecordatorio } from "./interaccion";
 import schema from "./schema";
 import { exportJWK, generateKeyPair, SignJWT } from "jose";
 
@@ -501,6 +501,72 @@ describe("interaccion — citación del docente", () => {
     });
     const despues = await e.docente.query(api.interaccion.misBloquesLibres, { desde: "2026-09-07" });
     expect(despues.map((b) => b.horaInicio)).toEqual(["12:45"]);
+  });
+
+  it("una citación sin respuesta se recuerda la víspera a las 19:00, o dos horas antes si ya es tarde", () => {
+    const VISPERA = new Date("2026-09-09T19:00:00-05:00").getTime();
+    expect(momentoRecordatorioCitacion(INICIO, AHORA.getTime())).toBe(VISPERA);
+    // Enviada el miércoles a las 20:00: la víspera ya pasó.
+    expect(momentoRecordatorioCitacion(INICIO, new Date("2026-09-09T20:00:00-05:00").getTime()))
+      .toBe(new Date("2026-09-10T10:30:00-05:00").getTime());
+    // Enviada con menos de dos horas de margen: no hay recordatorio que valga.
+    expect(momentoRecordatorioCitacion(INICIO, new Date("2026-09-10T11:00:00-05:00").getTime())).toBeNull();
+  });
+
+  it("si la familia no respondió, la víspera se le recuerda a ella y se le avisa al docente", async () => {
+    const t = convexTest(schema, modules);
+    const e = await sembrarEscenario(t);
+    const citaId = await e.docente.mutation(api.interaccion.citarFamilia, {
+      disponibilidadDocenteId: await bloqueDelDocente(e), estudianteId: e.estudianteId, motivo: "Hablar",
+    });
+    const tareas = (await t.run((ctx) => ctx.db.system.query("_scheduled_functions").collect()))
+      .filter((p) => p.name === "interaccion:recordarCitacionSinRespuesta");
+    expect(tareas).toHaveLength(1);
+    expect(tareas[0].scheduledTime).toBe(new Date("2026-09-09T19:00:00-05:00").getTime());
+
+    vi.setSystemTime(tareas[0].scheduledTime);
+    expect(await t.mutation(internal.interaccion.recordarCitacionSinRespuesta, { citaId, fechaHoraInicio: INICIO })).toBe(true);
+    const aFamilia = (await avisosDe(e.representante)).find((n) => n.titulo === "Tienes una citación sin responder");
+    expect(aFamilia?.cuerpo).toBe("El docente de Ana Pérez te citó para mañana a las 12:30. Confírmale si puedes asistir.");
+    expect(aFamilia?.tipo).toBe("RECORDATORIO_CITA");
+    const alDocente = (await avisosDe(e.docente)).find((n) => n.titulo === "La familia todavía no responde");
+    expect(alDocente?.cuerpo).toBe("Ana Pérez: citación de mañana a las 12:30, sin respuesta. Se lo recordamos a la familia.");
+  });
+
+  it("enviada tarde, el recordatorio de dos horas antes dice 'hoy'", async () => {
+    vi.setSystemTime(new Date("2026-09-09T20:00:00-05:00"));
+    const t = convexTest(schema, modules);
+    const e = await sembrarEscenario(t);
+    const citaId = await e.docente.mutation(api.interaccion.citarFamilia, {
+      disponibilidadDocenteId: await bloqueDelDocente(e), estudianteId: e.estudianteId, motivo: "Hablar",
+    });
+    vi.setSystemTime(new Date("2026-09-10T10:30:00-05:00"));
+    await t.mutation(internal.interaccion.recordarCitacionSinRespuesta, { citaId, fechaHoraInicio: INICIO });
+    const aviso = (await avisosDe(e.representante)).find((n) => n.titulo === "Tienes una citación sin responder");
+    expect(aviso?.cuerpo).toContain("te citó para hoy a las 12:30");
+  });
+
+  it.each([
+    ["la familia ya confirmó", "confirmar"],
+    ["la familia ya dijo que no puede", "declinar"],
+    ["el docente la retiró", "retirar"],
+  ] as const)("si %s, no se recuerda nada", async (_caso, accion) => {
+    const t = convexTest(schema, modules);
+    const e = await sembrarEscenario(t);
+    const citaId = await e.docente.mutation(api.interaccion.citarFamilia, {
+      disponibilidadDocenteId: await bloqueDelDocente(e), estudianteId: e.estudianteId, motivo: "Hablar",
+    });
+    if (accion === "confirmar") {
+      await e.representante.mutation(api.interaccion.responderCitacion, { citaId, asistira: true });
+    } else if (accion === "declinar") {
+      await e.representante.mutation(api.interaccion.responderCitacion, { citaId, asistira: false, mensaje: "No puedo" });
+    } else {
+      await e.docente.mutation(api.interaccion.cancelarCita, { citaId, como: "DOCENTE", motivo: "Ya no hace falta" });
+    }
+    await terminarTareas(t);
+    const avisos = [...await avisosDe(e.representante), ...await avisosDe(e.docente)];
+    expect(avisos.map((n) => n.titulo)).not.toContain("Tienes una citación sin responder");
+    expect(avisos.map((n) => n.titulo)).not.toContain("La familia todavía no responde");
   });
 
   it("las agendas traen el nombre del estudiante y el lugar del bloque", async () => {

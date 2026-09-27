@@ -532,6 +532,13 @@ export const citarFamilia = mutation({
       "cita",
       citaId,
     );
+    const recordar = momentoRecordatorioCitacion(inicio, ahora);
+    if (recordar !== null) {
+      await ctx.scheduler.runAt(recordar, internal.interaccion.recordarCitacionSinRespuesta, {
+        citaId,
+        fechaHoraInicio: inicio,
+      });
+    }
     return citaId;
   }),
 });
@@ -830,13 +837,41 @@ export function momentosDeRecordatorio(
   inicio: number,
   ahora: number,
 ): { momento: MomentoRecordatorio; en: number }[] {
-  const medianocheLocal =
-    Math.floor((inicio - DESFASE_GUAYAQUIL) / DIA) * DIA + DESFASE_GUAYAQUIL;
   const candidatos = [
-    { momento: "VISPERA" as const, en: medianocheLocal - DIA + HORA_VISPERA * HORA },
+    { momento: "VISPERA" as const, en: visperaDe(inicio) },
     { momento: "UNA_HORA" as const, en: inicio - HORA },
   ];
   return candidatos.filter((c) => c.en > ahora);
+}
+
+/** Medianoche de Guayaquil del día en que cae `instante`. */
+const medianocheLocal = (instante: number) =>
+  Math.floor((instante - DESFASE_GUAYAQUIL) / DIA) * DIA + DESFASE_GUAYAQUIL;
+
+/** Las 19:00 del día anterior a `inicio`, en hora de Guayaquil. */
+const visperaDe = (inicio: number) => medianocheLocal(inicio) - DIA + HORA_VISPERA * HORA;
+
+/** Con menos margen que esto, recordar una citación ya no le sirve a nadie. */
+const MARGEN_CITACION = 2 * HORA;
+
+/**
+ * Cuándo recordar una citación que la familia no ha respondido: la víspera a
+ * las 19:00, igual que una cita confirmada. Si la citación salió después de
+ * esa hora, dos horas antes; con menos margen que eso, nunca.
+ */
+export function momentoRecordatorioCitacion(inicio: number, ahora: number): number | null {
+  const vispera = visperaDe(inicio);
+  if (vispera > ahora) return vispera;
+  const antes = inicio - MARGEN_CITACION;
+  return antes > ahora ? antes : null;
+}
+
+/** "hoy a las 12:30", "mañana a las 12:30" o "el jueves 10 de septiembre a las 12:30". */
+function cuandoDesde(instante: number, ahora: number): string {
+  const dias = Math.round((medianocheLocal(instante) - medianocheLocal(ahora)) / DIA);
+  if (dias === 0) return `hoy a las ${horaLocal(instante)}`;
+  if (dias === 1) return `mañana a las ${horaLocal(instante)}`;
+  return `el ${cuandoEnTexto(instante)}`;
 }
 
 /** Al quedar confirmada una cita, por cualquiera de las dos partes. */
@@ -949,6 +984,50 @@ async function presentarCitas(ctx: QueryCtx, citas: Doc<"cita">[]) {
   }));
   return presentadas.sort((a, b) => b.fechaHoraInicio - a.fechaHoraInicio);
 }
+
+/**
+ * La familia no respondió una citación y ya es la víspera (o faltan dos
+ * horas): se le recuerda a ella, y se le avisa al docente, que así sabe con
+ * tiempo que quizá nadie llegue y puede volver a citar.
+ *
+ * Programada por `citarFamilia`. Como `recordarCita`, relee la cita al
+ * dispararse: si la familia ya respondió, o la citación se retiró o cambió de
+ * hora, no hace nada.
+ */
+export const recordarCitacionSinRespuesta = internalMutation({
+  args: { citaId: v.id("cita"), fechaHoraInicio: v.number() },
+  returns: v.boolean(),
+  handler: async (ctx, args): Promise<boolean> => {
+    const cita = await ctx.db.get(args.citaId);
+    const ahora = Date.now();
+    if (cita === null || cita.origen !== "CITACION_DOCENTE" || cita.estado !== "SOLICITADA" ||
+        cita.fechaHoraInicio !== args.fechaHoraInicio || cita.fechaHoraInicio <= ahora) {
+      return false;
+    }
+
+    const nombre = (await nombreDelEstudiante(ctx, cita.estudianteId)) ?? "tu representado";
+    const cuando = cuandoDesde(cita.fechaHoraInicio, ahora);
+    const representante = await ctx.db.get(cita.representanteId);
+    if (representante !== null) {
+      await notificar(
+        ctx, representante.perfilUsuarioId, "RECORDATORIO_CITA",
+        "Tienes una citación sin responder",
+        `El docente de ${nombre} te citó para ${cuando}. Confírmale si puedes asistir.`,
+        "cita", cita._id,
+      );
+    }
+    const docente = await ctx.db.get(cita.docenteId);
+    if (docente !== null) {
+      await notificar(
+        ctx, docente.perfilUsuarioId, "CITACION",
+        "La familia todavía no responde",
+        `${nombre}: citación de ${cuando}, sin respuesta. Se lo recordamos a la familia.`,
+        "cita", cita._id,
+      );
+    }
+    return true;
+  },
+});
 
 /** Citas del representante autenticado (P8). */
 export const misCitasRepresentante = query({
