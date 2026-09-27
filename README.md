@@ -7,6 +7,86 @@ El estudiante nunca es usuario de la aplicación.
 Desarrollado por el equipo **Neofix** para el RevenueCat Shipaton 2026,
 categoría Next Gen.
 
+> **For Shipaton judges — English summary.** Cresco connects teachers and
+> parents in Ecuadorian public schools around a child's school day: a daily
+> report, a behaviour record whose score the family can dispute, meetings
+> the teacher can call and document, and an emergency alert. In our field
+> interviews teachers told us that a WhatsApp message is not evidence ("what
+> counts is the written report"), so Cresco keeps a record of which families
+> saw each notice, who opened each daily report, and what was agreed at each
+> meeting. Monetisation runs on **RevenueCat**: a Premium entitlement for
+> families (seven past reports instead of two, no ads) and a PRO entitlement
+> for teachers (up to five courses), confirmed server-side by a RevenueCat
+> webhook in Convex, with Test Store purchases flagged as sandbox. Families on
+> the free plan see an AdMob banner whose revenue is reported to RevenueCat
+> through `Purchases.adTracker`; teachers never see ads. Built with Expo
+> (React Native), Clerk and Convex. The app is in Spanish; the demo video has
+> English subtitles.
+
+## Qué hace Cresco hoy
+
+**El docente**
+
+- Crea sus cursos y parciales, invita a las familias con un código y aprueba
+  a cada estudiante que registran.
+- Anota conducta positiva o negativa. El puntaje del parcial se **deriva** de
+  las anotaciones vigentes; una anotación se puede deshacer.
+- Pasa lista, publica el reporte del día y ve **quién lo abrió**. Publica
+  avisos y eventos al curso y ve **qué familias los vieron**.
+- Ve el panorama del curso: quién no tiene ninguna anotación y las negativas
+  que más se repiten.
+- Atiende a las familias: publica su horario de atención, confirma las citas
+  que le piden, **cita él mismo a una familia**, cancela con motivo, registra
+  si la familia asistió y deja por escrito **los acuerdos de la reunión**.
+- Ve el **historial de cada familia**: sus citas con los acuerdos, los avisos
+  que vio y los que no, los reportes que abrió y sus reclamos.
+- Responde los reclamos de las familias, con un plazo de 30 días que vence
+  solo y sube de prioridad.
+- Envía una alerta de emergencia al curso, después de volver a confirmar su
+  contraseña. La aplicación declara que no sustituye al ECU 911.
+
+**La familia**
+
+- Registra a su hijo con el código del curso y acepta el consentimiento.
+- Lee el reporte del día (en vivo, antes de que se publique), un resumen de
+  la semana los fines de semana, los reportes anteriores y el acumulado del
+  parcial, con frases de acompañamiento.
+- Reclama una anotación con la que no está de acuerdo.
+- Pide citas, responde las citaciones del docente y recibe los acuerdos.
+- Recibe avisos en el teléfono: el reporte publicado, anotaciones, avisos del
+  curso, citas y alertas.
+
+**Lo que corre solo**
+
+- Cierre nocturno a las 22:00: publica los borradores y genera los reportes.
+- Resumen de la semana por aviso, los sábados a las 09:00.
+- Recordatorios de cada cita, la noche anterior y una hora antes, y de las
+  citaciones que la familia no ha respondido.
+- Vencimiento de cada reclamo a los 30 días.
+
+## Monetización con RevenueCat
+
+| | Gratuito | De pago |
+|---|---|---|
+| **Familia** (`premium`) | 2 reportes anteriores, con anuncio | Premium mensual o bimestral: 7 reportes anteriores, sin anuncios |
+| **Docente** (`docente_pro`) | 1 curso, hasta 40 estudiantes | PRO: hasta 5 cursos, 60 estudiantes por curso |
+
+- Los precios los pone RevenueCat en la moneda de cada persona (ADR-006); la
+  aplicación no guarda ninguno.
+- La compra la confirma el servidor: el webhook de RevenueCat
+  (`/webhooks/revenuecat`, en `movil/convex/http.ts`) actualiza la suscripción
+  en Convex, y el acceso se decide ahí. Una suscripción cancelada conserva el
+  acceso hasta que expira.
+- Las compras del Test Store quedan marcadas como de prueba (ADR-008), para
+  que la demostración no se mezcle con un piloto real.
+- El anuncio (AdMob) solo existe en pantallas de la familia y desaparece con
+  Premium. Sus ingresos se reportan a RevenueCat con `Purchases.adTracker`.
+  Hasta publicar en una tienda usa los identificadores de prueba de Google.
+
+El detalle, incluida la build de desarrollo que hace falta para comprar de
+verdad, está en
+[`docs/04-guias/integracion-revenuecat.md`](docs/04-guias/integracion-revenuecat.md).
+
 ## Estado del proyecto
 
 La implementación activa es una sola aplicación Expo con autenticación de Clerk
@@ -14,24 +94,23 @@ y backend de Convex:
 
 | Pieza | Estado |
 |---|---|
-| Aplicación Expo (`movil/`) | Implementado: arranque, sesión y cierre de sesión |
-| Clerk para Expo | Implementado: proveedor, caché segura de token y flujo alojado |
-| Convex (`movil/convex/`) | Implementado: configuración de Clerk y consulta autenticada |
-| Esquema de datos (`convex/schema.ts`) | Implementado: 41 tablas, portadas del modelo relacional original |
+| Aplicación Expo (`movil/`) | 29 de las 31 pantallas del inventario, para docente y familia. Faltan importar estudiantes por CSV (D9, opcional) y exportar el informe en PDF, que espera la próxima build ([pendientes](docs/02-equipo/pendientes-proxima-build.md)) |
+| Clerk para Expo | Implementado: proveedor, caché segura de token, correo y Google |
+| Esquema de datos (`convex/schema.ts`) | 43 tablas, portadas del modelo relacional original |
 | Reglas de negocio y guardas (`convex/lib/`) | Implementado: constantes de dominio, guardas de integridad, capa de permisos |
-| Datos semilla (`convex/semillas.ts`) | Implementado y cargado en al menos un despliegue de desarrollo |
-| Webhook de RevenueCat (`convex/http.ts`) | Implementado, con pruebas (`npm test`) |
+| `convex/nucleo.ts` | Perfiles, cursos, parciales, invitaciones, vinculación y aprobación |
+| `convex/conducta.ts` | Anotaciones y puntaje, asistencia, reportes, cierre nocturno, avisos del curso y constancia de lectura |
+| `convex/interaccion.ts` | Citas y citaciones, reclamos, alertas, dispositivos y bandeja |
+| `convex/push.ts` | Envío por dispositivo con reintentos y recibos de Expo. El texto que llega al teléfono nunca nombra al estudiante |
+| `convex/suscripciones.ts` y webhook de RevenueCat | Implementado, con pruebas |
+| `convex/auditoria.ts` | Los cuatro eventos de DP-006 (`LOGIN`, `LEER_SENSIBLE`, `CREAR`/`ANULAR` acción, `APROBAR`), además de `ACTUALIZAR` y `ALERTA` |
+| Reautenticación antes de una alerta (`convex/lib/reautenticacion.ts`) | Implementado: verifica la firma de Clerk contra el JWKS y exige verificación reciente |
+| Datos semilla (`convex/semillas.ts`) | Catálogos: franjas, categorías de conducta, planes y plantilla del reporte |
 | Sistema de diseño (`movil/src/theme/Theme.ts`) | Implementado: color, tipografía, espaciado, iconografía |
-| Integración continua (`.github/workflows/ci.yml`) | Implementado: tipos y 252 pruebas en cada PR |
+| Integración continua (`.github/workflows/ci.yml`) | Tipos, más de 600 pruebas y empaquetado de Android en cada PR |
 | Propiedad por módulo (`.github/CODEOWNERS`) | Implementado: protección de `main` activa; exige CI y revisión |
 | Banderas de activación (`convex/lib/flags.ts`) | Implementado |
 | Bitwarden Secrets Manager | Estructura lista en `.env.schema`, **sin vault compartido configurado todavía** — ver más abajo |
-| `convex/nucleo.ts` | Implementado: perfiles, cursos, períodos, invitaciones, vinculación y aprobación |
-| `convex/interaccion.ts` | Implementado: citas, reclamos, alertas, dispositivos y bandeja. Push y recálculo tras resolver reclamos pendientes de integración |
-| `convex/conducta.ts` | Parcial: registrar acción con recálculo derivado. Asistencia, reportes y cierre nocturno en curso |
-| `convex/auditoria.ts` | Productores implementados: `LOGIN` conectado; conexión de `LEER_SENSIBLE` a las pantallas en PR #62 |
-| Reautenticación antes de una alerta (`convex/lib/reautenticacion.ts`) | Implementado: verifica la firma de Clerk contra el JWKS y exige verificación reciente |
-| **Las 31 pantallas del producto** | **En construcción.** Hechas: alta de perfil, cursos y parciales, invitación y vinculación, consentimiento, aprobación de estudiantes, reclamos, agenda de citas, alerta de emergencia, notificaciones y ajustes |
 
 No existe un servidor HTTP ni una base de datos SQL separados. `servidor/`,
 `db/`, Better Auth, Next.js, PostgreSQL y Drizzle fueron retirados al adoptar
@@ -46,15 +125,14 @@ Clerk + Convex.
 - `movil/convex/auth.config.ts`: valida en Convex los JWT emitidos por Clerk.
 - `movil/convex/lib/`: reglas de dominio, guardas de integridad y permisos. Todo
   acceso a datos de un estudiante pasa por aquí, nunca por la pantalla.
+- `movil/convex/crons.ts`: las tareas programadas.
 - `movil/.env.schema`: contrato de configuración de Clerk y Convex.
 
 ### Dos cosas que conviene saber antes de leer el código
 
-**El puntaje de conducta se deriva de las acciones vigentes** (ADR-005). Al
-registrar una acción se recalcula y se guarda el resultado en `puntajePeriodo`.
-La resolución de un reclamo ya cambia el estado y los puntos de la acción,
-pero **todavía falta conectar el recálculo del período en ese flujo** (#9): el
-total guardado puede quedar desactualizado hasta que se recalcule.
+**El puntaje de conducta se deriva de las acciones vigentes** (ADR-005).
+Registrar o anular una acción, y resolver un reclamo que la modifica o la
+anula, recalculan el período y guardan el resultado en `puntajePeriodo`.
 
 **El estudiante nunca es usuario.** No tiene cuenta ni puede iniciar sesión. Sus
 datos los aporta su representante legal o su docente, y quién puede leerlos se
@@ -124,6 +202,9 @@ npm run dev
 `convex:sync-auth-env` copia el Frontend API URL de Clerk al despliegue Convex.
 No se usa un archivo `.env` local para secretos.
 
+Comprar de verdad y ver el anuncio exige una build de desarrollo de EAS, no
+Expo Go: los dos SDKs son nativos. Los pasos están en la guía de RevenueCat.
+
 ## Comandos
 
 | Comando | Qué hace |
@@ -132,8 +213,8 @@ No se usa un archivo `.env` local para secretos.
 | `npm run convex:dev` | Configura o sincroniza el backend Convex |
 | `npm run convex:sync-auth-env` | Configura el emisor JWT de Clerk en Convex |
 | `npm run env:check` | Valida y resuelve la configuración |
-| `npm run typecheck` | Comprueba TypeScript |
-| `npm test` | Ejecuta las pruebas de funciones Convex |
+| `npm run typecheck` | Comprueba TypeScript de la app y de Convex |
+| `npm test` | Ejecuta las pruebas: funciones de Convex y pantallas |
 | `npm run build` | Comprueba tipos (no empaqueta; el bundle lo verifica el CI) |
 
 ## Comprobaciones antes de un PR
@@ -142,6 +223,13 @@ No se usa un archivo `.env` local para secretos.
 npm run env:check
 npm run typecheck
 npm test
+```
+
+El CI además empaqueta la app de Android. Si cambias dependencias o imports,
+córrelo también antes de abrir el PR:
+
+```bash
+cd movil && npx expo export --platform android --output-dir /tmp/export
 ```
 
 ## Desarrollo diario
