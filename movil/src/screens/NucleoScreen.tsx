@@ -74,6 +74,7 @@ import {
 } from "./ReporteScreen";
 import {
   AgendaDocente,
+  HistorialFamilia,
   Ajustes,
   PerfilDocente,
   ProfesorACargo,
@@ -154,6 +155,8 @@ type Ruta =
         | "recientes";
       curso: Curso;
     }
+  // Lleva el curso para que "atrás" vuelva a él, como las demás de un curso.
+  | { tipo: "historialFamilia"; curso: Curso; estudianteId: Id<"estudiante">; nombre: string }
   | { tipo: "invitacion"; invitacion: Invitacion; curso: Curso }
   | { tipo: "aprobar"; curso: Curso; alumno: Alumno };
 
@@ -845,6 +848,12 @@ export function NucleoScreen() {
           <ReclamosDocente />
         ) : ruta.tipo === "agenda" ? (
           <AgendaDocente curso={ruta.curso} />
+        ) : ruta.tipo === "historialFamilia" ? (
+          <HistorialFamilia
+            estudianteId={ruta.estudianteId}
+            nombre={ruta.nombre}
+            onVolver={() => setRuta({ tipo: "curso", curso: ruta.curso })}
+          />
         ) : ruta.tipo === "alerta" ? (
           <AlertaDocente curso={ruta.curso} />
         ) : ruta.tipo === "anotar" ? (
@@ -1428,7 +1437,12 @@ function DetalleCurso({
           aprobar={(alumno) => navegar({ tipo: "aprobar", curso, alumno })}
         />
       ) : (
-        <Estudiantes curso={curso} />
+        <Estudiantes
+          curso={curso}
+          onVerHistorial={(estudianteId, nombre) =>
+            navegar({ tipo: "historialFamilia", curso, estudianteId, nombre })
+          }
+        />
       )}
 
       {/*
@@ -1509,7 +1523,13 @@ function Pendientes({
     </>
   );
 }
-function Estudiantes({ curso }: { curso: Curso }) {
+function Estudiantes({
+  curso,
+  onVerHistorial,
+}: {
+  curso: Curso;
+  onVerHistorial: (estudianteId: Id<"estudiante">, nombre: string) => void;
+}) {
   const { results, status, loadMore } = usePaginatedQuery(
     api.nucleo.listarEstudiantes,
     { cursoId: curso.id },
@@ -1533,6 +1553,12 @@ function Estudiantes({ curso }: { curso: Curso }) {
               {a.nombres} {a.apellidos}
             </Subtitulo>
             <Cuerpo>Matrícula activa</Cuerpo>
+            <Boton
+              secundario
+              onPress={() => onVerHistorial(a.estudianteId, `${a.nombres} ${a.apellidos}`)}
+            >
+              Historial de la familia
+            </Boton>
           </Tarjeta>
         ))
       )}

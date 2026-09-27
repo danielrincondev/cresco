@@ -782,6 +782,131 @@ describe("interaccion — cancelar una cita y registrar si la familia vino", () 
   });
 });
 
+describe("interaccion — historial de la familia", () => {
+  const INICIO = new Date("2026-09-10T12:30:00-05:00").getTime();
+
+  /** Dos avisos del curso (uno visto) y dos reportes (uno abierto). */
+  async function sembrarAvisosYReportes(t: ReturnType<typeof convexTest>, e: Awaited<ReturnType<typeof sembrarEscenario>>) {
+    await t.run(async (ctx) => {
+      const aviso = (titulo: string) => ctx.db.insert("comunicadoCurso", {
+        cursoId: e.cursoId, tipo: "NOTA_PROFESOR", alcance: "CURSO", titulo, contenido: "Texto",
+        visibleDesde: "2026-09-07", visibleHasta: "2026-09-08", creadoPorDocenteId: e.docenteId,
+        activo: true, actualizadoEn: Date.now(),
+      });
+      const visto = await aviso("Reunión de padres");
+      await aviso("Traer materiales");
+      await ctx.db.insert("vistaComunicado", {
+        comunicadoCursoId: visto, representanteId: e.representanteId, estudianteId: e.estudianteId, vistoEn: Date.now(),
+      });
+      for (const [fecha, abierto] of [["2026-09-07", true], ["2026-09-08", false]] as const) {
+        const reporte = await ctx.db.insert("reporteEstudiante", {
+          matriculaId: e.matriculaId, periodoAcademicoId: e.periodoAcademicoId, fecha,
+          tieneNovedades: false, puntajeAlCierre: 60, generadoEn: Date.now(),
+        });
+        await ctx.db.insert("entregaReporte", {
+          reporteEstudianteId: reporte, representanteId: e.representanteId, entregadoEn: Date.now(),
+          ...(abierto ? { leidoEn: Date.now() } : {}),
+        });
+      }
+    });
+  }
+
+  it("junta las citas con este docente, los avisos que vio, los reportes que abrió y sus reclamos", async () => {
+    const t = convexTest(schema, modules);
+    const e = await sembrarEscenario(t);
+    // Una citación a la que la familia fue, con sus acuerdos...
+    const citacion = await e.docente.mutation(api.interaccion.citarFamilia, {
+      disponibilidadDocenteId: await bloqueDelDocente(e), estudianteId: e.estudianteId, motivo: "Hablar de las tareas",
+    });
+    await e.representante.mutation(api.interaccion.responderCitacion, { citaId: citacion, asistira: true });
+    // ...y una cita que pidió la familia y el docente no pudo aceptar.
+    const otroBloque = await e.docente.mutation(api.interaccion.publicarDisponibilidad, {
+      fecha: "2026-09-10", horaInicio: "12:45", horaFin: "13:00",
+    });
+    const pedida = await e.representante.mutation(api.interaccion.solicitarCita, {
+      disponibilidadDocenteId: otroBloque, estudianteId: e.estudianteId,
+    });
+    await e.docente.mutation(api.interaccion.responderCita, { citaId: pedida, aceptar: false });
+    await sembrarAvisosYReportes(t, e);
+    await abrirReclamo(t, e);
+    vi.setSystemTime(INICIO + 20 * 60_000);
+    await e.docente.mutation(api.interaccion.registrarAsistenciaCita, { citaId: citacion, asistio: true });
+    await e.docente.mutation(api.interaccion.anotarAcuerdos, { citaId: citacion, acuerdos: "Revisar la agenda" });
+
+    const historial = await e.docente.query(api.interaccion.historialDeLaFamilia, { estudianteId: e.estudianteId });
+    expect(historial).toMatchObject({
+      estudiante: "Ana Pérez",
+      // El perfil del representante de prueba no tiene nombres: se dice así, sin inventar uno.
+      representante: { nombre: null },
+      reportes: { entregados: 2, abiertos: 1 },
+      reclamos: { total: 1, sinResolver: 1 },
+    });
+    expect(historial.citas.map((c) => [c.origen, c.estado])).toEqual([
+      ["SOLICITADA_POR_REPRESENTANTE", "RECHAZADA"],
+      ["CITACION_DOCENTE", "ATENDIDA"],
+    ]);
+    expect(historial.citas[1]).toMatchObject({ acuerdos: "Revisar la agenda", estudianteNombre: "Ana Pérez" });
+    expect(historial.avisos.map((a) => [a.titulo, a.visto])).toEqual([
+      ["Traer materiales", false],
+      ["Reunión de padres", true],
+    ]);
+  });
+
+  it("sin representante vinculado lo dice, y no cuenta nada como visto ni abierto", async () => {
+    const t = convexTest(schema, modules);
+    const e = await sembrarEscenario(t);
+    await sembrarAvisosYReportes(t, e);
+    await t.run(async (ctx) => {
+      for (const vinculo of await ctx.db.query("vinculoRepresentacion").collect()) {
+        await ctx.db.patch(vinculo._id, { estado: "REVOCADO" });
+      }
+    });
+    const historial = await e.docente.query(api.interaccion.historialDeLaFamilia, { estudianteId: e.estudianteId });
+    expect(historial.representante).toBeNull();
+    expect(historial.avisos.every((a) => !a.visto)).toBe(true);
+    expect(historial.reportes).toEqual({ entregados: 0, abiertos: 0 });
+  });
+
+  it("las citas que la familia tiene con otro docente del curso no entran", async () => {
+    const t = convexTest(schema, modules);
+    const e = await sembrarEscenario(t);
+    await t.run(async (ctx) => {
+      const perfil = await ctx.db.insert("perfilUsuario", {
+        authSubject: "https://convex.test|docente_2", tipoDocumento: "CEDULA", numeroDocumento: "0900000009",
+        actualizadoEn: Date.now(),
+      });
+      const docenteId = await ctx.db.insert("docente", { perfilUsuarioId: perfil, actualizadoEn: Date.now() });
+      await ctx.db.insert("asignacionDocente", {
+        cursoId: e.cursoId, docenteId, rol: "COLABORADOR", vigenteDesde: "2026-05-04", actualizadoEn: Date.now(),
+      });
+    });
+    const colaborador = t.withIdentity({ subject: "docente_2" });
+    const bloque = await colaborador.mutation(api.interaccion.publicarDisponibilidad, {
+      fecha: "2026-09-10", horaInicio: "10:00", horaFin: "10:15",
+    });
+    await colaborador.mutation(api.interaccion.citarFamilia, {
+      disponibilidadDocenteId: bloque, estudianteId: e.estudianteId, motivo: "Tareas de inglés",
+    });
+    expect((await e.docente.query(api.interaccion.historialDeLaFamilia, { estudianteId: e.estudianteId })).citas).toEqual([]);
+    expect((await colaborador.query(api.interaccion.historialDeLaFamilia, { estudianteId: e.estudianteId })).citas).toHaveLength(1);
+  });
+
+  it("un docente sin ese curso no puede ver el historial", async () => {
+    const t = convexTest(schema, modules);
+    const e = await sembrarEscenario(t);
+    await t.run(async (ctx) => {
+      const perfil = await ctx.db.insert("perfilUsuario", {
+        authSubject: "https://convex.test|docente_3", tipoDocumento: "CEDULA", numeroDocumento: "0900000010",
+        actualizadoEn: Date.now(),
+      });
+      await ctx.db.insert("docente", { perfilUsuarioId: perfil, actualizadoEn: Date.now() });
+    });
+    await expect(t.withIdentity({ subject: "docente_3" }).query(api.interaccion.historialDeLaFamilia, {
+      estudianteId: e.estudianteId,
+    })).rejects.toThrow("no pertenece a un curso tuyo");
+  });
+});
+
 describe("interaccion — inconformidades", () => {
   it("no se puede reclamar una accion positiva", async () => {
     const t = convexTest(schema, modules);

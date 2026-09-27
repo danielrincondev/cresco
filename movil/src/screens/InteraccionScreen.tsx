@@ -59,6 +59,7 @@ import {
 import { parrafosLegibles } from "../lib/texto";
 import {
   fechaHoraLegible,
+  fechaISO,
   fechaLegible,
   hoyISO,
   plazoLegible,
@@ -68,6 +69,7 @@ import { Espacio, Radio, Semantico, Superficie, Tamano, Texto } from "../theme/T
 type Curso = FunctionReturnType<typeof api.nucleo.listarCursos>["cursos"][number];
 type CitaDocente = FunctionReturnType<typeof api.interaccion.misCitasDocente>[number];
 type CitaFamilia = FunctionReturnType<typeof api.interaccion.misCitasRepresentante>[number];
+type Historial = FunctionReturnType<typeof api.interaccion.historialDeLaFamilia>;
 type Reclamo = FunctionReturnType<
   typeof api.interaccion.inconformidadesDelDocente
 >[number];
@@ -771,6 +773,152 @@ function CitarFamilia({ curso, onCerrar }: { curso: Curso; onCerrar: () => void 
       )}
       <Boton secundario onPress={() => setElegido(undefined)}>
         Elegir otro estudiante
+      </Boton>
+    </Pagina>
+  );
+}
+
+/* ==========================================================================
+ * Historial de una familia, para el docente
+ * ======================================================================= */
+
+const cuenta = (n: number, uno: string, varios: string) => `${n} ${n === 1 ? uno : varios}`;
+
+/**
+ * Las cuatro líneas del resumen, en castellano y no en tabla: el docente lo
+ * lee de pie, entre clase y clase, y "asistió a 2 y faltó a 1" se entiende
+ * de un vistazo donde "Atendidas: 2 · No asistió: 1" pide detenerse.
+ */
+export function resumenDelHistorial(h: Historial): string[] {
+  const lineas: string[] = [];
+
+  if (h.citas.length === 0) {
+    lineas.push("Todavía no tuvo citas contigo.");
+  } else {
+    const citadas = h.citas.filter((c) => c.origen === "CITACION_DOCENTE").length;
+    lineas.push(
+      `${cuenta(h.citas.length, "cita", "citas")} contigo` +
+        (citadas === 0
+          ? "."
+          : citadas === h.citas.length
+            ? h.citas.length === 1 ? ", citada por ti." : ", todas citadas por ti."
+            : `, ${cuenta(citadas, "citada", "citadas")} por ti.`),
+    );
+    const vino = h.citas.filter((c) => c.estado === "ATENDIDA").length;
+    const falto = h.citas.filter((c) => c.estado === "NO_ASISTIO").length;
+    const asistencia = [vino > 0 && `asistió a ${vino}`, falto > 0 && `faltó a ${falto}`].filter(Boolean);
+    if (asistencia.length > 0) {
+      const frase = asistencia.join(" y ");
+      lineas.push(`${frase[0].toUpperCase()}${frase.slice(1)}.`);
+    }
+  }
+
+  const vistos = h.avisos.filter((a) => a.visto).length;
+  lineas.push(
+    h.avisos.length === 0
+      ? "Todavía no hay avisos del curso."
+      : h.avisos.length === 1
+        ? vistos === 1 ? "Vio el último aviso del curso." : "No vio el último aviso del curso."
+        : vistos === h.avisos.length
+          ? `Vio los ${h.avisos.length} avisos más recientes del curso.`
+          : `Vio ${vistos} de los ${h.avisos.length} avisos más recientes del curso.`,
+  );
+
+  const { entregados, abiertos } = h.reportes;
+  lineas.push(
+    entregados === 0
+      ? "Todavía no recibió reportes."
+      : entregados === 1
+        ? abiertos === 1 ? "Abrió su último reporte." : "No abrió su último reporte."
+        : `Abrió ${abiertos} de sus últimos ${entregados} reportes.`,
+  );
+
+  lineas.push(
+    h.reclamos.total === 0
+      ? "Sin reclamos sobre tus anotaciones."
+      : `${cuenta(h.reclamos.total, "reclamo", "reclamos")} sobre tus anotaciones` +
+          (h.reclamos.sinResolver === 0 ? ", ya resueltos." : `, ${h.reclamos.sinResolver} sin resolver.`),
+  );
+  return lineas;
+}
+
+/**
+ * Todo lo que Cresco sabe de la relación con una familia, en una pantalla.
+ *
+ * De las entrevistas del 1 de septiembre: cuando un alumno pierde el año, el
+ * distrito le pide al docente "una carpeta de todas las citaciones, informes".
+ * Esto es lo que la aplicación puede poner en esa carpeta: las citas con lo
+ * que se acordó, los avisos que la familia vio y los que no, los reportes que
+ * abrió. La pantalla dice que no reemplaza el expediente del plantel (DP-009).
+ */
+export function HistorialFamilia({
+  estudianteId,
+  nombre,
+  onVolver,
+}: {
+  estudianteId: Id<"estudiante">;
+  nombre: string;
+  onVolver: () => void;
+}) {
+  const historial = useQuery(api.interaccion.historialDeLaFamilia, { estudianteId });
+
+  if (historial === undefined) return <EsqueletoPagina etiqueta="Cargando el historial" />;
+
+  const ahora = Date.now();
+  const noVistos = historial.avisos.filter((a) => !a.visto);
+
+  return (
+    <Pagina titulo="Historial de la familia" descripcion={nombre} atras={{ onPress: onVolver }}>
+      <Tarjeta>
+        <Text style={i.etiqueta}>Representante</Text>
+        <Cuerpo>
+          {historial.representante === null
+            ? "Sin representante vinculado en Cresco."
+            : historial.representante.nombre ?? "Vinculado, todavía sin nombre registrado."}
+        </Cuerpo>
+      </Tarjeta>
+
+      <Tarjeta>
+        <Subtitulo>En resumen</Subtitulo>
+        {resumenDelHistorial(historial).map((linea) => (
+          <Cuerpo key={linea}>{linea}</Cuerpo>
+        ))}
+      </Tarjeta>
+      <Aviso>
+        Es lo que Cresco registró de la relación con esta familia. No reemplaza
+        el expediente del plantel.
+      </Aviso>
+
+      <Subtitulo>Citas</Subtitulo>
+      {historial.citas.length === 0 ? (
+        <EstadoVacio icono="calendar-blank" titulo="Sin citas todavía">
+          Aquí van a quedar las citas y citaciones con esta familia, con lo que
+          se acordó en cada una.
+        </EstadoVacio>
+      ) : (
+        historial.citas.map((cita) => (
+          <Tarjeta key={cita._id}>
+            <DatosCita cita={cita} ahora={ahora} para="DOCENTE" />
+          </Tarjeta>
+        ))
+      )}
+
+      {noVistos.length > 0 && (
+        <>
+          <Subtitulo>Avisos que no vio</Subtitulo>
+          {noVistos.map((aviso) => (
+            <Tarjeta key={aviso.id}>
+              <Cuerpo>{aviso.titulo}</Cuerpo>
+              <Text style={i.etiqueta}>
+                {`Publicado el ${fechaLegible(fechaISO(aviso.publicadoEn))}`}
+              </Text>
+            </Tarjeta>
+          ))}
+        </>
+      )}
+
+      <Boton secundario onPress={onVolver}>
+        Volver al curso
       </Boton>
     </Pagina>
   );

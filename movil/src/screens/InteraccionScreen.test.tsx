@@ -15,6 +15,7 @@ const estado = vi.hoisted(() => ({
   citas: [] as any[],
   notificaciones: [] as any[],
   bloques: [] as any[],
+  historial: undefined as any,
   mutaciones: {} as Record<string, ReturnType<typeof vi.fn>>,
 }));
 vi.mock("react-native", async () => ({
@@ -34,6 +35,7 @@ vi.mock("convex/react", () => ({
     const nombre = getFunctionName(ref);
     if (nombre === "interaccion:misNotificaciones") return estado.notificaciones;
     if (nombre === "interaccion:misBloquesLibres") return estado.bloques;
+    if (nombre === "interaccion:historialDeLaFamilia") return estado.historial;
     return estado.citas;
   },
   usePaginatedQuery: () => ({ results: estado.hijos, status: estado.status, loadMore: estado.loadMore }),
@@ -45,7 +47,7 @@ vi.mock("convex/react", () => ({
     return vi.fn();
   },
 }));
-import { AgendaDocente, AlertaDocente, Ajustes, CitasFamilia, Notificaciones } from "./InteraccionScreen";
+import { AgendaDocente, AlertaDocente, Ajustes, CitasFamilia, HistorialFamilia, Notificaciones, resumenDelHistorial } from "./InteraccionScreen";
 import { Boton, Campo, Casilla, Opciones } from "../components/NucleoUI";
 
 let vista: ReactTestRenderer;
@@ -60,6 +62,7 @@ beforeEach(() => {
   estado.citas = [];
   estado.notificaciones = [];
   estado.bloques = [];
+  estado.historial = undefined;
   estado.mutaciones = {};
   estado.startVerification.mockResolvedValue({ supportedFirstFactors: [{ strategy: "password" }] });
   estado.attemptFirstFactorVerification.mockResolvedValue({ status: "complete" });
@@ -498,3 +501,74 @@ it("sin onAbrir, tocar una notificación solo la marca leída y no revienta", as
   const fila = vista.root.findByProps({ accessibilityLabel: "Aviso, sin leer" });
   await expect(act(async () => fila.props.onPress())).resolves.toBeUndefined();
 });
+
+/* ---------- Historial de una familia ---------- */
+
+const historialVacio = {
+  estudiante: "Ana Pérez", representante: { nombre: "María Pérez" }, citas: [] as any[],
+  avisos: [] as any[], reportes: { entregados: 0, abiertos: 0 }, reclamos: { total: 0, sinResolver: 0 },
+};
+
+it("el historial resume la relación con la familia y avisa que no es el expediente", async () => {
+  estado.historial = {
+    ...historialVacio,
+    citas: [
+      cita({ _id: "a", estado: "ATENDIDA", origen: "CITACION_DOCENTE", fechaHoraInicio: Date.now() - 2 * 86400000, acuerdos: "Revisar la agenda" }),
+      cita({ _id: "b", estado: "NO_ASISTIO", origen: "CITACION_DOCENTE", fechaHoraInicio: Date.now() - 9 * 86400000 }),
+      cita({ _id: "c", estado: "RECHAZADA", fechaHoraInicio: Date.now() - 20 * 86400000 }),
+    ],
+    avisos: [
+      { id: "k1", titulo: "Reunión de padres", publicadoEn: Date.UTC(2026, 8, 15, 15), visto: true },
+      { id: "k2", titulo: "Traer materiales", publicadoEn: Date.UTC(2026, 8, 16, 15), visto: false },
+    ],
+    reportes: { entregados: 10, abiertos: 7 },
+    reclamos: { total: 2, sinResolver: 1 },
+  };
+  await act(async () => { vista = create(<HistorialFamilia estudianteId={"e1" as never} nombre="Ana Pérez" onVolver={() => {}} />); });
+  const texto = JSON.stringify(vista.toJSON());
+  for (const linea of [
+    "María Pérez",
+    "3 citas contigo, 2 citadas por ti.",
+    "Asistió a 1 y faltó a 1.",
+    "Vio 1 de los 2 avisos más recientes del curso.",
+    "Abrió 7 de sus últimos 10 reportes.",
+    "2 reclamos sobre tus anotaciones, 1 sin resolver.",
+    "No reemplaza",
+    "Acuerdos de la reunión: Revisar la agenda",
+  ]) expect(texto).toContain(linea);
+  // Solo el aviso que no vio va en la lista de pendientes.
+  expect(texto).toContain("Avisos que no vio");
+  expect(texto).toContain("Traer materiales");
+  expect(texto.split("Reunión de padres").length).toBe(1);
+});
+
+it("un historial sin nada todavía lo dice con frases, no con ceros", () => {
+  expect(resumenDelHistorial(historialVacio as never)).toEqual([
+    "Todavía no tuvo citas contigo.",
+    "Todavía no hay avisos del curso.",
+    "Todavía no recibió reportes.",
+    "Sin reclamos sobre tus anotaciones.",
+  ]);
+});
+
+it("el resumen no fuerza plurales ni ceros", () => {
+  const una = { ...historialVacio, citas: [cita({ estado: "ATENDIDA", origen: "CITACION_DOCENTE" })],
+    avisos: [{ id: "k", titulo: "Aviso", publicadoEn: 0, visto: false }],
+    reportes: { entregados: 1, abiertos: 1 }, reclamos: { total: 1, sinResolver: 0 } };
+  expect(resumenDelHistorial(una as never)).toEqual([
+    "1 cita contigo, citada por ti.",
+    "Asistió a 1.",
+    "No vio el último aviso del curso.",
+    "Abrió su último reporte.",
+    "1 reclamo sobre tus anotaciones, ya resueltos.",
+  ]);
+});
+
+it("sin representante vinculado, el historial lo dice", async () => {
+  estado.historial = { ...historialVacio, representante: null };
+  await act(async () => { vista = create(<HistorialFamilia estudianteId={"e1" as never} nombre="Ana Pérez" onVolver={() => {}} />); });
+  const texto = JSON.stringify(vista.toJSON());
+  expect(texto).toContain("Sin representante vinculado en Cresco.");
+  expect(texto).toContain("Sin citas todavía");
+});
+

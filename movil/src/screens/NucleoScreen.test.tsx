@@ -77,9 +77,19 @@ vi.mock("convex/react", () => ({
     if (nombre === "nucleo:listarCursos") return estado.cursos;
     if (nombre === "interaccion:misCitasDocente") return [];
     if (nombre === "interaccion:misBloquesLibres") return [];
+    if (nombre === "nucleo:obtenerCalendarioCurso") return { periodos: [] };
+    if (nombre === "interaccion:historialDeLaFamilia") return {
+      estudiante: "Ana Pérez", representante: null, citas: [], avisos: [],
+      reportes: { entregados: 0, abiertos: 0 }, reclamos: { total: 0, sinResolver: 0 },
+    };
     return estado.perfil;
   },
-  usePaginatedQuery: () => ({ results: estado.hijos, status: estado.estadoHijos, loadMore: vi.fn() }),
+  // Como Convex: una consulta en "skip" no trae nada. Sin esto, al docente le
+  // llegaban como "hijos" los estudiantes de prueba y la app lo mandaba al
+  // reporte de un hijo que no tiene.
+  usePaginatedQuery: (_ref: unknown, args: unknown) => args === "skip"
+    ? { results: [], status: "LoadingFirstPage", loadMore: vi.fn() }
+    : { results: estado.hijos, status: estado.estadoHijos, loadMore: vi.fn() },
   useMutation: (ref: Parameters<typeof getFunctionName>[0]) => {
     const nombre = getFunctionName(ref);
     if (!estado.funciones.has(nombre)) estado.funciones.set(nombre, async (args: unknown) => {
@@ -511,5 +521,21 @@ it("con varios cursos y ninguno identificado, no adivina: se queda en la campana
   await montar();
   await abrirAviso("La familia confirmó la citación");
   expect(JSON.stringify(vista!.toJSON())).not.toContain("Atención a familias");
+});
+
+it("desde la lista de estudiantes del curso se abre el historial de su familia, y atrás vuelve al curso", async () => {
+  estado.perfil = { ...perfil, representanteId: null, docenteId: "docente" as never };
+  estado.cursos = { cursos: [cursoDePrueba("curso-a", "Quinto A")], limitePlan: 1 };
+  estado.hijos = [{ estudianteId: "e1", nombres: "Ana", apellidos: "Pérez", estadoVerificacion: "APROBADO" }];
+  await montar();
+  await act(async () => vista!.root.findByProps({ accessibilityLabel: "Abrir Quinto A" }).props.onPress());
+  await pulsar("Historial de la familia");
+  let texto = JSON.stringify(vista!.toJSON());
+  expect(texto).toContain("Historial de la familia");
+  expect(texto).toContain("Sin representante vinculado en Cresco.");
+  await pulsar("Volver al curso");
+  texto = JSON.stringify(vista!.toJSON());
+  expect(texto).not.toContain("Sin representante vinculado en Cresco.");
+  expect(texto).toContain("Historial de la familia"); // otra vez el botón, en la lista del curso
 });
 

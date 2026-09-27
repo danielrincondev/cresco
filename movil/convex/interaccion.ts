@@ -1055,6 +1055,117 @@ export const misCitasDocente = query({
   }),
 });
 
+/** Cuántos avisos y reportes recientes entran en el historial de una familia. */
+const HISTORIAL_AVISOS = 15;
+const HISTORIAL_REPORTES = 15;
+
+/**
+ * El historial de la relación con una familia, para el docente: sus citas y
+ * citaciones con él, qué avisos del curso vio, qué reportes abrió, y sus
+ * reclamos.
+ *
+ * De las entrevistas del 1 de septiembre: cuando un alumno pierde el año, el
+ * distrito le pide al docente "una carpeta de todas las citaciones, informes".
+ * Esto junta en una pantalla lo que Cresco ya sabe de esa carpeta. No la
+ * reemplaza (DP-009): es lo que la aplicación registró, no el expediente del
+ * plantel, y la pantalla lo dice.
+ *
+ * Solo las citas y los reclamos **de este docente**: los que la familia tenga
+ * con otro docente son de esa relación, no de esta.
+ */
+export const historialDeLaFamilia = query({
+  args: { estudianteId: v.id("estudiante") },
+  handler: (ctx, args) => conErroresPublicos(async () => {
+    const { docente, matricula } = await exigirAccesoDocenteAEstudiante(ctx, args.estudianteId);
+    const vinculo = await ctx.db
+      .query("vinculoRepresentacion")
+      .withIndex("por_estudiante_estado", (q) =>
+        q.eq("estudianteId", args.estudianteId).eq("estado", "ACTIVO"),
+      )
+      .unique();
+    const representante = vinculo === null ? null : await ctx.db.get(vinculo.representanteId);
+    const perfil = representante === null ? null : await ctx.db.get(representante.perfilUsuarioId);
+
+    const deEsteDocente = await ctx.db
+      .query("cita")
+      .withIndex("por_docente", (q) => q.eq("docenteId", docente._id))
+      .collect();
+    const citas = await presentarCitas(
+      ctx,
+      deEsteDocente.filter((c) => c.estudianteId === args.estudianteId),
+    );
+
+    // Los avisos que le llegaron: los del curso y los dirigidos a este hijo.
+    const comunicados = (await ctx.db
+      .query("comunicadoCurso")
+      .withIndex("por_curso_ventana", (q) => q.eq("cursoId", matricula.cursoId).eq("activo", true))
+      .collect())
+      .filter((c) => c.alcance === "CURSO" || c.estudianteId === args.estudianteId)
+      .sort((a, b) => b._creationTime - a._creationTime)
+      .slice(0, HISTORIAL_AVISOS);
+    const avisos = await Promise.all(comunicados.map(async (c) => ({
+      id: c._id,
+      titulo: c.titulo,
+      publicadoEn: c._creationTime,
+      visto: vinculo !== null && (await ctx.db
+        .query("vistaComunicado")
+        .withIndex("por_comunicado_representante", (q) =>
+          q.eq("comunicadoCursoId", c._id).eq("representanteId", vinculo.representanteId),
+        )
+        .first()) !== null,
+    })));
+
+    const reportes = await ctx.db
+      .query("reporteEstudiante")
+      .withIndex("por_matricula_fecha", (q) => q.eq("matriculaId", matricula._id))
+      .order("desc")
+      .take(HISTORIAL_REPORTES);
+    let entregados = 0;
+    let abiertos = 0;
+    for (const reporte of reportes) {
+      const entrega = vinculo === null ? null : await ctx.db
+        .query("entregaReporte")
+        .withIndex("por_reporte_representante", (q) =>
+          q.eq("reporteEstudianteId", reporte._id).eq("representanteId", vinculo.representanteId),
+        )
+        .unique();
+      if (entrega === null) continue;
+      entregados++;
+      if (entrega.leidoEn !== undefined) abiertos++;
+    }
+
+    const reclamosDelDocente = await ctx.db
+      .query("inconformidad")
+      .withIndex("por_docente_estado", (q) => q.eq("docenteId", docente._id))
+      .collect();
+    const reclamos: Doc<"inconformidad">[] = [];
+    for (const reclamo of reclamosDelDocente) {
+      const accion = await ctx.db.get(reclamo.accionRegistradaId);
+      const suya = accion === null ? null : await ctx.db.get(accion.matriculaId);
+      if (suya?.estudianteId === args.estudianteId) reclamos.push(reclamo);
+    }
+
+    return {
+      estudiante: (await nombreDelEstudiante(ctx, args.estudianteId)) ?? "Estudiante",
+      // `null`: sin representante vinculado. `nombre: null`: vinculado, pero
+      // su perfil es anterior a los nombres (#52).
+      representante: representante === null ? null : {
+        nombre: perfil && (perfil.nombres || perfil.apellidos)
+          ? `${perfil.nombres ?? ""} ${perfil.apellidos ?? ""}`.trim()
+          : null,
+      },
+      citas,
+      avisos,
+      reportes: { entregados, abiertos },
+      reclamos: {
+        total: reclamos.length,
+        sinResolver: reclamos.filter((r) =>
+          r.estado === "ABIERTA" || r.estado === "EN_REVISION" || r.estado === "VENCIDA").length,
+      },
+    };
+  }),
+});
+
 /* ------------------------------------------------------------------ *
  *  INCONFORMIDADES  (F3, F4)
  * ------------------------------------------------------------------ */
