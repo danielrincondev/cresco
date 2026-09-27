@@ -1662,13 +1662,40 @@ export const misNotificaciones = query({
     const perfil = await perfilActual(ctx);
     if (perfil === null) return [];
 
-    return await ctx.db
+    const notificaciones = await ctx.db
       .query("notificacion")
       .withIndex("por_usuario", (q) => q.eq("perfilUsuarioId", perfil._id))
       .order("desc")
       .take(NOTIFICACIONES_EN_BANDEJA);
+    return await Promise.all(notificaciones.map(async (n) => ({
+      ...n,
+      cursoId: n.entidadTipo === "cita" && n.entidadId ? await cursoDeLaCita(ctx, n.entidadId) : null,
+    })));
   }),
 });
+
+/**
+ * El curso de una cita, para que tocar su aviso lleve al docente a la agenda
+ * correcta: esa pantalla vive dentro de un curso (D16), y con varios no hay
+ * cómo adivinar cuál. Primero el curso para el que se publicó la franja; si
+ * no lo dice, el curso en el que está matriculado el estudiante.
+ */
+async function cursoDeLaCita(ctx: QueryCtx, entidadId: string): Promise<Id<"curso"> | null> {
+  const citaId = ctx.db.normalizeId("cita", entidadId);
+  const cita = citaId === null ? null : await ctx.db.get(citaId);
+  if (cita === null) return null;
+  const bloque = cita.disponibilidadDocenteId === undefined
+    ? null
+    : await ctx.db.get(cita.disponibilidadDocenteId);
+  if (bloque?.cursoId !== undefined) return bloque.cursoId;
+  const matricula = await ctx.db
+    .query("matricula")
+    .withIndex("por_estudiante_estado", (q) =>
+      q.eq("estudianteId", cita.estudianteId).eq("estado", "CURSANDO"),
+    )
+    .unique();
+  return matricula?.cursoId ?? null;
+}
 
 /** Marca una notificación como leída. Solo el dueño puede. */
 export const marcarNotificacionLeida = mutation({

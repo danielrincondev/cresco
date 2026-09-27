@@ -691,6 +691,19 @@ describe("interaccion — cancelar una cita y registrar si la familia vino", () 
     })).rejects.toThrow("Esa cita no es tuya");
   });
 
+  it("cada aviso de cita trae el curso de la cita; los que no son de citas, ninguno", async () => {
+    const t = convexTest(schema, modules);
+    const { e } = await citaConfirmada(t);
+    await abrirReclamo(t, e);
+    const avisos = await avisosDe(e.docente);
+    const deCita = avisos.filter((n) => n.entidadTipo === "cita");
+    const otros = avisos.filter((n) => n.entidadTipo !== "cita");
+    expect(deCita.length).toBeGreaterThan(0);
+    expect(deCita.every((n) => n.cursoId === e.cursoId)).toBe(true);
+    expect(otros.length).toBeGreaterThan(0);
+    expect(otros.every((n) => n.cursoId === null)).toBe(true);
+  });
+
   it("el docente no confirma una solicitud cuya hora ya pasó", async () => {
     const t = convexTest(schema, modules);
     const e = await sembrarEscenario(t);

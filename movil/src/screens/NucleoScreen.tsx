@@ -494,10 +494,19 @@ export function NucleoScreen() {
       return;
     }
     if (n.tipo === "CITACION" || n.tipo === "RECORDATORIO_CITA") {
-      // La bandeja de citas del docente vive dentro de un curso (D16); sin
-      // uno solo en contexto no hay a cuál ir, así que se queda en la
+      if (rol === "REPRESENTANTE") {
+        setRuta({ tipo: "citas" });
+        return;
+      }
+      // La agenda del docente vive dentro de un curso (D16). El servidor
+      // manda el de la cita en `cursoId`; si no llega, sirve el único curso
+      // del docente. Con varios y ninguno identificado, se queda en la
       // campana en vez de adivinar.
-      if (rol === "REPRESENTANTE") setRuta({ tipo: "citas" });
+      const suyos = cursos?.cursos ?? [];
+      const curso =
+        suyos.find((c) => c.id === n.cursoId) ??
+        (suyos.length === 1 ? suyos[0] : undefined);
+      if (curso) setRuta({ tipo: "agenda", curso });
       return;
     }
     if (n.tipo === "RESPUESTA_INCONFORMIDAD") {

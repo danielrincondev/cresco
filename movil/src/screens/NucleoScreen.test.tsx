@@ -18,7 +18,8 @@ const estado = vi.hoisted(() => ({
   fallosRegistro: 0,
   fallosAuditoria: 0,
   consentimientoDesactualizado: false,
-  novedades: [] as { leidaEn?: number }[],
+  novedades: [] as Record<string, unknown>[],
+  cursos: { cursos: [] as Record<string, unknown>[], limitePlan: 1 },
   funciones: new Map<string, (args: unknown) => Promise<unknown>>(),
   barraInferior: true,
   barraInferiorGuardada: [] as boolean[],
@@ -71,6 +72,11 @@ vi.mock("convex/react", () => ({
     // septiembre); sin esta rama, el mock genérico de abajo (`estado.perfil`,
     // un objeto) revienta el `.map` de `NovedadesDelCurso`.
     if (nombre === "conducta:comunicadosVigentes") return [];
+    // Las pantallas del docente: sin estas ramas recibían el perfil, que no
+    // es una lista, y `<Cursos>` o la agenda reventaban dentro de la prueba.
+    if (nombre === "nucleo:listarCursos") return estado.cursos;
+    if (nombre === "interaccion:misCitasDocente") return [];
+    if (nombre === "interaccion:misBloquesLibres") return [];
     return estado.perfil;
   },
   usePaginatedQuery: () => ({ results: estado.hijos, status: estado.estadoHijos, loadMore: vi.fn() }),
@@ -126,6 +132,7 @@ beforeEach(() => {
   estado.fallosAuditoria = 0;
   estado.consentimientoDesactualizado = false;
   estado.novedades = [];
+  estado.cursos = { cursos: [], limitePlan: 1 };
   estado.barraInferior = true;
   estado.barraInferiorGuardada = [];
   estado.hijos = [];
@@ -333,13 +340,6 @@ it("la barra inferior existe para el representante y no para el docente", async 
     vista!.root.findAll((n) => n.props.accessibilityLabel === "Inicio"),
   ).not.toHaveLength(0);
 
-  // El mock de useQuery de este archivo solo conoce "obtenerPerfil" y
-  // "misNotificaciones": para cualquier otra consulta -incluida
-  // listarCursos, que usa la pantalla del docente- devuelve el perfil tal
-  // cual, y `<Cursos>` revienta leyendo un campo que no existe ahi. Es un
-  // hueco del mock compartido, no del producto: por eso el volcado de error
-  // en stderr es ruido esperado, y la asercion que importa (sin barra
-  // inferior para el docente) sigue siendo válida pese a él.
   estado.perfil = { ...perfil, representanteId: null, docenteId: "docente" as never };
   await actualizar();
   expect(tablist()).toBeUndefined();
@@ -462,3 +462,54 @@ it("tocar Inicio después del arranque sí lleva a Mis hijos, y se queda ahí", 
   await actualizar();
   expect(JSON.stringify(vista!.toJSON())).toContain("Acompaña a tus hijos");
 });
+
+/* ---------- Del aviso de una cita a la agenda del docente ---------- */
+
+const cursoDePrueba = (id: string, nombre: string) => ({
+  id, nombre, nivel: "5", paralelo: nombre.slice(-1), jornada: "MATUTINA",
+  institucion: "Escuela de prueba", totalEstudiantes: 20, periodoVigente: null,
+});
+const avisoDeCita = (cursoId: string | null) => ({
+  _id: "n1", _creationTime: Date.now(), tipo: "CITACION", titulo: "La familia confirmó la citación",
+  cuerpo: "Ana Pérez, jueves 10 de septiembre a las 12:30.", entidadTipo: "cita", entidadId: "c1", cursoId,
+});
+async function abrirAviso(titulo: string) {
+  await act(async () => vista!.root.findByProps({ accessibilityLabel: "Novedades, 1 sin leer" }).props.onPress());
+  await act(async () => vista!.root.findByProps({ accessibilityLabel: `${titulo}, sin leer` }).props.onPress());
+}
+
+/**
+ * Antes, tocar un aviso de cita dejaba al docente en la campana: la agenda
+ * vive dentro de un curso y la app no sabía de cuál era la cita. Ahora el
+ * aviso trae su curso, y con varios cursos se elige ese, no el primero.
+ */
+it("el docente que toca un aviso de cita llega a la agenda del curso de esa cita", async () => {
+  estado.perfil = { ...perfil, representanteId: null, docenteId: "docente" as never };
+  estado.cursos = { cursos: [cursoDePrueba("curso-a", "Quinto A"), cursoDePrueba("curso-b", "Sexto B")], limitePlan: 5 };
+  estado.novedades = [avisoDeCita("curso-b")];
+  await montar();
+  await abrirAviso("La familia confirmó la citación");
+  expect(JSON.stringify(vista!.toJSON())).toContain("Atención a familias");
+  // La agenda abierta es la de Sexto B: se nota al citar desde ella.
+  await pulsar("Citar a una familia");
+  expect(JSON.stringify(vista!.toJSON())).toContain("Sexto B. Elige al estudiante.");
+});
+
+it("sin curso en el aviso, sirve el único curso del docente", async () => {
+  estado.perfil = { ...perfil, representanteId: null, docenteId: "docente" as never };
+  estado.cursos = { cursos: [cursoDePrueba("curso-a", "Quinto A")], limitePlan: 1 };
+  estado.novedades = [avisoDeCita(null)];
+  await montar();
+  await abrirAviso("La familia confirmó la citación");
+  expect(JSON.stringify(vista!.toJSON())).toContain("Atención a familias");
+});
+
+it("con varios cursos y ninguno identificado, no adivina: se queda en la campana", async () => {
+  estado.perfil = { ...perfil, representanteId: null, docenteId: "docente" as never };
+  estado.cursos = { cursos: [cursoDePrueba("curso-a", "Quinto A"), cursoDePrueba("curso-b", "Sexto B")], limitePlan: 5 };
+  estado.novedades = [avisoDeCita(null)];
+  await montar();
+  await abrirAviso("La familia confirmó la citación");
+  expect(JSON.stringify(vista!.toJSON())).not.toContain("Atención a familias");
+});
+
