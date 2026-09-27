@@ -103,6 +103,7 @@ import {
   guardarBarraInferior,
   leerBarraInferior,
 } from "../lib/preferenciasFamilia";
+import { fechaISO } from "../lib/fechas";
 
 type Rol = "DOCENTE" | "REPRESENTANTE";
 type Curso = FunctionReturnType<
@@ -137,6 +138,8 @@ type Ruta =
       tipo: "docenteACargo" | "reporteHoy" | "reportesAnteriores" | "acumulado";
       estudianteId: Id<"estudiante">;
       nombre: string;
+      /** Solo "reporteHoy", cuando un aviso lleva al reporte de otro día. */
+      fecha?: string;
     }
   // P7 lleva la anotacion entera y no solo su id: la bitacora ya la trajo, y
   // volver a pedirla al servidor para pintar lo mismo seria trabajo de mas.
@@ -159,6 +162,15 @@ type Ruta =
   | { tipo: "historialFamilia"; curso: Curso; estudianteId: Id<"estudiante">; nombre: string }
   | { tipo: "invitacion"; invitacion: Invitacion; curso: Curso }
   | { tipo: "aprobar"; curso: Curso; alumno: Alumno };
+
+/**
+ * Los avisos que hablan de **un día**: al tocarlos se abre el reporte de ese
+ * día, no el de hoy. Un comunicado no está en la lista porque se ve desde el
+ * reporte de cualquier día mientras siga vigente.
+ */
+const DE_UN_DIA = new Set<Notificacion["tipo"]>([
+  "REPORTE_DIARIO", "ACCION_POSITIVA", "ACCION_NEGATIVA", "RESUMEN_SEMANAL",
+]);
 
 const documentosAdulto = [
   { valor: "CEDULA", texto: "Cédula" },
@@ -522,6 +534,11 @@ export function NucleoScreen() {
         tipo: "reporteHoy",
         estudianteId: n.entidadId as Id<"estudiante">,
         nombre: hijo?.nombre ?? n.titulo,
+        // Lo que habla de un día concreto abre ese día: el reporte de las
+        // 22:00 casi siempre se toca a la mañana siguiente, y ahí "hoy" ya
+        // es otro día, todavía sin nada. Los avisos del curso no: se ven
+        // mientras sigan vigentes, desde el reporte de cualquier día.
+        ...(DE_UN_DIA.has(n.tipo) ? { fecha: fechaISO(n._creationTime) } : {}),
       });
     }
   };
@@ -890,6 +907,10 @@ export function NucleoScreen() {
           <ReporteDeHoy
             estudianteId={ruta.estudianteId}
             nombre={ruta.nombre}
+            fecha={ruta.fecha}
+            onVerHoy={() =>
+              setRuta({ tipo: "reporteHoy", estudianteId: ruta.estudianteId, nombre: ruta.nombre })
+            }
             hijos={hijosAprobados}
             onCambiarHijo={(estudianteId, nombre) =>
               setRuta({ tipo: "reporteHoy", estudianteId: estudianteId as Id<"estudiante">, nombre })

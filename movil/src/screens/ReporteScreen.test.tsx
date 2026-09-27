@@ -9,6 +9,7 @@ const estado = vi.hoisted(() => ({
   acumulado: undefined as unknown,
   comunicados: [] as unknown,
   lecturas: [] as unknown[],
+  argsHoy: undefined as unknown,
 }));
 
 vi.mock("react-native", async () => ({
@@ -20,9 +21,12 @@ vi.mock("react-native", async () => ({
 }));
 vi.mock("../theme/Icono", () => ({ Icono: "Icono" }));
 vi.mock("convex/react", () => ({
-  useQuery: (ref: Parameters<typeof getFunctionName>[0]) => {
+  useQuery: (ref: Parameters<typeof getFunctionName>[0], args?: unknown) => {
     const nombre = getFunctionName(ref);
-    if (nombre === "conducta:reporteDeHoy") return estado.hoy;
+    if (nombre === "conducta:reporteDeHoy") {
+      estado.argsHoy = args;
+      return estado.hoy;
+    }
     if (nombre === "conducta:reportesAnteriores") return estado.anteriores;
     if (nombre === "conducta:comunicadosVigentes") return estado.comunicados;
     if (nombre === "nucleo:obtenerPerfil") return undefined;
@@ -44,6 +48,7 @@ vi.mock("../lib/compras", () => ({ prepararCompras: async () => null }));
 
 const { ReporteAcumulado, ReporteDeHoy, ReportesAnteriores } =
   await import("./ReporteScreen");
+const { Boton } = await import("../components/NucleoUI");
 
 const pintar = (e: React.ReactElement) => {
   let v!: ReactTestRenderer;
@@ -200,6 +205,43 @@ it("sin comunicados no registra nada de comunicados", () => {
 it("sin comunicados vigentes, no muestra la sección de novedades del curso", () => {
   estado.comunicados = [];
   expect(texto(hoy())).not.toContain("Novedades del curso");
+});
+
+/* ---------- El reporte de otro día, desde un aviso ---------- */
+
+it("abierto desde el aviso de otro día, pide ese día, lo dice y ofrece volver al de hoy", async () => {
+  estado.hoy = { fecha: "2020-03-04", hay: true, reporte: { ...REPORTE, fecha: "2020-03-04" } };
+  const onVerHoy = vi.fn();
+  const v = pintar(
+    <ReporteDeHoy
+      estudianteId={"e1" as never} nombre="Ana Pérez" fecha="2020-03-04"
+      onVerAnteriores={() => {}} onVerAcumulado={() => {}} onVerHoy={onVerHoy}
+    />,
+  );
+  expect(estado.argsHoy).toEqual({ estudianteId: "e1", fecha: "2020-03-04" });
+  expect(texto(v)).toContain("Lo del miércoles 4 de marzo, contado por su docente.");
+  const volver = v.root.findAllByType(Boton).find((b) => b.props.children === "Ver el reporte de hoy")!;
+  await act(async () => volver.props.onPress());
+  expect(onVerHoy).toHaveBeenCalled();
+});
+
+it("sin reporte ese día, no dice que todavía no hay reporte de hoy", () => {
+  estado.hoy = { fecha: "2020-03-04", hay: false, reporte: null, finDeSemana: false, resumenSemana: null };
+  const t = texto(pintar(
+    <ReporteDeHoy
+      estudianteId={"e1" as never} nombre="Ana Pérez" fecha="2020-03-04"
+      onVerAnteriores={() => {}} onVerAcumulado={() => {}} onVerHoy={() => {}}
+    />,
+  ));
+  expect(t).toContain("No hay reporte de ese día");
+  expect(t).not.toContain("Todavía no hay reporte de hoy");
+});
+
+it("sin fecha sigue siendo el reporte de hoy, sin botón para volver a él", () => {
+  const v = hoy();
+  expect(estado.argsHoy).toEqual({ estudianteId: "e1" });
+  expect(texto(v)).toContain("Lo de hoy, contado por su docente.");
+  expect(v.root.findAllByType(Boton).some((b) => b.props.children === "Ver el reporte de hoy")).toBe(false);
 });
 
 /* ---------- P5 ---------- */

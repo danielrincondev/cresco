@@ -25,6 +25,7 @@ const estado = vi.hoisted(() => ({
   barraInferiorGuardada: [] as boolean[],
   hijos: [] as { estudianteId: string; nombres: string; apellidos: string; estadoVerificacion: string }[],
   estadoHijos: "Exhausted" as "Exhausted" | "LoadingFirstPage",
+  argsReporteDeHoy: [] as unknown[],
 }));
 vi.mock("react-native", async () => ({
   ...(await import("../test/mockReactNative")).reactNative(),
@@ -65,9 +66,10 @@ vi.mock("convex/react", () => ({
   // El mock tiene que distinguir que se le pregunta: la pantalla consulta el
   // perfil **y** las novedades, y devolver el perfil para las dos hacia que
   // `sinLeer` operara sobre algo que no es una lista.
-  useQuery: (ref: Parameters<typeof getFunctionName>[0]) => {
+  useQuery: (ref: Parameters<typeof getFunctionName>[0], args?: unknown) => {
     const nombre = getFunctionName(ref);
     if (nombre === "interaccion:misNotificaciones") return estado.novedades;
+    if (nombre === "conducta:reporteDeHoy") estado.argsReporteDeHoy.push(args);
     // El reporte del día trae también las novedades del curso (QA del 26 de
     // septiembre); sin esta rama, el mock genérico de abajo (`estado.perfil`,
     // un objeto) revienta el `.map` de `NovedadesDelCurso`.
@@ -143,6 +145,7 @@ beforeEach(() => {
   estado.consentimientoDesactualizado = false;
   estado.novedades = [];
   estado.cursos = { cursos: [], limitePlan: 1 };
+  estado.argsReporteDeHoy = [];
   estado.barraInferior = true;
   estado.barraInferiorGuardada = [];
   estado.hijos = [];
@@ -537,5 +540,32 @@ it("desde la lista de estudiantes del curso se abre el historial de su familia, 
   texto = JSON.stringify(vista!.toJSON());
   expect(texto).not.toContain("Sin representante vinculado en Cresco.");
   expect(texto).toContain("Historial de la familia"); // otra vez el botón, en la lista del curso
+});
+
+/* ---------- El aviso de un día abre ese día ---------- */
+
+// 22:00 del martes 15 en Guayaquil: son las 03:00 del 16 en UTC.
+const NOCHE_DEL_15 = Date.UTC(2026, 8, 16, 3, 0);
+const avisoDeLaFamilia = (tipo: string, titulo: string) => ({
+  _id: "n1", _creationTime: NOCHE_DEL_15, tipo, titulo, cuerpo: "",
+  entidadTipo: "estudiante", entidadId: "e1", cursoId: null,
+});
+
+/**
+ * El reporte de las 22:00 casi siempre se toca a la mañana siguiente. Antes
+ * abría "hoy", un día todavía sin reporte, y el de anoche quedaba escondido.
+ */
+it("tocar a la mañana el aviso del reporte de anoche abre el reporte de anoche", async () => {
+  estado.novedades = [avisoDeLaFamilia("REPORTE_DIARIO", "Reporte de hoy publicado")];
+  await montar();
+  await abrirAviso("Reporte de hoy publicado");
+  expect(estado.argsReporteDeHoy.at(-1)).toEqual({ estudianteId: "e1", fecha: "2026-09-15" });
+});
+
+it("un aviso del curso no lleva a un día: abre el reporte de hoy", async () => {
+  estado.novedades = [avisoDeLaFamilia("NOTA_DOCENTE", "Traer materiales")];
+  await montar();
+  await abrirAviso("Traer materiales");
+  expect(estado.argsReporteDeHoy.at(-1)).toEqual({ estudianteId: "e1" });
 });
 

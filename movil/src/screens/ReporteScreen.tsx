@@ -46,7 +46,7 @@ import {
 import { Icono } from "../theme/Icono";
 import { etiquetaAccion, etiquetaFranja } from "../lib/estados";
 import type { AccionDeLaBitacora } from "./ReclamarScreen";
-import { fechaLegible } from "../lib/fechas";
+import { fechaLegible, hoyISO } from "../lib/fechas";
 import { useRegistrarVistos } from "../lib/useRegistrarVistos";
 import { useLecturaSensible } from "../lib/useLecturaSensible";
 import { Espacio, Franja, Marca, Radio, Superficie, Tamano, Texto, TonoEstado } from "../theme/Theme";
@@ -146,10 +146,10 @@ type ResumenSemana = NonNullable<
  * hay reporte de hoy" decía algo que no era cierto. En su lugar, lo que pasó
  * en la semana.
  */
-function ResumenSemanal({ resumen }: { resumen: ResumenSemana }) {
+function ResumenSemanal({ resumen, otroDia = false }: { resumen: ResumenSemana; otroDia?: boolean }) {
   return (
     <Tarjeta>
-      <Subtitulo>Hoy no es día de clases</Subtitulo>
+      <Subtitulo>{otroDia ? "Ese día no hubo clases" : "Hoy no es día de clases"}</Subtitulo>
       <Cuerpo>
         {`Esto es lo que pasó del ${fechaLegible(resumen.desde)} al ${fechaLegible(resumen.hasta)}.`}
       </Cuerpo>
@@ -183,20 +183,34 @@ function ResumenSemanal({ resumen }: { resumen: ResumenSemana }) {
 export function ReporteDeHoy({
   estudianteId,
   nombre,
+  fecha,
   hijos,
   onCambiarHijo,
   onVerAnteriores,
   onVerAcumulado,
+  onVerHoy,
 }: {
   estudianteId: Id<"estudiante">;
   nombre: string;
+  /**
+   * El día que se quiere ver, si no es hoy. Llega desde un aviso: el del
+   * reporte de las 22:00 que se toca a la mañana siguiente tiene que abrir
+   * **ese** reporte, no el de un día que todavía no empieza.
+   */
+  fecha?: string;
   /** Todos los hijos aprobados, para poder cambiar sin salir de la pantalla. */
   hijos?: { estudianteId: string; nombre: string }[];
   onCambiarHijo?: (estudianteId: string, nombre: string) => void;
   onVerAnteriores: () => void;
   onVerAcumulado: () => void;
+  /** Volver al reporte de hoy cuando se está mirando el de otro día. */
+  onVerHoy?: () => void;
 }) {
-  const hoy = useQuery(api.conducta.reporteDeHoy, { estudianteId });
+  const hoy = useQuery(
+    api.conducta.reporteDeHoy,
+    fecha ? { estudianteId, fecha } : { estudianteId },
+  );
+  const otroDia = fecha !== undefined && fecha !== hoyISO();
   const comunicados = useQuery(api.conducta.comunicadosVigentes, { estudianteId });
   // Constancia para el docente de que esta familia ya tuvo los avisos del
   // curso en pantalla: ver `comunicadosPublicados`.
@@ -215,7 +229,14 @@ export function ReporteDeHoy({
   if (hoy === undefined) return <EsqueletoPagina etiqueta="Cargando el reporte" />;
 
   return (
-    <Pagina titulo={nombre} descripcion="Lo de hoy, contado por su docente.">
+    <Pagina
+      titulo={nombre}
+      descripcion={
+        otroDia && fecha
+          ? `Lo del ${fechaLegible(fecha)}, contado por su docente.`
+          : "Lo de hoy, contado por su docente."
+      }
+    >
       {/* Con dos hijos, los dos reportes se parecen mucho: saber de quién es
           lo que se lee no es un adorno. Con uno solo, esto es el nombre y
           nada más. */}
@@ -232,7 +253,12 @@ export function ReporteDeHoy({
       {hoy.hay ? (
         <TarjetaReporte reporte={hoy.reporte} />
       ) : hoy.finDeSemana && hoy.resumenSemana ? (
-        <ResumenSemanal resumen={hoy.resumenSemana} />
+        <ResumenSemanal resumen={hoy.resumenSemana} otroDia={otroDia} />
+      ) : otroDia ? (
+        <EstadoVacio icono="file-document-outline" titulo="No hay reporte de ese día">
+          Puede que el docente no lo haya publicado. Los que sí se publicaron
+          están en "Reportes anteriores".
+        </EstadoVacio>
       ) : (
         // Distinto de "no hubo novedades": aqui el docente todavia no ha
         // cerrado el dia. Confundirlos haria que una madre creyera que a su
@@ -246,6 +272,11 @@ export function ReporteDeHoy({
           lo que le pasó a él o ella hoy. */}
       <NovedadesDelCurso comunicados={comunicados ?? []} />
 
+      {otroDia && onVerHoy && (
+        <Boton secundario onPress={onVerHoy}>
+          Ver el reporte de hoy
+        </Boton>
+      )}
       <Boton secundario onPress={onVerAcumulado}>
         Ver el acumulado del parcial
       </Boton>
