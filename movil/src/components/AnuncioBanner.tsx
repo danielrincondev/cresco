@@ -7,6 +7,16 @@
  * docente nunca lo importa, así que la regla se cumple por construcción, no
  * por un `if` de rol que alguien podría olvidar en una pantalla nueva.
  *
+ * ## Quien pagó Premium no lo ve
+ *
+ * El muro de pago promete "Sin anuncios" en los planes Premium
+ * (`plan.sinPublicidad`). Hasta el 27 de septiembre este componente no lo
+ * miraba: una familia que pagaba seguía viendo el anuncio. Ahora pregunta el
+ * plan vigente (`miSuscripcion`, que ya respeta la regla de las suscripciones
+ * canceladas que no han expirado) y, mientras no lo sabe, tampoco lo
+ * muestra: enseñarle un anuncio a quien pagó, aunque sea un instante, es
+ * romper esa promesa delante de él.
+ *
  * ## Por qué RevenueCat sigue en el centro, aunque el anuncio lo sirva AdMob
  *
  * `react-native-google-mobile-ads` **muestra** el anuncio; no reporta nada a
@@ -109,6 +119,7 @@ async function sdkDeCompras() {
 
 export function AnuncioBanner() {
   const perfil = useQuery(api.nucleo.obtenerPerfil);
+  const suscripcion = useQuery(api.suscripciones.miSuscripcion);
   const [modulo, setModulo] = useState<Awaited<ReturnType<typeof sdkDeAnuncios>>>();
   const [purchases, setPurchases] = useState<Awaited<ReturnType<typeof sdkDeCompras>>>();
   const impresionActual = useRef<string | null>(null);
@@ -128,7 +139,9 @@ export function AnuncioBanner() {
     void prepararCompras(perfil.perfilUsuarioId).catch(() => {});
   }, [perfil?.perfilUsuarioId]);
 
-  if (!modulo || !purchases) return null;
+  const sinPublicidad =
+    suscripcion === undefined || suscripcion.representante?.plan.sinPublicidad === true;
+  if (sinPublicidad || !modulo || !purchases) return null;
   const { BannerAd, BannerAdSize } = modulo;
 
   return (
