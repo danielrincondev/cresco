@@ -31,7 +31,7 @@ documentación del producto.
 
 | Documento | Estado | Dueño |
 |---|---|---|
-| `decisiones/` (13 decisiones de producto, DP-001 a DP-013) | ✅ una decisión por archivo, misma disciplina que los ADR | Persona C |
+| `decisiones/` (15 decisiones de producto, DP-001 a DP-015) | ✅ una decisión por archivo, misma disciplina que los ADR | Persona C |
 
 ## 01-arquitectura — ¿Cómo está construido?
 

@@ -100,6 +100,11 @@ request.
   cierran sus matrículas. Desde el día siguiente al fin del año ya aparecen en
   «Cursos anteriores» y no ocupan cupo del plan.
 
+**En toda la aplicación:** modo oscuro opcional desde Ajustes, apagado por
+defecto ([DP-014](docs/00-producto/decisiones/014-modo-oscuro-opcional.md)).
+La aplicación está en español; el inglés está diseñado para la v2
+([DP-015](docs/00-producto/decisiones/015-ingles-se-difiere-a-v2.md)).
+
 ## Monetización con RevenueCat
 
 | | Gratuito | De pago |
@@ -143,7 +148,7 @@ y backend de Convex:
 | `convex/auditoria.ts` | Los cuatro eventos de DP-006 (`LOGIN`, `LEER_SENSIBLE`, `CREAR`/`ANULAR` acción, `APROBAR`), además de `ACTUALIZAR`, `ALERTA` y `EXPORTAR` (el informe en PDF) |
 | Reautenticación antes de una alerta o de eliminar un curso (`convex/lib/reautenticacion.ts`) | Implementado: verifica la firma de Clerk contra el JWKS y exige verificación reciente |
 | Datos semilla (`convex/semillas.ts`) | Catálogos: franjas, categorías de conducta, planes y plantilla del reporte |
-| Sistema de diseño (`movil/src/theme/Theme.ts`) | Implementado: color, tipografía, espaciado, iconografía |
+| Sistema de diseño (`movil/src/theme/Theme.ts`) | Implementado: color (paleta clara y oscura, las dos con contraste AA comprobado por prueba), tipografía, espaciado, iconografía |
 | Integración continua (`.github/workflows/ci.yml`) | Tipos, más de 700 pruebas y empaquetado de Android en cada PR |
 | Propiedad por módulo (`.github/CODEOWNERS`) | Implementado: protección de `main` activa; exige CI y revisión |
 | Banderas de activación (`convex/lib/flags.ts`) | Implementado |

@@ -145,6 +145,30 @@ arranca con el splash de siempre, y las pruebas de siempre en el teléfono
 
 ---
 
+## 3. Que lo nativo también se oscurezca (DP-014)
+
+**Estado:** anotado el 28 de septiembre. El modo oscuro ya funciona en
+todas las pantallas y llegó por el aire; lo que no alcanza es lo que
+pinta Android por su cuenta.
+
+**Qué:** con el modo oscuro encendido, hoy siguen claros la pantalla de
+arranque, el fondo nativo que asoma un instante al abrir la aplicación y
+los diálogos del sistema.
+
+**Cómo:**
+
+- `npx expo install expo-system-ui`, y al arrancar
+  `SystemUI.setBackgroundColorAsync(Superficie.fondo)`.
+- `userInterfaceStyle` de `"light"` a `"automatic"` en `app.json`, para que
+  los diálogos sigan al tema. Revisar entonces que en modo claro no cambie
+  nada.
+- Con eso, ofrecer en Ajustes una tercera opción, «Como el teléfono».
+
+**Cuándo está terminado:** con el modo oscuro encendido, abrir la
+aplicación no muestra ningún destello claro.
+
+---
+
 ## Al hacer la tanda
 
 1. Instalar las dependencias nativas de todos los puntos de arriba de una vez.
