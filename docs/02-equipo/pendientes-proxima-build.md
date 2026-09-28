@@ -20,7 +20,43 @@ de la build, para que no se confunda con lo que sí la espera.
 
 ---
 
-## 1. Informe imprimible del reporte acumulado (representante)
+## 1. Avisos al teléfono: la app todavía no registra el teléfono
+
+**Encontrado el 27 de septiembre, y es lo más importante de esta lista.** El
+servidor envía los avisos bien (`push.ts`: entrega por dispositivo,
+reintentos, recibos), pero **ningún teléfono los recibe**. La app nunca llama a
+`registrarDispositivo`, y en el backend de desarrollo no hay ni un dispositivo
+registrado. `docs/04-guias/contrato-push.md` pide que la app, al iniciar
+sesión, pida permiso de notificaciones, obtenga el token de Expo y lo mande;
+eso nunca se construyó. Hoy todos los avisos (reportes, anotaciones, citas,
+recordatorios, el resumen del sábado) solo se ven en la campana, dentro de la
+app. Por lo mismo, "familias que no reciben avisos" lista hoy a todas.
+
+**Lo que tiene que hacer Kenny** (con su cuenta de Google, no se puede hacer
+desde el código):
+
+1. Crear un proyecto en Firebase y agregarle la app Android `app.cresco.mobile`.
+2. Descargar `google-services.json` y dejarlo en `movil/`.
+3. En Firebase, crear la clave de cuenta de servicio de FCM (API v1) y subirla
+   a EAS: `npx eas-cli credentials` → Android → Push Notifications (FCM V1).
+
+**Lo que queda del lado del código**, cuando exista lo anterior:
+
+4. `npx expo install expo-notifications` y, en `app.json`, el plugin y
+   `android.googleServicesFile: "./google-services.json"`.
+5. Registrar el teléfono al iniciar sesión, como pide el contrato del push
+   (permiso → token de Expo con el `projectId` de EAS → `registrarDispositivo`),
+   y al tocar un aviso del sistema, abrir la misma pantalla que abre la
+   campana (`navegarDesdeNotificacion`).
+6. Pruebas, y una build nueva: `google-services.json` va dentro del APK.
+
+---
+
+## 2. Informe imprimible del reporte acumulado (representante)
+
+**Estado:** construido el 27 de septiembre (commit `914a1d6`) e incluido en
+las builds "Beta" y "General" de ese día. Falta la prueba en el teléfono con
+las dos cuentas (ver "Cuándo está terminado"); cuando pase, se borra de aquí.
 
 **Qué:** un PDF del reporte acumulado del parcial, listo para compartir por
 WhatsApp.
