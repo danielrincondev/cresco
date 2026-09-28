@@ -27,6 +27,11 @@ de las 22:00, y la familia lo lee de noche.
 
 - **Opcional y apagado por defecto.** Quien no lo activa ve la aplicación
   exactamente igual que antes: la paleta clara no cambió ni un valor.
+- **Tres opciones en Ajustes → Apariencia:** Claro (la de siempre), Oscuro, y
+  Como el teléfono, que sigue el modo oscuro del sistema. Esta última se
+  decide al abrir la app: si el sistema cambia con la app abierta, se aplica
+  la próxima vez, porque reiniciarla sola podría borrar un reporte a medio
+  escribir.
 - **Se guarda en el teléfono, no en la cuenta**, igual que la barra inferior
   de la familia. Así hasta la pantalla de inicio de sesión se pinta con él.
 - **Cambiarlo reinicia la aplicación.** La paleta se elige una vez al arrancar,
@@ -49,17 +54,21 @@ de las 22:00, y la familia lo lee de noche.
 
 ## Consecuencias
 
-- **Lo nativo sigue claro.** La pantalla de arranque, el fondo nativo que
-  asoma un instante al abrir y los diálogos del sistema no cambian, porque
-  `app.json` fija `userInterfaceStyle: "light"`. Oscurecerlos exige build nueva
-  (`expo-system-ui` y `userInterfaceStyle: "automatic"`); está anotado en
-  `docs/02-equipo/pendientes-proxima-build.md`.
+- **Lo nativo sigue al tema elegido desde la versión 1.1.0.** `expo-system-ui`
+  pinta el fondo nativo con el de la paleta, y `app.json` deja el tema nativo
+  en `"automatic"` para que `Appearance.setColorScheme` le imponga el de la
+  app: la barra de navegación del sistema sigue a la app, no al teléfono.
+  Antes de la 1.1.0, un teléfono en modo oscuro ya oscurecía esa barra sobre
+  la app clara, porque `userInterfaceStyle: "light"` no se aplicaba sin
+  `expo-system-ui`.
+- **La pantalla de arranque sigue clara.** Android la pinta antes de que corra
+  la aplicación, así que no puede saber lo que se eligió en Ajustes. Una
+  versión oscura seguiría al *teléfono*, y chocaría con quien lo tiene oscuro
+  y eligió la app clara.
 - **El anuncio de AdMob es nativo** y se ve con sus propios colores.
 - **El informe en PDF se imprime siempre en claro.**
 - **Las franjas de conducta tienen los mismos colores en las dos paletas**:
   son un dato de la base (`franjaConducta.colorHex`), no del tema.
-- **No sigue al modo del teléfono.** Es un interruptor propio. La opción
-  "automático" tiene sentido cuando lo nativo también pueda oscurecerse.
 
 ## Alternativas consideradas
 
@@ -67,5 +76,6 @@ de las 22:00, y la familia lo lee de noche.
   forma elegante, pero exige reescribir los estilos de los 14 archivos que los
   crean, a dos días de enviar. El reinicio se nota un segundo, una vez, y no
   pone en riesgo ninguna pantalla.
-- **Seguir el modo del sistema.** Exige build nueva y le quita el control a la
-  persona.
+- **Seguir siempre el modo del sistema, sin elegir.** Le quita el control a la
+  persona: quien tiene el teléfono oscuro por la batería no necesariamente
+  quiere la app oscura. Por eso es una de las tres opciones y no la única.

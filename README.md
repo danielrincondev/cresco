@@ -100,8 +100,8 @@ request.
   cierran sus matrículas. Desde el día siguiente al fin del año ya aparecen en
   «Cursos anteriores» y no ocupan cupo del plan.
 
-**En toda la aplicación:** modo oscuro opcional desde Ajustes, apagado por
-defecto ([DP-014](docs/00-producto/decisiones/014-modo-oscuro-opcional.md)).
+**En toda la aplicación:** tema claro, oscuro o como el teléfono, desde
+Ajustes; claro por defecto ([DP-014](docs/00-producto/decisiones/014-modo-oscuro-opcional.md)).
 La aplicación está en español; el inglés está diseñado para la v2
 ([DP-015](docs/00-producto/decisiones/015-ingles-se-difiere-a-v2.md)).
 
