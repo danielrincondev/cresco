@@ -151,21 +151,32 @@ type ResumenSemana = NonNullable<
  * en la semana.
  */
 function ResumenSemanal({ resumen, otroDia = false }: { resumen: ResumenSemana; otroDia?: boolean }) {
+  const perdidos = Math.abs(resumen.puntosNegativos);
   return (
     <Tarjeta>
-      <Subtitulo>{otroDia ? "Ese día no hubo clases" : "Hoy no es día de clases"}</Subtitulo>
-      <Cuerpo>
-        {`Esto es lo que pasó del ${fechaLegible(resumen.desde)} al ${fechaLegible(resumen.hasta)}.`}
-      </Cuerpo>
+      {/* QA del 27 de septiembre: "no solo indiques que no es día de clases,
+          indica que es un resumen de la semana y cuántos puntos ganó y
+          perdió". Título, luego el porqué en una etiqueta, luego las cifras
+          en negrita: tres niveles que se distinguen de un vistazo. */}
+      <Subtitulo>Resumen de la semana</Subtitulo>
+      <Text style={r.etiqueta}>
+        {`${otroDia ? "Ese día no hubo clases" : "Hoy no hay clases"} · del ${fechaLegible(resumen.desde)} al ${fechaLegible(resumen.hasta)}`}
+      </Text>
       {resumen.acciones.length === 0 ? (
         // El mismo criterio que "hoy no hubo anotaciones": una semana sin
         // novedades es la semana normal de un estudiante, no un hueco.
         <Cuerpo>Sin novedades de conducta esta semana.</Cuerpo>
       ) : (
         <>
-          <Text style={r.etiqueta}>
-            {`Suma ${resumen.puntosPositivos > 0 ? `+${resumen.puntosPositivos}` : 0} · Resta ${resumen.puntosNegativos}`}
-          </Text>
+          <View style={r.balance}>
+            <Cuerpo>
+              Puntos ganados: <Text style={[r.fuerte, r.ganados]}>{`+${resumen.puntosPositivos}`}</Text>
+            </Cuerpo>
+            <Cuerpo>
+              Puntos perdidos: <Text style={[r.fuerte, perdidos > 0 && r.perdidos]}>{perdidos > 0 ? `-${perdidos}` : "0"}</Text>
+            </Cuerpo>
+          </View>
+          <Text style={r.etiqueta}>{`Anotaciones de la semana (${resumen.acciones.length})`}</Text>
           {resumen.acciones.map((accion) => (
             <View key={accion.id} style={r.accion}>
               <Chips>
@@ -591,6 +602,12 @@ export function ReporteAcumulado({
 }
 
 const r = StyleSheet.create({
+  // Lo que hay que leer primero dentro de un texto: más peso y el color de
+  // los títulos, no el gris del cuerpo.
+  fuerte: { fontFamily: "Inter-Semibold", color: Texto.primario },
+  ganados: { color: TonoEstado.positivo.texto },
+  perdidos: { color: TonoEstado.negativo.texto },
+  balance: { gap: Espacio.xs },
   // Con borde superior: separa cada anotación y cada campo general del
   // bloque de arriba y entre sí (QA del 26 de septiembre: "dar énfasis a
   // los subtítulos y contenedores"). Sin esto, dos anotaciones seguidas se

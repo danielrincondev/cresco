@@ -178,7 +178,14 @@ it("un fin de semana sin reporte, muestra el resumen de la semana en vez de deci
     },
   };
   const t = texto(hoy());
-  expect(t).toContain("Hoy no es día de clases");
+  expect(t).toContain("Resumen de la semana");
+  expect(t).toContain("Hoy no hay clases");
+  // Las cifras, destacadas y sin signos confusos: ganó 2, perdió 1.
+  expect(t).toContain("Puntos ganados: ");
+  expect(t).toContain("+2");
+  expect(t).toContain("Puntos perdidos: ");
+  expect(t).toContain("-1");
+  expect(t).toContain("Anotaciones de la semana (1)");
   expect(t).toContain("Se distrajo en clase");
   expect(t).not.toContain("Todavía no hay reporte de hoy");
 });
@@ -195,7 +202,7 @@ it("entre semana sin reporte, sigue diciendo que todavía no hay uno, sin resume
   estado.hoy = { fecha: "2026-09-09", hay: false, reporte: null, finDeSemana: false, resumenSemana: null };
   const t = texto(hoy());
   expect(t).toContain("Todavía no hay reporte de hoy");
-  expect(t).not.toContain("Hoy no es día de clases");
+  expect(t).not.toContain("Resumen de la semana");
 });
 
 /**
