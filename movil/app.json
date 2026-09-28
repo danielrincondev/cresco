@@ -3,15 +3,10 @@
     "name": "Cresco",
     "slug": "cresco",
     "scheme": "cresco",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "orientation": "portrait",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "automatic",
     "icon": "./assets/icon.png",
-    "splash": {
-      "image": "./assets/splash.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#EBF4FA"
-    },
     "backgroundColor": "#EBF4FA",
     "platforms": [
       "android",
@@ -36,7 +31,16 @@
         }
       ],
       "expo-sharing",
-      "expo-notifications"
+      "expo-notifications",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/adaptive-icon.png",
+          "imageWidth": 200,
+          "resizeMode": "contain",
+          "backgroundColor": "#EBF4FA"
+        }
+      ]
     ],
     "extra": {
       "eas": {
