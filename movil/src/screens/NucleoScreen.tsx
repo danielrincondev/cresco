@@ -105,6 +105,8 @@ import {
 } from "../lib/preferenciasFamilia";
 import { fechaISO } from "../lib/fechas";
 import { useAvisosDelTelefono } from "../lib/avisosDelTelefono";
+import { Chip } from "../components/Estado";
+import { EliminarCurso } from "./EliminarCursoScreen";
 
 type Rol = "DOCENTE" | "REPRESENTANTE";
 type Curso = FunctionReturnType<
@@ -152,7 +154,7 @@ type Ruta =
     }
   | {
       tipo:
-        | "curso" | "periodos" | "agenda" | "alerta" | "anotar" | "anioLectivo"
+        | "curso" | "periodos" | "agenda" | "alerta" | "anotar" | "anioLectivo" | "eliminarCurso"
         // El cierre de jornada (D12, D13, D14): las tres son de un curso
         // concreto, a diferencia de los reclamos.
         | "asistencia" | "reporteDia" | "comunicado"
@@ -884,6 +886,12 @@ export function NucleoScreen() {
           <ReclamosDocente />
         ) : ruta.tipo === "agenda" ? (
           <AgendaDocente curso={ruta.curso} />
+        ) : ruta.tipo === "eliminarCurso" ? (
+          <EliminarCurso
+            curso={ruta.curso}
+            onEliminado={() => setRuta({ tipo: "inicio" })}
+            onVolver={() => setRuta({ tipo: "curso", curso: ruta.curso })}
+          />
         ) : ruta.tipo === "anioLectivo" ? (
           <EditarAnioLectivo
             curso={ruta.curso}
@@ -1207,6 +1215,8 @@ function Cursos({
   navegar: (ruta: Ruta) => void;
 }) {
   const datos = useQuery(api.nucleo.listarCursos);
+  const [verAnteriores, setVerAnteriores] = useState(false);
+  const anteriores = datos?.anteriores ?? [];
   return (
     <Pagina
       titulo={nombre ? `Hola, ${nombre}` : "Tus cursos"}
@@ -1251,6 +1261,34 @@ function Cursos({
           </Pressable>
         ))
       )}
+      {/* Los cursos de un año lectivo que ya terminó: no cuentan para el
+          plan, así que el del año siguiente se puede abrir de inmediato. Van
+          plegados para que la pantalla muestre primero lo del año en curso. */}
+      {anteriores.length > 0 && (
+        <Boton secundario onPress={() => setVerAnteriores(!verAnteriores)}>
+          {verAnteriores ? "Ocultar cursos anteriores" : `Cursos anteriores (${anteriores.length})`}
+        </Boton>
+      )}
+      {verAnteriores &&
+        anteriores.map((curso) => (
+          <Pressable
+            key={curso.id}
+            accessibilityRole="button"
+            accessibilityLabel={`Abrir ${curso.nombre}, finalizado`}
+            onPress={() => navegar({ tipo: "curso", curso })}
+          >
+            <Tarjeta>
+              <View style={styles.sectionRow}>
+                <Subtitulo>{curso.nombre}</Subtitulo>
+                <Chip etiqueta={{ tono: "neutro", texto: "Finalizado" }} />
+              </View>
+              <Cuerpo>{curso.institucion}</Cuerpo>
+              <Text style={styles.etiqueta}>
+                {curso.totalEstudiantes} estudiantes · {curso.nivel}
+              </Text>
+            </Tarjeta>
+          </Pressable>
+        ))}
       {/* Vive aqui y no dentro de un curso porque cubre todos: con el plan
           PRO son hasta cinco, y abrirla desde uno hacia creer lo contrario. */}
       <Boton secundario onPress={() => navegar({ tipo: "reclamos" })}>
@@ -1549,6 +1587,9 @@ function DetalleCurso({
           </Boton>
           <Boton secundario onPress={() => navegar({ tipo: "anioLectivo", curso })}>
             Editar año lectivo
+          </Boton>
+          <Boton secundario tono="NEGATIVA" onPress={() => navegar({ tipo: "eliminarCurso", curso })}>
+            Eliminar curso
           </Boton>
         </>
       )}

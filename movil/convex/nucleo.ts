@@ -9,12 +9,14 @@ import { ConvexError, v } from "convex/values";
 
 import { paginationOptsValidator } from "convex/server";
 import type { Doc, Id } from "./_generated/dataModel";
-import { mutation, query, type QueryCtx } from "./_generated/server";
+import { internal } from "./_generated/api";
+import { action, internalMutation, mutation, query, type QueryCtx } from "./_generated/server";
 import { JORNADA, PARENTESCO, REGLAS, TIPO_DOCUMENTO } from "./lib/enums";
 import { ErrorDominio, exigirRangoFechas, hoyEnGuayaquil } from "./lib/guardas";
 import { esVigentePorFecha } from "./lib/periodos";
 import { auditar, ErrorPermiso, exigirDocente, exigirRepresentante, exigirTitularDelCurso, exigirVinculo, perfilActual } from "./lib/permisos";
 import { tieneAccesoVigente } from "./lib/revenuecat";
+import { verificarReautenticacion } from "./lib/reautenticacion";
 
 const jornada = v.union(...JORNADA.map((valor) => v.literal(valor)));
 
@@ -300,19 +302,36 @@ async function limiteDelDocente(
   return limiteFree;
 }
 
-async function cursosActivosDelDocente(ctx: QueryCtx, docenteId: Doc<"docente">["_id"]) {
+/**
+ * Los cursos del docente, separados en activos y anteriores.
+ *
+ * Un curso cuyo año lectivo ya terminó es anterior aunque la tarea nocturna
+ * (`finalizarCursosVencidos`) todavía no lo haya marcado: así deja de contar
+ * para el límite del plan el mismo día, y el docente puede abrir el curso del
+ * año siguiente de inmediato. Los eliminados no aparecen en ninguna lista.
+ */
+async function cursosDelDocente(ctx: QueryCtx, docenteId: Doc<"docente">["_id"]) {
   const asignaciones = await ctx.db
     .query("asignacionDocente")
     .withIndex("por_docente", (q) => q.eq("docenteId", docenteId))
     .collect();
-
-  const cursos = new Map<Doc<"curso">["_id"], Doc<"curso">>();
+  const hoy = hoyEnGuayaquil();
+  const activos = new Map<Doc<"curso">["_id"], Doc<"curso">>();
+  const anteriores = new Map<Doc<"curso">["_id"], Doc<"curso">>();
   for (const asignacion of asignaciones) {
     if (asignacion.vigenteHasta !== undefined) continue;
     const curso = await ctx.db.get("curso", asignacion.cursoId);
-    if (curso?.estado === "ACTIVO") cursos.set(curso._id, curso);
+    if (curso === null || curso.estado === "ELIMINADO") continue;
+    const anio = await ctx.db.get("anioLectivo", curso.anioLectivoId);
+    const vencido = anio !== null && anio.fechaFin < hoy;
+    if (curso.estado === "ACTIVO" && !vencido) activos.set(curso._id, curso);
+    else anteriores.set(curso._id, curso);
   }
-  return [...cursos.values()];
+  return { activos: [...activos.values()], anteriores: [...anteriores.values()] };
+}
+
+async function cursosActivosDelDocente(ctx: QueryCtx, docenteId: Doc<"docente">["_id"]) {
+  return (await cursosDelDocente(ctx, docenteId)).activos;
 }
 
 async function presentarCurso(ctx: QueryCtx, curso: Doc<"curso">) {
@@ -362,13 +381,108 @@ export const listarCursos = query({
   args: {},
   handler: async (ctx) => {
     const docente = await exigirDocente(ctx);
-    const cursos = await cursosActivosDelDocente(ctx, docente._id);
+    const { activos, anteriores } = await cursosDelDocente(ctx, docente._id);
     const limitePlan = await limiteDelDocente(ctx, docente.perfilUsuarioId);
 
     return {
-      cursos: await Promise.all(cursos.map(async (curso) => await presentarCurso(ctx, curso))),
+      cursos: await Promise.all(activos.map(async (curso) => await presentarCurso(ctx, curso))),
+      // "Cursos anteriores": los de un año lectivo que ya terminó.
+      anteriores: await Promise.all(anteriores.map(async (curso) => await presentarCurso(ctx, curso))),
       limitePlan,
     };
+  },
+});
+
+/**
+ * Eliminar un curso, con las mismas verificaciones que una alerta de
+ * emergencia: el docente vuelve a confirmar su contraseña en ese momento, y el
+ * servidor verifica la firma de Clerk (`verificarReautenticacion`). Es una
+ * action porque esa verificación consulta las claves públicas de Clerk.
+ */
+export const eliminarCurso = action({
+  args: { cursoId: v.id("curso"), tokenReautenticacion: v.string() },
+  handler: (ctx, { cursoId, tokenReautenticacion }): Promise<{ matriculasRetiradas: number }> =>
+    conErroresPublicos(async () => {
+      const reautenticadoEn = await verificarReautenticacion(
+        tokenReautenticacion, await ctx.auth.getUserIdentity(), "eliminar el curso",
+      );
+      return await ctx.runMutation(internal.nucleo.eliminarCursoVerificado, { cursoId, reautenticadoEn });
+    }),
+});
+
+/**
+ * Privada: la titularidad y todas las escrituras, atómicas.
+ *
+ * "Eliminar" oculta, no borra (decisión de Kenny del 27 de septiembre, y
+ * DP-007: nada con datos de menores se borra físicamente). El curso pasa a
+ * ELIMINADO y desaparece para el docente; sus matrículas pasan a RETIRADA, así
+ * que también para las familias; las invitaciones pendientes se revocan. Las
+ * anotaciones, reportes y citas quedan guardados, y la auditoría dice quién
+ * lo hizo.
+ */
+export const eliminarCursoVerificado = internalMutation({
+  args: { cursoId: v.id("curso"), reautenticadoEn: v.number() },
+  handler: (ctx, args) => conErroresPublicos(async () => {
+    await exigirTitularDelCurso(ctx, args.cursoId);
+    const ahora = Date.now();
+    if (!Number.isFinite(args.reautenticadoEn) || args.reautenticadoEn > ahora ||
+        ahora - args.reautenticadoEn > 5 * 60_000) {
+      throw new ErrorDominio("REAUTENTICACION_REQUERIDA", "Vuelve a confirmar tu identidad para eliminar el curso.");
+    }
+    const curso = await ctx.db.get("curso", args.cursoId);
+    if (curso === null || curso.estado === "ELIMINADO") {
+      throw new ErrorDominio("NO_ENCONTRADO", "Ese curso ya no existe.");
+    }
+    const hoy = hoyEnGuayaquil(ahora);
+    await ctx.db.patch("curso", curso._id, { estado: "ELIMINADO", actualizadoEn: ahora });
+
+    const matriculas = await ctx.db.query("matricula")
+      .withIndex("por_curso_estado", (q) => q.eq("cursoId", curso._id).eq("estado", "CURSANDO")).collect();
+    for (const matricula of matriculas) {
+      await ctx.db.patch("matricula", matricula._id, { estado: "RETIRADA", fechaSalida: hoy, actualizadoEn: ahora });
+    }
+    const invitaciones = await ctx.db.query("invitacionCurso")
+      .withIndex("por_curso", (q) => q.eq("cursoId", curso._id)).collect();
+    for (const invitacion of invitaciones.filter((i) => i.estado === "PENDIENTE")) {
+      await ctx.db.patch("invitacionCurso", invitacion._id, { estado: "REVOCADA", actualizadoEn: ahora });
+    }
+
+    await auditar(ctx, {
+      accion: "ANULAR",
+      entidadTipo: "curso",
+      entidadId: curso._id,
+      datosAntes: { estado: curso.estado },
+      datosDespues: { estado: "ELIMINADO", matriculasRetiradas: matriculas.length },
+    });
+    return { matriculasRetiradas: matriculas.length };
+  }),
+});
+
+/**
+ * Cada noche: los cursos cuyo año lectivo terminó pasan a ARCHIVADO
+ * ("Finalizado") y sus matrículas a FINALIZADA. Así dejan de contar para el
+ * límite del plan, van a "Cursos anteriores", y un estudiante queda libre
+ * para matricularse en el curso del año siguiente.
+ */
+export const finalizarCursosVencidos = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const hoy = hoyEnGuayaquil();
+    const ahora = Date.now();
+    const activos = await ctx.db.query("curso").filter((q) => q.eq(q.field("estado"), "ACTIVO")).collect();
+    let finalizados = 0;
+    for (const curso of activos) {
+      const anio = await ctx.db.get("anioLectivo", curso.anioLectivoId);
+      if (anio === null || anio.fechaFin >= hoy) continue;
+      await ctx.db.patch("curso", curso._id, { estado: "ARCHIVADO", actualizadoEn: ahora });
+      const matriculas = await ctx.db.query("matricula")
+        .withIndex("por_curso_estado", (q) => q.eq("cursoId", curso._id).eq("estado", "CURSANDO")).collect();
+      for (const matricula of matriculas) {
+        await ctx.db.patch("matricula", matricula._id, { estado: "FINALIZADA", fechaSalida: anio.fechaFin, actualizadoEn: ahora });
+      }
+      finalizados++;
+    }
+    return finalizados;
   },
 });
 

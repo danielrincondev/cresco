@@ -22,7 +22,7 @@
 import { useState } from "react";
 import { Linking, Modal, Pressable, StyleSheet, Text, View } from "react-native";
 import { useClerk, useSession, useUser } from "@clerk/expo";
-import { ConvexError } from "convex/values";
+
 import { useAction, useMutation, usePaginatedQuery, useQuery } from "convex/react";
 import type { FunctionReturnType } from "convex/server";
 
@@ -58,6 +58,7 @@ import {
 } from "../lib/estados";
 import { parrafosLegibles } from "../lib/texto";
 import { useRegistrarVistos } from "../lib/useRegistrarVistos";
+import { tokenDeReautenticacion } from "../lib/reautenticar";
 import {
   fechaHoraLegible,
   fechaISO,
@@ -982,20 +983,7 @@ export function AlertaDocente({ curso }: { curso: Curso }) {
     const clave = password;
     setPassword("");
     const r = await op.ejecutar(async () => {
-      const fallo = (mensaje: string) => new ConvexError({ codigo: "REAUTENTICACION_REQUERIDA", mensaje });
-      try {
-        const inicio = await session.startVerification({ level: "first_factor" });
-        if (!inicio.supportedFirstFactors?.some(f => f.strategy === "password")) {
-          throw fallo("Tu cuenta necesita una contraseña para activar alertas.");
-        }
-        const verificacion = await session.attemptFirstFactorVerification({ strategy: "password", password: clave });
-        if (verificacion.status !== "complete") throw fallo("No se completó la verificación de tu identidad.");
-      } catch (error) {
-        if (error instanceof ConvexError) throw error;
-        throw fallo("No pudimos verificar tu contraseña. Revísala y vuelve a intentarlo.");
-      }
-      const tokenReautenticacion = await session.getToken({ skipCache: true });
-      if (!tokenReautenticacion) throw fallo("Tu sesión ya no está disponible. Vuelve a iniciar sesión.");
+      const tokenReautenticacion = await tokenDeReautenticacion(session, clave, "activar alertas");
       return await activar({ ...datos, tokenReautenticacion });
     });
     if (r.ok) {

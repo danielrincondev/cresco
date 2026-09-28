@@ -615,3 +615,18 @@ it("tocar un aviso del teléfono abre su pantalla y lo marca leído, como en la 
   ]);
 });
 
+it("los cursos de un año terminado van plegados en 'Cursos anteriores', marcados Finalizado", async () => {
+  estado.perfil = { ...perfil, representanteId: null, docenteId: "docente" as never };
+  estado.cursos = {
+    cursos: [cursoDePrueba("curso-a", "Quinto A")],
+    anteriores: [cursoDePrueba("curso-v", "Cuarto A")],
+    limitePlan: 1,
+  } as never;
+  await montar();
+  expect(JSON.stringify(vista!.toJSON())).not.toContain("Cuarto A");
+  await pulsar("Cursos anteriores (1)");
+  const texto = JSON.stringify(vista!.toJSON());
+  expect(texto).toContain("Cuarto A");
+  expect(texto).toContain("Finalizado");
+});
+

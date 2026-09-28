@@ -10,9 +10,13 @@ const clavesPorEmisor = new Map<string, ReturnType<typeof createRemoteJWKSet>>()
  * https://docs.convex.dev/auth/clerk#factor-verification-age
  * https://clerk.com/docs/guides/sessions/session-tokens
  */
-export async function verificarReautenticacion(token: string, identidad: UserIdentity | null) {
+export async function verificarReautenticacion(
+  token: string,
+  identidad: UserIdentity | null,
+  para = "activar una alerta",
+) {
   const rechazar = () => new ErrorDominio(
-    "REAUTENTICACION_REQUERIDA", "Vuelve a confirmar tu identidad para activar una alerta.",
+    "REAUTENTICACION_REQUERIDA", `Vuelve a confirmar tu identidad para ${para}.`,
   );
   const emisor = process.env.CLERK_JWT_ISSUER_DOMAIN;
   if (!identidad || !emisor || identidad.issuer !== emisor ||

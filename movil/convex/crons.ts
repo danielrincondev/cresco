@@ -20,4 +20,12 @@ crons.cron(
   {},
 );
 
+/** 00:30 Guayaquil (UTC-5): los cursos cuyo año lectivo terminó pasan a Finalizado. */
+crons.cron(
+  "nucleo: finalizar cursos vencidos",
+  "30 5 * * *",
+  internal.nucleo.finalizarCursosVencidos,
+  {},
+);
+
 export default crons;
