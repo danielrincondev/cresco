@@ -30,6 +30,8 @@ import { Inter_400Regular } from "@expo-google-fonts/inter/400Regular";
 import { Inter_600SemiBold } from "@expo-google-fonts/inter/600SemiBold";
 import { NucleoScreen } from "./screens/NucleoScreen";
 import { LimiteError } from "./components/NucleoUI";
+import { aplicarTemaNativo } from "./lib/apariencia";
+import { FAMILIA_ICONOS, FUENTE_ICONOS } from "./theme/Icono";
 
 const clerkPublishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY;
 const convexUrl = process.env.EXPO_PUBLIC_CONVEX_URL;
@@ -50,10 +52,18 @@ const convex = new ConvexReactClient(convexUrl, {
   unsavedChangesWarning: false,
 });
 
+// El tema también en lo que Android pinta por su cuenta (DP-014): la barra de
+// navegación del sistema y el fondo nativo. Antes del primer render, para que
+// ya salgan con el tema elegido.
+aplicarTemaNativo();
+
 export function App() {
   const [fontsLoaded, fontError] = useFonts({
     Inter: Inter_400Regular,
     "Inter-Semibold": Inter_600SemiBold,
+    // La fuente de iconos recortada (#84): 6 KB. Precargada aquí, los iconos
+    // salen con la primera pantalla en vez de aparecer un instante después.
+    [FAMILIA_ICONOS]: FUENTE_ICONOS,
   });
   if (!fontsLoaded && !fontError)
     return (

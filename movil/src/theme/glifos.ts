@@ -1,0 +1,51 @@
+/**
+ * Los iconos que usa Cresco y su código en `assets/fonts/IconosCresco.ttf`.
+ *
+ * **Generado por `scripts/generar-iconos.py`: no se edita a mano.** Para
+ * usar un icono nuevo, se escribe en el código y se vuelve a correr el
+ * script, que recorta la fuente y reescribe este archivo (#84).
+ */
+export const GLIFOS = {
+  "account": 0xF0004,
+  "account-group": 0xF0849,
+  "account-group-outline": 0xF0B58,
+  "account-off": 0xF0012,
+  "account-off-outline": 0xF0BE7,
+  "account-outline": 0xF0013,
+  "account-question": 0xF0B59,
+  "account-question-outline": 0xF0B5A,
+  "alert": 0xF0026,
+  "alert-outline": 0xF002A,
+  "arrow-left": 0xF004D,
+  "bell": 0xF009A,
+  "bell-outline": 0xF009C,
+  "bell-ring": 0xF009E,
+  "bell-ring-outline": 0xF009F,
+  "book-open": 0xF00BD,
+  "book-open-outline": 0xF0B63,
+  "calendar-blank": 0xF00EE,
+  "calendar-blank-outline": 0xF0B66,
+  "calendar-check": 0xF00EF,
+  "calendar-check-outline": 0xF0C44,
+  "calendar-remove": 0xF00F4,
+  "calendar-remove-outline": 0xF0C45,
+  "chevron-down": 0xF0140,
+  "chevron-right": 0xF0142,
+  "chevron-up": 0xF0143,
+  "clock-outline": 0xF0150,
+  "cog": 0xF0493,
+  "cog-outline": 0xF08BB,
+  "currency-usd": 0xF01C1,
+  "file-document": 0xF0219,
+  "file-document-outline": 0xF09EE,
+  "home": 0xF02DC,
+  "home-outline": 0xF06A1,
+  "logout": 0xF0343,
+  "menu": 0xF035C,
+  "message-text": 0xF0369,
+  "message-text-outline": 0xF036A,
+  "notebook": 0xF082E,
+  "notebook-outline": 0xF0EBF,
+  "school": 0xF0474,
+  "school-outline": 0xF1180,
+} as const;
