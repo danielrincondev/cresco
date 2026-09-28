@@ -104,6 +104,7 @@ import {
   leerBarraInferior,
 } from "../lib/preferenciasFamilia";
 import { fechaISO } from "../lib/fechas";
+import { useAvisosDelTelefono } from "../lib/avisosDelTelefono";
 
 type Rol = "DOCENTE" | "REPRESENTANTE";
 type Curso = FunctionReturnType<
@@ -568,6 +569,24 @@ export function NucleoScreen() {
    * de verdad hacia dónde se va: con un representante, eso es esperar a que
    * `estadoHijos` deje de estar en su primera carga.
    */
+  /**
+   * Tocar un aviso en el teléfono hace lo mismo que tocarlo en la campana:
+   * lo marca leído y abre su pantalla. Si la app estaba cerrada, el aviso
+   * llega antes que la bandeja; se guarda y se resuelve en cuanto carga.
+   */
+  const marcarLeida = useMutation(api.interaccion.marcarNotificacionLeida);
+  const [avisoTocado, setAvisoTocado] = useState<string>();
+  useAvisosDelTelefono(perfil?.perfilUsuarioId, setAvisoTocado);
+  useEffect(() => {
+    if (!avisoTocado || !novedades) return;
+    setAvisoTocado(undefined);
+    const tocada = novedades.find((n) => n._id === avisoTocado);
+    if (!tocada) return;
+    if (tocada.leidaEn === undefined) {
+      void marcarLeida({ notificacionId: tocada._id }).catch(() => {});
+    }
+    navegarDesdeNotificacion(tocada);
+  }, [avisoTocado, novedades]);
   const [decisionTomada, setDecisionTomada] = useState(false);
   const esperandoHijos = !!perfil?.representanteId && estadoHijos === "LoadingFirstPage";
   useEffect(() => {

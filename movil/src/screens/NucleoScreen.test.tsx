@@ -27,6 +27,11 @@ const estado = vi.hoisted(() => ({
   estadoHijos: "Exhausted" as "Exhausted" | "LoadingFirstPage",
   argsReporteDeHoy: [] as unknown[],
   sinAvisos: { familias: 0, sinAvisos: [] as { estudianteId: string; nombre: string }[] },
+  alTocarAviso: undefined as ((id: string) => void) | undefined,
+}));
+// El módulo nativo no existe en pruebas: se guarda a quién avisar al tocar.
+vi.mock("../lib/avisosDelTelefono", () => ({
+  useAvisosDelTelefono: (_perfil: unknown, alTocar: (id: string) => void) => { estado.alTocarAviso = alTocar; },
 }));
 vi.mock("react-native", async () => ({
   ...(await import("../test/mockReactNative")).reactNative(),
@@ -596,5 +601,17 @@ it("si a todas les llegan los avisos, no hay nada que señalar", async () => {
   await montar();
   await act(async () => vista!.root.findByProps({ accessibilityLabel: "Abrir Quinto A" }).props.onPress());
   expect(JSON.stringify(vista!.toJSON())).not.toContain("avisos en el teléfono");
+});
+
+/* ---------- Tocar un aviso del sistema, fuera de la app ---------- */
+
+it("tocar un aviso del teléfono abre su pantalla y lo marca leído, como en la campana", async () => {
+  estado.novedades = [avisoDeLaFamilia("REPORTE_DIARIO", "Reporte de hoy publicado")];
+  await montar();
+  await act(async () => estado.alTocarAviso!("n1"));
+  expect(estado.argsReporteDeHoy.at(-1)).toEqual({ estudianteId: "e1", fecha: "2026-09-15" });
+  expect(llamadas("interaccion:marcarNotificacionLeida")).toEqual([
+    { nombre: "interaccion:marcarNotificacionLeida", args: { notificacionId: "n1" } },
+  ]);
 });
 

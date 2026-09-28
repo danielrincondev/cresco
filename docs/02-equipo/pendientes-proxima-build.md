@@ -22,6 +22,13 @@ de la build, para que no se confunda con lo que sí la espera.
 
 ## 1. Avisos al teléfono: la app todavía no registra el teléfono
 
+**Estado (27 de septiembre, noche):** Kenny creó el proyecto de Firebase
+(`cresco-cb32e`) y subió la clave FCM V1 a EAS. `google-services.json` va a
+EAS como variable secreta de tipo archivo (`GOOGLE_SERVICES_JSON`), no al
+repo. El código (pasos 4 a 6) está construido y en las builds de esa noche.
+Falta confirmar en el teléfono que un aviso llega; cuando pase, se borra de
+aquí.
+
 **Encontrado el 27 de septiembre, y es lo más importante de esta lista.** El
 servidor envía los avisos bien (`push.ts`: entrega por dispositivo,
 reintentos, recibos), pero **ningún teléfono los recibe**. La app nunca llama a
