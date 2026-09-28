@@ -12,8 +12,9 @@
  * Es **idempotente**: si ya hay filas, no duplica nada. Se puede correr las
  * veces que haga falta.
  *
- * Los valores salen de `docs/00-producto/decisiones-pendientes.md` (sesión del
- * 14 de agosto) y de `cuestionario-direccion-visual.md` (bloque C1).
+ * Los valores salen de `decisiones-pendientes.md` (sesión del 14 de agosto) y
+ * de `cuestionario-direccion-visual.md` (bloque C1), que ya no están en el
+ * árbol: siguen en `git show c5ce997:docs/99-archivo/<archivo>`.
  *
  * `institucionId` va ausente en todas: son el catálogo del sistema, común a
  * todas las instituciones. Una escuela que quiera el suyo propio inserta filas

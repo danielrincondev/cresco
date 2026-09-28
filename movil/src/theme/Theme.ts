@@ -10,9 +10,9 @@
  * de "ningún valor mágico fuera del tema".
  *
  * Cada valor de aquí sale de una decisión escrita, no de un criterio de quien
- * programó la pantalla. Las fuentes son
- * `docs/00-producto/cuestionario-direccion-visual.md` y el bloque 2 de
- * `docs/00-producto/decisiones-pendientes.md`.
+ * programó la pantalla. Las fuentes son `cuestionario-direccion-visual.md` y
+ * el bloque 2 de `decisiones-pendientes.md`, que ya no están en el árbol:
+ * siguen en `git show c5ce997:docs/99-archivo/<archivo>`.
  *
  * **Regla de uso: ningún `#hex` fuera de este archivo.** El criterio para saber
  * que el sistema funciona es que alguien pueda construir una pantalla nueva sin

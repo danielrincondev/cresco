@@ -7,8 +7,9 @@ nueva que reemplaza a la anterior y la vieja pasa a estado `Reemplazada`.
 
 Esto reemplaza el modelo anterior (`registro-decisiones.md` y
 `decisiones-pendientes.md` como documentos únicos que se editaban encima cada
-vez que algo cambiaba). Esos dos archivos quedaron `Reemplazado` y se movieron
-a `docs/99-archivo/`.
+vez que algo cambiaba). Esos dos archivos quedaron `Reemplazado`; el 28 de
+septiembre se retiraron del árbol y siguen en el historial de git
+(`git show c5ce997:docs/99-archivo/registro-decisiones.md`).
 
 | # | Decisión | Estado |
 |---|---|---|

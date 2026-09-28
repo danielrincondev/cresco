@@ -195,9 +195,9 @@ Las referencias `RN-xx` y las letras del cuestionario apuntan a la especificaci�
 ## 5. Plan de seis semanas
 
 > ⚠️ **Este calendario de seis semanas es el de agosto y quedó atrás.** El estado
-> real y el orden de trabajo vigente están en `Contexto/NEXT_STEPS.md` (y, en
-> cuanto existan, en los Issues del milestone). Se conserva porque el reparto de
-> pantallas por persona sigue siendo el acordado.
+> real está en el `README.md` de la raíz y lo pendiente, en los Issues de
+> GitHub. Se conserva porque el reparto de pantallas por persona sigue siendo el
+> acordado.
 
 | Semana | A — Núcleo | B — Conducta | C — Interacción e infra |
 |---|---|---|---|
@@ -228,7 +228,7 @@ Una historia está terminada cuando cumple las seis:
 6. Funciona en un dispositivo Android real, no solo en el emulador.
 
 > La columna "Endpoint principal" del inventario de pantallas describe el
-> contrato HTTP original, archivado en
-> `docs/99-archivo/openapi-v1.1.0-archivado.yaml`. Ya no es ejecutable, pero
-> sigue siendo la descripción más completa de qué debe hacer cada función de
-> Convex: léelo como especificación, no como ruta.
+> contrato HTTP original del stack anterior, que ya no existe: cada ruta es hoy
+> una función de Convex en `movil/convex/`. Léela como especificación, no como
+> ruta. El contrato completo sigue en el historial de git
+> (`git show c5ce997:docs/99-archivo/openapi-v1.1.0-archivado.yaml`).
