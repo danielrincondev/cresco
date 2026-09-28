@@ -33,6 +33,7 @@ import {
   PieMenu,
   SeccionMenu,
   SeparadorMenu,
+  useGestoParaAbrirMenu,
 } from "../components/MenuLateral";
 import {
   Espacio,
@@ -751,8 +752,11 @@ export function NucleoScreen() {
       setRuta({ tipo: "curso", curso: ruta.curso });
     else volver();
   };
+  /** Donde está la hamburguesa, el menú también se abre deslizando desde el borde. */
+  const hayMenu = !!perfil && (rol === "DOCENTE" ? esRaizDocente : true);
+  const gestoMenu = useGestoParaAbrirMenu(() => setMenu(true), hayMenu && !menu);
   return (
-    <SafeAreaView style={styles.pantalla}>
+    <SafeAreaView style={styles.pantalla} {...gestoMenu}>
       <View style={styles.barra}>
         {/* **Un solo icono a la izquierda.** Para el docente: hamburguesa en
             las dos raíces —la lista de cursos y el curso abierto—, flecha en
@@ -766,10 +770,10 @@ export function NucleoScreen() {
             hace desde el menú (eligiendo "Mis hijos" u otra opción) o con el
             gesto/botón de atrás del sistema, que sigue funcionando igual.
 
-            No hay gesto desde el borde para abrir el menú: eso necesita
-            `gesture-handler`, que es nativo. La hamburguesa es la afordancia
-            que descubre todo el mundo de todas formas. */}
-        {perfil && (rol === "DOCENTE" ? esRaizDocente : true) ? (
+            Donde hay hamburguesa, el menú también se abre deslizando desde
+            el borde izquierdo (`useGestoParaAbrirMenu`). La hamburguesa sigue
+            siendo la afordancia que descubre todo el mundo. */}
+        {hayMenu ? (
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Abrir el menú"

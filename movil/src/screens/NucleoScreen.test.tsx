@@ -643,3 +643,13 @@ it("la campana está en cualquier pantalla, no solo en el inicio, y no en la pro
   expect(vista!.root.findAllByProps({ accessibilityLabel: "Novedades, 1 sin leer" })).toHaveLength(0);
 });
 
+it("deslizar desde el borde izquierdo abre el mismo menú que la hamburguesa", async () => {
+  await montar();
+  expect(vista!.root.findAll((n) => n.props.accessibilityLabel === "Cerrar el menú")).toHaveLength(0);
+  const pantalla = vista!.root.findAll(
+    (n) => (n.type as unknown) === "SafeAreaView" && typeof n.props.onPanResponderRelease === "function",
+  )[0];
+  expect(pantalla.props.onMoveShouldSetPanResponderCapture(null, { x0: 8, dx: 40, dy: 2, vx: 0 })).toBe(true);
+  await act(async () => pantalla.props.onPanResponderRelease(null, { x0: 8, dx: 120, dy: 2, vx: 0 }));
+  expect(vista!.root.findAll((n) => n.props.accessibilityLabel === "Cerrar el menú")).not.toHaveLength(0);
+});

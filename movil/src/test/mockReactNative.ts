@@ -99,6 +99,18 @@ export function reactNative() {
       // pero aqui terminar de inmediato es justo lo que evita un test colgado.
       loop: animacionResuelta,
       delay: animacionResuelta,
+      // El componente animado es el mismo componente: aquí no hay nada que mover.
+      createAnimatedComponent: <T,>(componente: T) => componente,
+    },
+
+    /**
+     * Los manejadores salen con los nombres de la configuración
+     * (`onMoveShouldSetPanResponderCapture`, `onPanResponderRelease`...), para
+     * que una prueba los llame con un `gestureState` inventado: sin dedo ni
+     * pantalla, es lo único comprobable de un gesto.
+     */
+    PanResponder: {
+      create: (config: Record<string, unknown>) => ({ panHandlers: config }),
     },
 
     Easing: {

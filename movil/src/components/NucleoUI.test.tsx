@@ -154,3 +154,29 @@ it("con proveedor, Pagina reserva el relleno pedido y reenvía el scroll", () =>
   act(() => scroll.props.onScroll({ nativeEvent: { contentOffset: { y: 42 } } }));
   expect(scrolls).toEqual([42]);
 });
+
+/* ---------- Botón ---------- */
+
+it("un botón con tono que no es secundario va relleno de su tono: el texto se lee", async () => {
+  const { Boton } = await import("./NucleoUI");
+  const { TonoEstado } = await import("../theme/Theme");
+  const vista = pintar(<Boton tono="NEGATIVA" onPress={() => {}}>Eliminar curso</Boton>);
+  const boton = vista.root.findByProps({ accessibilityRole: "button" });
+  const estilos = [boton.props.style].flat(Infinity).filter(Boolean);
+  expect(estilos).toContainEqual({ backgroundColor: TonoEstado.negativo.fondo });
+});
+
+it("al pulsar se marca y al soltar vuelve; el toque llega igual", async () => {
+  const { Boton } = await import("./NucleoUI");
+  const onPress = vi.fn();
+  const vista = pintar(<Boton onPress={onPress}>Guardar</Boton>);
+  const boton = () => vista.root.findByProps({ accessibilityRole: "button" });
+  const opacidad = () =>
+    [boton().props.style].flat(Infinity).filter(Boolean).some((e: { opacity?: number }) => e.opacity === 0.8);
+  act(() => boton().props.onPressIn());
+  expect(opacidad()).toBe(true);
+  act(() => boton().props.onPressOut());
+  expect(opacidad()).toBe(false);
+  act(() => boton().props.onPress());
+  expect(onPress).toHaveBeenCalledTimes(1);
+});

@@ -10,11 +10,19 @@
  * `translateX`: con el `Animated` del núcleo sale igual y **viaja por el
  * aire**, sin recompilar nada.
  *
- * Lo que se pierde: **abrir deslizando desde el borde**. Eso sí necesita
- * `gesture-handler`. Se abre con el botón de hamburguesa, que es la
- * afordancia estándar y la que descubre todo el mundo; el gesto es un atajo
- * para quien ya sabe que el cajón existe. Cuando haya una build nueva se
- * puede añadir sin tocar nada de esto.
+ * ## Los gestos (issue #101)
+ *
+ * Se abre también **deslizando desde el borde izquierdo** y se cierra
+ * deslizando hacia la izquierda. Se creía que eso exigía `gesture-handler`;
+ * alcanza con el `PanResponder` del núcleo, que tampoco es nativo nuevo. El
+ * gesto es un atajo para quien ya sabe que el cajón existe: la hamburguesa
+ * sigue siendo la puerta que descubre todo el mundo.
+ *
+ * Los dos gestos solo toman movimientos **horizontales**: un toque o un
+ * desplazamiento vertical siguen llegando a la pantalla como siempre. Y en
+ * los teléfonos con navegación por gestos, Android se queda con lo que nace
+ * pegado al borde (es su gesto de "atrás"): allí el menú se abre empezando
+ * el deslizamiento un dedo más adentro.
  *
  * ## Qué sí hace
  *
@@ -24,8 +32,18 @@
  * movimiento" aparece sin deslizarse.
  */
 
-import { useEffect, useRef, useState, type PropsWithChildren } from "react";
-import { Animated, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useEffect, useMemo, useRef, useState, type PropsWithChildren } from "react";
+import {
+  Animated,
+  PanResponder,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+  type GestureResponderHandlers,
+  type PanResponderGestureState,
+} from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { Icono, type PropsIcono } from "../theme/Icono";
@@ -44,6 +62,44 @@ import { useReduceMotion } from "./Movimiento";
 
 /** Ancho del panel. Deja ver un borde de la pantalla: recuerda que hay algo detrás. */
 const ANCHO = 292;
+
+/** Franja del borde izquierdo desde la que el deslizamiento abre el menú. */
+export const BORDE_DEL_GESTO = 40;
+/** Cuánto hay que deslizar para que cuente como gesto, y no como un toque tembloroso. */
+const ARRANQUE = 12;
+/** Al soltar: basta con haber recorrido esto, o con ir así de rápido. */
+const RECORRIDO = 56;
+const VELOCIDAD = 0.4;
+
+/** Más horizontal que vertical: así un desplazamiento de la lista nunca abre ni cierra nada. */
+const esHorizontal = (g: PanResponderGestureState) => Math.abs(g.dx) > Math.abs(g.dy);
+
+/**
+ * Abrir el menú deslizando desde el borde izquierdo. Los manejadores van en
+ * la vista que ocupa toda la pantalla; con `activo` en falso (sin menú en esa
+ * pantalla, o ya abierto) no toman nada.
+ */
+export function useGestoParaAbrirMenu(
+  onAbrir: () => void,
+  activo: boolean,
+): GestureResponderHandlers {
+  const ultimo = useRef({ onAbrir, activo });
+  ultimo.current = { onAbrir, activo };
+  return useMemo(
+    () =>
+      PanResponder.create({
+        // Fase de captura: la pantalla se queda con el gesto antes que sus
+        // hijos, pero solo si nace en el borde y va hacia la derecha.
+        onMoveShouldSetPanResponderCapture: (_evento, g) =>
+          ultimo.current.activo && g.x0 <= BORDE_DEL_GESTO && g.dx > ARRANQUE && esHorizontal(g),
+        onPanResponderRelease: (_evento, g) => {
+          if (g.dx > RECORRIDO || g.vx > VELOCIDAD) ultimo.current.onAbrir();
+        },
+        onPanResponderTerminationRequest: () => true,
+      }).panHandlers,
+    [],
+  );
+}
 
 export function MenuLateral({
   abierto,
@@ -64,6 +120,20 @@ export function MenuLateral({
   // `montado` sobrevive al cierre hasta que la animación termina. Sin esto el
   // panel desaparecería de golpe en vez de salirse.
   const [montado, setMontado] = useState(abierto);
+  const alCerrar = useRef(onCerrar);
+  alCerrar.current = onCerrar;
+  /** Cerrar deslizando hacia la izquierda, sobre el panel o sobre el velo. */
+  const gestoCerrar = useMemo(
+    () =>
+      PanResponder.create({
+        onMoveShouldSetPanResponderCapture: (_evento, g) => g.dx < -ARRANQUE && esHorizontal(g),
+        onPanResponderRelease: (_evento, g) => {
+          if (g.dx < -RECORRIDO || g.vx < -VELOCIDAD) alCerrar.current();
+        },
+        onPanResponderTerminationRequest: () => true,
+      }).panHandlers,
+    [],
+  );
 
   useEffect(() => {
     if (abierto) setMontado(true);
@@ -87,7 +157,7 @@ export function MenuLateral({
   if (!montado) return null;
 
   return (
-    <View style={m.capa} accessibilityViewIsModal>
+    <View style={m.capa} accessibilityViewIsModal {...gestoCerrar}>
       <Animated.View style={[m.velo, { opacity: progreso }]}>
         <Pressable
           accessibilityRole="button"
