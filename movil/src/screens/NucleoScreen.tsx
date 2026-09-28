@@ -1351,6 +1351,8 @@ function DetalleCurso({
     calendario && calendario.periodos.length > 0 ? { cursoId: curso.id } : "skip",
   );
   const [verTop, setVerTop] = useState(false);
+  const avisos = useQuery(api.interaccion.familiasSinAvisos, { cursoId: curso.id });
+  const [verSinAvisos, setVerSinAvisos] = useState(false);
   const invitar = useMutation(api.nucleo.crearInvitacion);
   const op = useOperacion();
   async function invitarFamilias() {
@@ -1400,6 +1402,39 @@ function DetalleCurso({
             ? "1 estudiante sin ninguna anotación este parcial."
             : `${panorama.sinAnotaciones} estudiantes sin ninguna anotación este parcial.`}
         </Aviso>
+      )}
+
+      {/* Las constancias de Cresco (quién vio, quién abrió) y los
+          recordatorios dependen de que el aviso llegue: a quien no le llega,
+          el docente tiene que decírselo en persona. */}
+      {avisos && avisos.sinAvisos.length > 0 && (
+        <Tarjeta>
+          <Subtitulo>
+            {avisos.sinAvisos.length === avisos.familias
+              ? avisos.familias === 1
+                ? "La familia del curso no recibe avisos en el teléfono"
+                : "Ninguna familia del curso recibe avisos en el teléfono"
+              : `${avisos.sinAvisos.length} de ${avisos.familias} familias no ${
+                  avisos.sinAvisos.length === 1 ? "recibe" : "reciben"
+                } avisos en el teléfono`}
+          </Subtitulo>
+          <Cuerpo>
+            Cresco solo puede avisar en el teléfono a quien lo tiene registrado.
+            Mientras tanto, lo ven todo al abrir la aplicación.
+          </Cuerpo>
+          {verSinAvisos ? (
+            <>
+              <Cuerpo>{`${avisos.sinAvisos.map((f) => f.nombre).join(", ")}.`}</Cuerpo>
+              <Boton secundario onPress={() => setVerSinAvisos(false)}>
+                Ocultar
+              </Boton>
+            </>
+          ) : (
+            <Boton secundario onPress={() => setVerSinAvisos(true)}>
+              {`Ver quiénes (${avisos.sinAvisos.length})`}
+            </Boton>
+          )}
+        </Tarjeta>
       )}
 
       {/* A diferencia del aviso de arriba, esto sí nombra a estudiantes

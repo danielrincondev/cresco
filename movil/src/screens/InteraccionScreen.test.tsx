@@ -572,3 +572,12 @@ it("sin representante vinculado, el historial lo dice", async () => {
   expect(texto).toContain("Sin citas todavía");
 });
 
+it("el historial dice si la familia recibe los avisos en el teléfono", async () => {
+  estado.historial = { ...historialVacio, representante: { nombre: "María Pérez", recibeAvisos: false } };
+  await act(async () => { vista = create(<HistorialFamilia estudianteId={"e1" as never} nombre="Ana Pérez" onVolver={() => {}} />); });
+  expect(JSON.stringify(vista.toJSON())).toContain("No tiene un teléfono registrado para avisos");
+  estado.historial = { ...historialVacio, representante: { nombre: "María Pérez", recibeAvisos: true } };
+  await act(async () => vista.update(<HistorialFamilia estudianteId={"e1" as never} nombre="Ana Pérez" onVolver={() => {}} />));
+  expect(JSON.stringify(vista.toJSON())).toContain("Recibe los avisos en el teléfono.");
+});
+

@@ -876,6 +876,13 @@ export function HistorialFamilia({
             ? "Sin representante vinculado en Cresco."
             : historial.representante.nombre ?? "Vinculado, todavía sin nombre registrado."}
         </Cuerpo>
+        {historial.representante !== null && (
+          <Cuerpo>
+            {historial.representante.recibeAvisos
+              ? "Recibe los avisos en el teléfono."
+              : "No tiene un teléfono registrado para avisos: lo ve todo al abrir Cresco."}
+          </Cuerpo>
+        )}
       </Tarjeta>
 
       <Tarjeta>

@@ -907,6 +907,73 @@ describe("interaccion — historial de la familia", () => {
   });
 });
 
+describe("interaccion — familias que no reciben avisos en el teléfono", () => {
+  const registrarTelefono = (e: Awaited<ReturnType<typeof sembrarEscenario>>) =>
+    e.representante.mutation(api.interaccion.registrarDispositivo, {
+      tokenPush: "ExponentPushToken[telefono-de-prueba]", plataforma: "ANDROID",
+    });
+
+  it("sin teléfono registrado aparece, y al registrar uno deja de aparecer", async () => {
+    const t = convexTest(schema, modules);
+    const e = await sembrarEscenario(t);
+    expect(await e.docente.query(api.interaccion.familiasSinAvisos, { cursoId: e.cursoId })).toEqual({
+      familias: 1, sinAvisos: [{ estudianteId: e.estudianteId, nombre: "Ana Pérez" }],
+    });
+    await registrarTelefono(e);
+    expect(await e.docente.query(api.interaccion.familiasSinAvisos, { cursoId: e.cursoId }))
+      .toEqual({ familias: 1, sinAvisos: [] });
+  });
+
+  it("un teléfono dado de baja vuelve a contar como sin avisos", async () => {
+    const t = convexTest(schema, modules);
+    const e = await sembrarEscenario(t);
+    await registrarTelefono(e);
+    // Lo que hace push.ts cuando Expo responde DeviceNotRegistered.
+    await t.run(async (ctx) => {
+      for (const d of await ctx.db.query("dispositivo").collect()) await ctx.db.patch(d._id, { activo: false });
+    });
+    const { sinAvisos } = await e.docente.query(api.interaccion.familiasSinAvisos, { cursoId: e.cursoId });
+    expect(sinAvisos.map((f) => f.nombre)).toEqual(["Ana Pérez"]);
+  });
+
+  it("un estudiante sin representante no es una familia a la que avisar", async () => {
+    const t = convexTest(schema, modules);
+    const e = await sembrarEscenario(t);
+    await t.run(async (ctx) => {
+      for (const vinculo of await ctx.db.query("vinculoRepresentacion").collect()) {
+        await ctx.db.patch(vinculo._id, { estado: "REVOCADO" });
+      }
+    });
+    expect(await e.docente.query(api.interaccion.familiasSinAvisos, { cursoId: e.cursoId }))
+      .toEqual({ familias: 0, sinAvisos: [] });
+  });
+
+  it("el historial de la familia también lo dice", async () => {
+    const t = convexTest(schema, modules);
+    const e = await sembrarEscenario(t);
+    const antes = await e.docente.query(api.interaccion.historialDeLaFamilia, { estudianteId: e.estudianteId });
+    expect(antes.representante?.recibeAvisos).toBe(false);
+    await registrarTelefono(e);
+    const despues = await e.docente.query(api.interaccion.historialDeLaFamilia, { estudianteId: e.estudianteId });
+    expect(despues.representante?.recibeAvisos).toBe(true);
+  });
+
+  it("solo el titular del curso ve a quién no le llegan los avisos", async () => {
+    const t = convexTest(schema, modules);
+    const e = await sembrarEscenario(t);
+    await t.run(async (ctx) => {
+      const perfil = await ctx.db.insert("perfilUsuario", {
+        authSubject: "https://convex.test|docente_4", tipoDocumento: "CEDULA", numeroDocumento: "0900000011",
+        actualizadoEn: Date.now(),
+      });
+      await ctx.db.insert("docente", { perfilUsuarioId: perfil, actualizadoEn: Date.now() });
+    });
+    await expect(t.withIdentity({ subject: "docente_4" }).query(api.interaccion.familiasSinAvisos, {
+      cursoId: e.cursoId,
+    })).rejects.toThrow("No eres el docente titular de este curso");
+  });
+});
+
 describe("interaccion — inconformidades", () => {
   it("no se puede reclamar una accion positiva", async () => {
     const t = convexTest(schema, modules);

@@ -1055,6 +1055,62 @@ export const misCitasDocente = query({
   }),
 });
 
+/**
+ * ¿Le puede llegar un aviso al teléfono a esta persona? Solo si tiene al menos
+ * un dispositivo activo: `registrarDispositivo` lo da de alta al iniciar
+ * sesión, y `push.ts` lo desactiva solo cuando Expo responde que ya no existe.
+ */
+async function tieneTelefonoParaAvisos(ctx: QueryCtx, perfilUsuarioId: Id<"perfilUsuario">): Promise<boolean> {
+  const activo = await ctx.db
+    .query("dispositivo")
+    .withIndex("por_usuario", (q) => q.eq("perfilUsuarioId", perfilUsuarioId).eq("activo", true))
+    .first();
+  return activo !== null;
+}
+
+/**
+ * Las familias del curso a las que hoy no les puede llegar un aviso al
+ * teléfono, para que el docente se lo diga en persona.
+ *
+ * Todo lo que Cresco deja constancia —quién vio un aviso, quién abrió un
+ * reporte, los recordatorios de citas y citaciones— depende de que el aviso
+ * llegue. Sin esto, la familia sin teléfono registrado era un punto ciego:
+ * nadie se enteraba de que nada le llegaba. Solo el titular del curso.
+ */
+export const familiasSinAvisos = query({
+  args: { cursoId: v.id("curso") },
+  handler: (ctx, args) => conErroresPublicos(async () => {
+    await exigirTitularDelCurso(ctx, args.cursoId);
+    const matriculas = await ctx.db
+      .query("matricula")
+      .withIndex("por_curso_estado", (q) => q.eq("cursoId", args.cursoId).eq("estado", "CURSANDO"))
+      .collect();
+    let familias = 0;
+    const sinAvisos: { estudianteId: Id<"estudiante">; nombre: string }[] = [];
+    for (const matricula of matriculas) {
+      // D2: un solo representante legal por estudiante en la v1.
+      const vinculo = await ctx.db
+        .query("vinculoRepresentacion")
+        .withIndex("por_estudiante_estado", (q) =>
+          q.eq("estudianteId", matricula.estudianteId).eq("estado", "ACTIVO"),
+        )
+        .unique();
+      const representante = vinculo === null ? null : await ctx.db.get(vinculo.representanteId);
+      if (representante === null) continue;
+      familias++;
+      if (await tieneTelefonoParaAvisos(ctx, representante.perfilUsuarioId)) continue;
+      sinAvisos.push({
+        estudianteId: matricula.estudianteId,
+        nombre: (await nombreDelEstudiante(ctx, matricula.estudianteId)) ?? "Estudiante",
+      });
+    }
+    return {
+      familias,
+      sinAvisos: sinAvisos.sort((a, b) => a.nombre.localeCompare(b.nombre, "es")),
+    };
+  }),
+});
+
 /** Cuántos avisos y reportes recientes entran en el historial de una familia. */
 const HISTORIAL_AVISOS = 15;
 const HISTORIAL_REPORTES = 15;
@@ -1153,6 +1209,7 @@ export const historialDeLaFamilia = query({
         nombre: perfil && (perfil.nombres || perfil.apellidos)
           ? `${perfil.nombres ?? ""} ${perfil.apellidos ?? ""}`.trim()
           : null,
+        recibeAvisos: await tieneTelefonoParaAvisos(ctx, representante.perfilUsuarioId),
       },
       citas,
       avisos,

@@ -26,6 +26,7 @@ const estado = vi.hoisted(() => ({
   hijos: [] as { estudianteId: string; nombres: string; apellidos: string; estadoVerificacion: string }[],
   estadoHijos: "Exhausted" as "Exhausted" | "LoadingFirstPage",
   argsReporteDeHoy: [] as unknown[],
+  sinAvisos: { familias: 0, sinAvisos: [] as { estudianteId: string; nombre: string }[] },
 }));
 vi.mock("react-native", async () => ({
   ...(await import("../test/mockReactNative")).reactNative(),
@@ -80,6 +81,7 @@ vi.mock("convex/react", () => ({
     if (nombre === "interaccion:misCitasDocente") return [];
     if (nombre === "interaccion:misBloquesLibres") return [];
     if (nombre === "nucleo:obtenerCalendarioCurso") return { periodos: [] };
+    if (nombre === "interaccion:familiasSinAvisos") return estado.sinAvisos;
     if (nombre === "interaccion:historialDeLaFamilia") return {
       estudiante: "Ana Pérez", representante: null, citas: [], avisos: [],
       reportes: { entregados: 0, abiertos: 0 }, reclamos: { total: 0, sinResolver: 0 },
@@ -146,6 +148,7 @@ beforeEach(() => {
   estado.novedades = [];
   estado.cursos = { cursos: [], limitePlan: 1 };
   estado.argsReporteDeHoy = [];
+  estado.sinAvisos = { familias: 0, sinAvisos: [] };
   estado.barraInferior = true;
   estado.barraInferiorGuardada = [];
   estado.hijos = [];
@@ -567,5 +570,31 @@ it("un aviso del curso no lleva a un día: abre el reporte de hoy", async () => 
   await montar();
   await abrirAviso("Traer materiales");
   expect(estado.argsReporteDeHoy.at(-1)).toEqual({ estudianteId: "e1" });
+});
+
+/* ---------- A quién no le llegan los avisos ---------- */
+
+it("en el curso, el docente ve a qué familias no les llegan los avisos al teléfono", async () => {
+  estado.perfil = { ...perfil, representanteId: null, docenteId: "docente" as never };
+  estado.cursos = { cursos: [cursoDePrueba("curso-a", "Quinto A")], limitePlan: 1 };
+  estado.sinAvisos = {
+    familias: 3,
+    sinAvisos: [{ estudianteId: "e1", nombre: "Ana Pérez" }, { estudianteId: "e2", nombre: "Bruno Zambrano" }],
+  };
+  await montar();
+  await act(async () => vista!.root.findByProps({ accessibilityLabel: "Abrir Quinto A" }).props.onPress());
+  expect(JSON.stringify(vista!.toJSON())).toContain("2 de 3 familias no reciben avisos en el teléfono");
+  expect(JSON.stringify(vista!.toJSON())).not.toContain("Bruno Zambrano");
+  await pulsar("Ver quiénes (2)");
+  expect(JSON.stringify(vista!.toJSON())).toContain("Ana Pérez, Bruno Zambrano.");
+});
+
+it("si a todas les llegan los avisos, no hay nada que señalar", async () => {
+  estado.perfil = { ...perfil, representanteId: null, docenteId: "docente" as never };
+  estado.cursos = { cursos: [cursoDePrueba("curso-a", "Quinto A")], limitePlan: 1 };
+  estado.sinAvisos = { familias: 3, sinAvisos: [] };
+  await montar();
+  await act(async () => vista!.root.findByProps({ accessibilityLabel: "Abrir Quinto A" }).props.onPress());
+  expect(JSON.stringify(vista!.toJSON())).not.toContain("avisos en el teléfono");
 });
 
