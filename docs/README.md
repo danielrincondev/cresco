@@ -83,7 +83,7 @@ documentación del producto.
 
 | Documento | Estado | Dueño |
 |---|---|---|
-| `borrador-devpost.md` | 🚧 material para el texto de Devpost (#55) | Persona D |
+| `devpost.md` | ✅ texto final en inglés, campo por campo, para pegar en Devpost (#55) | Persona C |
 
 ---
 
