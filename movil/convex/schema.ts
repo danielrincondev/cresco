@@ -687,6 +687,12 @@ export default defineSchema({
      * sirve de constancia en ninguna carpeta.
      */
     acuerdos: v.optional(v.string()),
+    /**
+     * Solo en una citación del docente: la primera vez que la familia la tuvo
+     * en pantalla (`marcarCitasVistas`). Le dice al docente si su citación
+     * llegó a leerse, no solo si se envió.
+     */
+    vistaPorFamiliaEn: v.optional(v.number()),
     ...actualizadoEn,
   })
     .index("por_representante", ["representanteId", "fechaHoraInicio"])

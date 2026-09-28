@@ -974,6 +974,40 @@ describe("interaccion — familias que no reciben avisos en el teléfono", () =>
   });
 });
 
+describe("interaccion — el docente sabe si la familia vio la citación", () => {
+  it("se marca la primera vez que la familia la tiene en pantalla, y el docente lo ve", async () => {
+    const t = convexTest(schema, modules);
+    const e = await sembrarEscenario(t);
+    const citaId = await e.docente.mutation(api.interaccion.citarFamilia, {
+      disponibilidadDocenteId: await bloqueDelDocente(e), estudianteId: e.estudianteId, motivo: "Hablar",
+    });
+    expect((await e.docente.query(api.interaccion.misCitasDocente))[0].vistaPorFamiliaEn).toBeUndefined();
+    expect(await e.representante.mutation(api.interaccion.marcarCitasVistas, { citaIds: [citaId] })).toBe(1);
+    const vista = (await e.docente.query(api.interaccion.misCitasDocente))[0].vistaPorFamiliaEn;
+    expect(vista).toBe(AHORA.getTime());
+    vi.setSystemTime(AHORA.getTime() + 60_000);
+    expect(await e.representante.mutation(api.interaccion.marcarCitasVistas, { citaIds: [citaId] })).toBe(0);
+    expect((await e.docente.query(api.interaccion.misCitasDocente))[0].vistaPorFamiliaEn).toBe(vista);
+  });
+
+  it("una cita que pidió la familia no se marca, ni la de otra familia", async () => {
+    const t = convexTest(schema, modules);
+    const e = await sembrarEscenario(t);
+    const pedida = await e.representante.mutation(api.interaccion.solicitarCita, {
+      disponibilidadDocenteId: await bloqueDelDocente(e), estudianteId: e.estudianteId,
+    });
+    expect(await e.representante.mutation(api.interaccion.marcarCitasVistas, { citaIds: [pedida] })).toBe(0);
+    await t.run(async (ctx) => {
+      const perfil = await ctx.db.insert("perfilUsuario", {
+        authSubject: "https://convex.test|rep_2", tipoDocumento: "CEDULA", numeroDocumento: "0900000003", actualizadoEn: Date.now(),
+      });
+      await ctx.db.insert("representante", { perfilUsuarioId: perfil, actualizadoEn: Date.now() });
+    });
+    await t.run((ctx) => ctx.db.patch(pedida, { origen: "CITACION_DOCENTE" }));
+    expect(await t.withIdentity({ subject: "rep_2" }).mutation(api.interaccion.marcarCitasVistas, { citaIds: [pedida] })).toBe(0);
+  });
+});
+
 describe("interaccion — inconformidades", () => {
   it("no se puede reclamar una accion positiva", async () => {
     const t = convexTest(schema, modules);

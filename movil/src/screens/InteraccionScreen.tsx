@@ -57,6 +57,7 @@ import {
   textoMotivo,
 } from "../lib/estados";
 import { parrafosLegibles } from "../lib/texto";
+import { useRegistrarVistos } from "../lib/useRegistrarVistos";
 import {
   fechaHoraLegible,
   fechaISO,
@@ -545,6 +546,15 @@ function DatosCita({
         <Text style={i.etiqueta}>
           {para === "DOCENTE" ? "Citación tuya" : "Citación del docente"}
         </Text>
+      )}
+      {/* Si la familia llegó a ver la citación: el docente necesita saberlo
+          antes de dar por hecho que la ignoraron. */}
+      {para === "DOCENTE" && cita.origen === "CITACION_DOCENTE" && (
+        <Cuerpo>
+          {cita.vistaPorFamiliaEn !== undefined
+            ? `La familia la vio el ${fechaHoraLegible(cita.vistaPorFamiliaEn)}.`
+            : "La familia todavía no la ha visto."}
+        </Cuerpo>
       )}
       <Subtitulo>{fechaHoraLegible(cita.fechaHoraInicio)}</Subtitulo>
       <Cuerpo>
@@ -1118,6 +1128,15 @@ export function CitasFamilia() {
   const [declinando, setDeclinando] = useState<CitaFamilia>();
   const [cancelando, setCancelando] = useState<CitaFamilia>();
   const respuesta = useOperacion();
+  // Tener las citaciones en esta pantalla es haberlas visto: el docente lo ve
+  // en su agenda. El servidor solo cuenta la primera vez.
+  const marcarVistas = useMutation(api.interaccion.marcarCitasVistas);
+  useRegistrarVistos(
+    "citas",
+    citas?.filter((c) => c.origen === "CITACION_DOCENTE" && c.vistaPorFamiliaEn === undefined).map((c) => c._id),
+    (citaIds) => marcarVistas({ citaIds }),
+    "citaciones",
+  );
 
   const hijo = hijos.find((h) => h.estudianteId === eligiendo);
   if (hijo) {

@@ -728,6 +728,35 @@ export const registrarAsistenciaCita = mutation({
   }),
 });
 
+/** Una pantalla de citas no muestra más que esto de una vez. */
+const CITAS_VISTAS_POR_LLAMADA = 50;
+
+/**
+ * La familia tuvo en pantalla estas citaciones del docente. Lo llama la app al
+ * mostrarlas (una query no puede escribir), igual que los avisos del curso.
+ * Solo cuenta la primera vez, solo citaciones (una cita que pidió la familia
+ * no hace falta "verla") y solo las de quien llama.
+ */
+export const marcarCitasVistas = mutation({
+  args: { citaIds: v.array(v.id("cita")) },
+  handler: (ctx, args) => conErroresPublicos(async () => {
+    const representante = await exigirRepresentante(ctx);
+    if (args.citaIds.length > CITAS_VISTAS_POR_LLAMADA) {
+      throw new ErrorDominio("VALIDACION", "Son demasiadas citas de una sola vez.");
+    }
+    const ahora = Date.now();
+    let marcadas = 0;
+    for (const citaId of new Set(args.citaIds)) {
+      const cita = await ctx.db.get(citaId);
+      if (cita === null || cita.representanteId !== representante._id ||
+          cita.origen !== "CITACION_DOCENTE" || cita.vistaPorFamiliaEn !== undefined) continue;
+      await ctx.db.patch(cita._id, { vistaPorFamiliaEn: ahora });
+      marcadas++;
+    }
+    return marcadas;
+  }),
+});
+
 /** Unas líneas, no un informe: es lo que se acordó, no la reunión entera. */
 const ACUERDOS_MAX = 1000;
 

@@ -581,3 +581,24 @@ it("el historial dice si la familia recibe los avisos en el teléfono", async ()
   expect(JSON.stringify(vista.toJSON())).toContain("Recibe los avisos en el teléfono.");
 });
 
+it("en la agenda, el docente ve si la familia vio su citación", async () => {
+  estado.citas = [
+    cita({ _id: "v", estado: "SOLICITADA", origen: "CITACION_DOCENTE", motivo: "Vista", vistaPorFamiliaEn: Date.UTC(2026, 8, 15, 17, 30) }),
+    cita({ _id: "n", estado: "SOLICITADA", origen: "CITACION_DOCENTE", motivo: "Sin ver", fechaHoraInicio: Date.now() + 3 * 86400000 }),
+  ];
+  await act(async () => { vista = create(<AgendaDocente curso={curso} />); });
+  const texto = JSON.stringify(vista.toJSON());
+  expect(texto).toContain("La familia la vio el martes 15 de septiembre");
+  expect(texto).toContain("La familia todavía no la ha visto.");
+});
+
+it("la familia, al ver sus citaciones, deja constancia de que las vio", async () => {
+  estado.status = "Exhausted";
+  estado.citas = [
+    cita({ _id: "c1", estado: "SOLICITADA", origen: "CITACION_DOCENTE", motivo: "Hablar" }),
+    cita({ _id: "c2", estado: "CONFIRMADA" }),
+  ];
+  await act(async () => { vista = create(<CitasFamilia />); });
+  expect(estado.mutaciones["interaccion:marcarCitasVistas"]).toHaveBeenCalledWith({ citaIds: ["c1"] });
+});
+
