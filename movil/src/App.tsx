@@ -20,7 +20,7 @@ import {
 } from "convex/react";
 import { ConvexProviderWithClerk } from "convex/react-clerk";
 
-import { Marca, Semantico, Superficie, Texto } from "./theme/Theme";
+import { Marca, Semantico, Superficie, Texto, modoOscuro } from "./theme/Theme";
 // Se importa peso por peso, no desde `@expo-google-fonts/inter`. El paquete
 // barril arrastra sus 18 archivos .ttf al bundle -- 6 MB para usar dos de
 // ellos, mas que el codigo entero de la aplicacion. En un colegio fiscal
@@ -68,7 +68,7 @@ export function App() {
         tokenCache={tokenCache}
       >
         <ConvexProviderWithClerk client={convex} useAuth={useAuth}>
-          <StatusBar barStyle="dark-content" />
+          <StatusBar barStyle={modoOscuro ? "light-content" : "dark-content"} />
           <AuthLoading>
             <LoadingScreen message="Preparando tu sesión..." />
           </AuthLoading>
@@ -360,6 +360,7 @@ function WelcomeScreen() {
                     keyboardType="email-address"
                     onChangeText={setEmailAddress}
                     placeholder="nombre@ejemplo.com"
+                    placeholderTextColor={modoOscuro ? Texto.secundario : undefined}
                     style={styles.input}
                     value={emailAddress}
                   />
@@ -376,6 +377,7 @@ function WelcomeScreen() {
                     onSubmitEditing={() => void submitCredentials()}
                     placeholder="Mínimo 15 caracteres"
                     secureTextEntry
+                    placeholderTextColor={modoOscuro ? Texto.secundario : undefined}
                     style={styles.input}
                     value={password}
                   />
@@ -395,6 +397,7 @@ function WelcomeScreen() {
                     onChangeText={setCode}
                     onSubmitEditing={() => void verifyCode()}
                     placeholder="123456"
+                    placeholderTextColor={modoOscuro ? Texto.secundario : undefined}
                     style={styles.input}
                     value={code}
                   />

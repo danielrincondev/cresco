@@ -52,6 +52,13 @@ vi.mock("../lib/avisosDelTelefono", () => ({
   useEstadoAvisos: () => avisos.estado,
   registrarTelefono: async () => { avisos.reintentos++; return "REGISTRADO"; },
 }));
+const apariencia = vi.hoisted(() => ({ resultado: "REINICIANDO" as string, pedidos: [] as boolean[] }));
+vi.mock("../lib/apariencia", () => ({
+  cambiarModoOscuro: async (oscuro: boolean) => {
+    apariencia.pedidos.push(oscuro);
+    return apariencia.resultado;
+  },
+}));
 import { AgendaDocente, AlertaDocente, Ajustes, CitasFamilia, HistorialFamilia, Notificaciones, resumenDelHistorial } from "./InteraccionScreen";
 import { Boton, Campo, Casilla, Opciones } from "../components/NucleoUI";
 
@@ -626,3 +633,42 @@ it("con los avisos activos, lo dice y no ofrece reintentar", async () => {
   expect(vista.root.findAllByType(Boton).some((b) => b.props.children === "Reintentar")).toBe(false);
 });
 
+/* ---------- Ajustes: modo oscuro (DP-014) ---------- */
+
+const interruptorOscuro = () => vista.root.findByProps({ accessibilityLabel: "Modo oscuro" });
+
+it("Ajustes ofrece el modo oscuro, apagado de entrada, y al tocarlo pide encenderlo", async () => {
+  apariencia.pedidos = [];
+  apariencia.resultado = "REINICIANDO";
+  await act(async () => { vista = create(<Ajustes />); });
+  expect(interruptorOscuro().props.accessibilityState.checked).toBe(false);
+  await act(async () => interruptorOscuro().props.onPress());
+  expect(apariencia.pedidos).toEqual([true]);
+  expect(interruptorOscuro().props.accessibilityState.checked).toBe(true);
+});
+
+it("si la app no pudo reiniciarse lo dice, y si no se pudo guardar el interruptor vuelve atrás", async () => {
+  apariencia.pedidos = [];
+  apariencia.resultado = "CIERRA_Y_ABRE";
+  await act(async () => { vista = create(<Ajustes />); });
+  await act(async () => interruptorOscuro().props.onPress());
+  expect(JSON.stringify(vista.toJSON())).toContain("Cierra la aplicación y vuelve a abrirla para verlo.");
+
+  apariencia.resultado = "SIN_GUARDAR";
+  await act(async () => interruptorOscuro().props.onPress());
+  expect(apariencia.pedidos).toEqual([true, false]);
+  expect(interruptorOscuro().props.accessibilityState.checked).toBe(true);
+  expect(JSON.stringify(vista.toJSON())).toContain("No pudimos guardar el cambio en este teléfono.");
+  apariencia.resultado = "REINICIANDO";
+});
+
+it("Ajustes le dice a la familia dónde está su informe en PDF, y al docente que el suyo es de la siguiente versión", async () => {
+  await act(async () => { vista = create(<Ajustes esRepresentante />); });
+  let texto = JSON.stringify(vista.toJSON());
+  expect(texto).toContain("se descarga en PDF desde su reporte acumulado");
+  expect(texto).not.toContain("no entra en esta versión");
+
+  await act(async () => { vista = create(<Ajustes esRepresentante={false} />); });
+  texto = JSON.stringify(vista.toJSON());
+  expect(texto).toContain("El informe del docente para el distrito no entra en esta versión.");
+});

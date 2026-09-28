@@ -27,28 +27,93 @@
  *    el cuerpo nunca baja de 16.
  */
 
+import { modoOscuro } from "./modo";
+
 /* --------------------------------------------------------------------------
  * COLOR
  * ----------------------------------------------------------------------- */
 
+/*
+ * Dos paletas con los mismos nombres (DP-014). La clara es la de siempre: la
+ * ve todo el mundo mientras no active el modo oscuro en Ajustes, y ninguno de
+ * sus valores cambió. Las pantallas no eligen paleta: importan `Marca`,
+ * `Superficie`, `Texto`, `Semantico` y `TonoEstado`, que al final de esta
+ * sección ya salen de la que toca según `modo.ts`.
+ *
+ * La oscura invierte una regla de la clara: en ella los botones y los
+ * rellenos de color son **claros con texto oscuro** (`Texto.sobreColor` pasa
+ * a ser casi negro), como en el tema oscuro de Material Design. No hay otra
+ * forma de que `Marca.base` sirva a la vez de texto sobre el fondo y de fondo
+ * de un botón: un azul que da 4.5:1 frente al blanco no llega a 4.5:1 frente
+ * a un fondo oscuro, y al revés. Todas las parejas de texto y fondo que usan
+ * las pantallas pasan AA en las dos paletas; `Theme.test.ts` lo comprueba.
+ */
+
+type Paleta = {
+  readonly Marca: { readonly claro: string; readonly base: string; readonly oscuro: string };
+  readonly Superficie: {
+    readonly fondo: string;
+    readonly tarjeta: string;
+    readonly borde: string;
+    readonly separador: string;
+  };
+  readonly Texto: {
+    readonly primario: string;
+    readonly secundario: string;
+    readonly deshabilitado: string;
+    readonly sobreColor: string;
+  };
+  readonly Semantico: {
+    readonly negativa: string;
+    readonly error: string;
+    readonly emergencia: string;
+    readonly positiva: string;
+  };
+  readonly TonoEstado: Readonly<
+    Record<
+      "neutro" | "positivo" | "atencion" | "negativo" | "critico",
+      { readonly fondo: string; readonly borde: string; readonly texto: string }
+    >
+  >;
+};
+
 /** Marca. Azul institucional: la app da noticias que importan sobre un hijo. */
-export const Marca = {
+const MARCA_CLARA = {
   claro: "#EBF4FA",
   base: "#00509E",
   oscuro: "#002A5C",
-} as const;
+};
 
-export const Superficie = {
+/**
+ * En oscuro, `claro` es el resaltado de lo elegido o presionado sobre una
+ * tarjeta; `base`, el azul de enlaces, iconos y botones; y `oscuro`, el
+ * relleno más fuerte (la opción elegida), que también se lee como texto.
+ */
+const MARCA_OSCURA = {
+  claro: "#1F3A5C",
+  base: "#7DB7EE",
+  oscuro: "#B9D8F7",
+};
+
+const SUPERFICIE_CLARA = {
   /** Fondo de pantalla. */
-  fondo: Marca.claro,
+  fondo: MARCA_CLARA.claro,
   /** Fondo de tarjeta: blanco, para contraste y limpieza. */
   tarjeta: "#FFFFFF",
   borde: "#E2E8F0",
   separador: "#E2E8F0",
-} as const;
+};
 
-export const Texto = {
-  primario: Marca.oscuro,
+const SUPERFICIE_OSCURA = {
+  fondo: "#0E1726",
+  tarjeta: "#172336",
+  /** También es la pista apagada del interruptor: la bolita (tarjeta) tiene que verse encima. */
+  borde: "#3A4C66",
+  separador: "#3A4C66",
+};
+
+const TEXTO_CLARO = {
+  primario: MARCA_CLARA.oscuro,
   /**
    * Corregido el 14 de agosto: era `#718096`, que daba ~3.9:1 sobre el fondo
    * claro — por debajo del mínimo AA de 4.5:1 y, por tanto, difícil de leer
@@ -59,7 +124,15 @@ export const Texto = {
   deshabilitado: "#A0AEC0",
   /** Sobre `Marca.base`: botones y barras. */
   sobreColor: "#FFFFFF",
-} as const;
+};
+
+const TEXTO_OSCURO = {
+  primario: "#E7EEF6",
+  secundario: "#AAB6C6",
+  deshabilitado: "#6B7A8F",
+  /** Casi negro: en oscuro los rellenos de color son claros (ver arriba). */
+  sobreColor: "#0B1A2C",
+};
 
 /**
  * Los tres rojos.
@@ -71,7 +144,7 @@ export const Texto = {
  * Todos tienen matiz ~0° (rojo puro), deliberadamente separados del matiz
  * rojo-naranja (~5–16°) de las franjas `CRITICA` y `MUY_BAJO`.
  */
-export const Semantico = {
+const SEMANTICO_CLARO = {
   /**
    * Acción negativa registrada al estudiante.
    *
@@ -90,10 +163,24 @@ export const Semantico = {
    * matiz se confundiría con ellas de reojo.
    */
   positiva: "#16A34A",
-} as const;
+};
 
 /**
- * Las seis franjas de conducta (C7).
+ * En oscuro los tres rojos se separan por la saturación y no por lo oscuros
+ * que son: el error es rosado pálido, la emergencia un rojo saturado (los dos
+ * con texto casi negro encima), y la acción negativa queda como borde de un
+ * chip de fondo rojo oscuro.
+ */
+const SEMANTICO_OSCURO = {
+  negativa: "#F87171",
+  error: "#F2B8B5",
+  emergencia: "#FF5A5A",
+  positiva: "#4ADE80",
+};
+
+/**
+ * Las seis franjas de conducta (C7). Iguales en las dos paletas: son un dato
+ * de la base, no del tema.
  *
  * Estos valores **también viven en `convex/semillas.ts`**, porque
  * `franjaConducta.colorHex` es un dato de la base: el representante los ve en
@@ -129,22 +216,63 @@ export const Franja = {
  * `critico`, sobre `Semantico.emergencia`, que da 7.5:1 y pasa AAA — es el
  * tono que tiene que gritar, y por eso es el unico que puede.
  */
-export const TonoEstado = {
+const TONO_CLARO: Paleta["TonoEstado"] = {
   /** Sin carga: informativo, en curso, o el punto de partida. */
-  neutro: { fondo: Superficie.fondo, borde: Superficie.borde, texto: Texto.secundario },
+  neutro: { fondo: SUPERFICIE_CLARA.fondo, borde: SUPERFICIE_CLARA.borde, texto: TEXTO_CLARO.secundario },
   /** Algo salio bien, o quedo cerrado a favor. 8.0:1 sobre su fondo. */
-  positivo: { fondo: "#E7F6EE", borde: Semantico.positiva, texto: "#14532D" },
+  positivo: { fondo: "#E7F6EE", borde: SEMANTICO_CLARO.positiva, texto: "#14532D" },
   /** Pide accion de quien lo ve, todavia sin gravedad. 7.4:1 sobre su fondo. */
   atencion: { fondo: "#FDF4E3", borde: Franja.BAJO, texto: "#7A4A12" },
   /** Algo negativo registrado, o cerrado en contra. 8.6:1 sobre su fondo. */
-  negativo: { fondo: "#FCEAEA", borde: Semantico.negativa, texto: "#7A1C1C" },
+  negativo: { fondo: "#FCEAEA", borde: SEMANTICO_CLARO.negativa, texto: "#7A1C1C" },
   /** Solo emergencias reales. Escaso a proposito. */
   critico: {
-    fondo: Semantico.emergencia,
-    borde: Semantico.emergencia,
-    texto: Texto.sobreColor,
+    fondo: SEMANTICO_CLARO.emergencia,
+    borde: SEMANTICO_CLARO.emergencia,
+    texto: TEXTO_CLARO.sobreColor,
   },
-} as const;
+};
+
+/** Al revés que en la clara: fondo oscuro teñido y texto claro del mismo matiz. */
+const TONO_OSCURO: Paleta["TonoEstado"] = {
+  neutro: { fondo: "#1C2A3F", borde: SUPERFICIE_OSCURA.borde, texto: TEXTO_OSCURO.secundario },
+  positivo: { fondo: "#123524", borde: SEMANTICO_OSCURO.positiva, texto: "#9FE8B8" },
+  atencion: { fondo: "#3A2A10", borde: Franja.BAJO, texto: "#F7D49B" },
+  negativo: { fondo: "#3D1717", borde: SEMANTICO_OSCURO.negativa, texto: "#FCA5A5" },
+  critico: {
+    fondo: SEMANTICO_OSCURO.emergencia,
+    borde: SEMANTICO_OSCURO.emergencia,
+    texto: TEXTO_OSCURO.sobreColor,
+  },
+};
+
+/** Las dos paletas enteras. Las pantallas no las usan: son para las pruebas. */
+export const Paletas: { readonly claro: Paleta; readonly oscuro: Paleta } = {
+  claro: {
+    Marca: MARCA_CLARA,
+    Superficie: SUPERFICIE_CLARA,
+    Texto: TEXTO_CLARO,
+    Semantico: SEMANTICO_CLARO,
+    TonoEstado: TONO_CLARO,
+  },
+  oscuro: {
+    Marca: MARCA_OSCURA,
+    Superficie: SUPERFICIE_OSCURA,
+    Texto: TEXTO_OSCURO,
+    Semantico: SEMANTICO_OSCURO,
+    TonoEstado: TONO_OSCURO,
+  },
+};
+
+/** La paleta de esta sesión: la oscura solo si se activó en Ajustes. */
+const PALETA = modoOscuro ? Paletas.oscuro : Paletas.claro;
+
+export const Marca = PALETA.Marca;
+export const Superficie = PALETA.Superficie;
+export const Texto = PALETA.Texto;
+export const Semantico = PALETA.Semantico;
+export const TonoEstado = PALETA.TonoEstado;
+export { modoOscuro };
 
 /* --------------------------------------------------------------------------
  * TIPOGRAFÍA
@@ -325,7 +453,10 @@ export const Densidad = {
   },
 } as const;
 
-/** A2: sin modo oscuro en la v1. Los tokens ya son semánticos por si entra en v2. */
+/**
+ * A2 decía «sin modo oscuro en la v1», y por eso los tokens ya eran semánticos.
+ * DP-014 lo reemplaza: modo oscuro opcional desde Ajustes, apagado por defecto.
+ */
 export const Tema = {
   Marca,
   Superficie,
