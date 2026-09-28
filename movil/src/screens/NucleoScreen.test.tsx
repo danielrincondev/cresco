@@ -653,3 +653,30 @@ it("deslizar desde el borde izquierdo abre el mismo menú que la hamburguesa", a
   await act(async () => pantalla.props.onPanResponderRelease(null, { x0: 8, dx: 120, dy: 2, vx: 0 }));
   expect(vista!.root.findAll((n) => n.props.accessibilityLabel === "Cerrar el menú")).not.toHaveLength(0);
 });
+
+/**
+ * El muro de pago del docente aparece en el momento exacto en que el plan
+ * gratuito se queda corto: al querer un segundo curso. Antes decía que ampliar
+ * el plan estaría "disponible próximamente", cuando la compra ya existía.
+ */
+it("el docente con su único curso gratuito ve cómo pasar a PRO, y el botón lo lleva al plan", async () => {
+  estado.perfil = { ...perfil, representanteId: null, docenteId: "docente" as never };
+  estado.cursos = { cursos: [cursoDePrueba("curso-a", "Quinto A")], limitePlan: 1 };
+  await montar();
+  const texto = () => JSON.stringify(vista!.toJSON());
+  expect(texto()).toContain("Con el plan PRO puedes tener más cursos");
+  expect(texto()).not.toContain("disponible próximamente");
+  await pulsar("Ver el plan PRO");
+  expect(texto()).not.toContain("Tu plan incluye un curso y ya lo estás usando");
+});
+
+it("un docente PRO en su límite no recibe una oferta de PRO", async () => {
+  estado.perfil = { ...perfil, representanteId: null, docenteId: "docente" as never };
+  estado.cursos = {
+    cursos: ["a", "b", "c", "d", "e"].map((id) => cursoDePrueba(`curso-${id}`, `Curso ${id}`)),
+    limitePlan: 5,
+  };
+  await montar();
+  expect(JSON.stringify(vista!.toJSON())).toContain("Has alcanzado los 5 cursos de tu plan");
+  expect(vista!.root.findAllByType(Boton).some((b) => b.props.children === "Ver el plan PRO")).toBe(false);
+});

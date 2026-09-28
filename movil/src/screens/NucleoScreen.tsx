@@ -1307,17 +1307,20 @@ function Cursos({
           <Boton onPress={() => navegar({ tipo: "crearCurso" })}>
             Crear curso
           </Boton>
+        ) : datos.limitePlan === 1 ? (
+          // El momento exacto en que el plan gratuito se queda corto: aquí se
+          // ofrece PRO, no en la portada. Decía "disponible próximamente" desde
+          // antes de que existiera la compra, y ya existe.
+          <>
+            <Aviso>
+              Tu plan incluye un curso y ya lo estás usando. Con el plan PRO
+              puedes tener más cursos, y más estudiantes en cada uno.
+            </Aviso>
+            <Boton onPress={() => navegar({ tipo: "plan" })}>Ver el plan PRO</Boton>
+          </>
         ) : (
           <Aviso>
-            {/*
-              El plan gratuito permite 1 curso, y "los 1 cursos de tu plan" es
-              justo lo que se lee en un telefono real. El singular se trata
-              aparte en vez de dejar una plantilla que solo funciona en plural.
-            */}
-            {datos.limitePlan === 1
-              ? "Tu plan incluye un curso y ya lo estás usando."
-              : `Has alcanzado los ${datos.limitePlan} cursos de tu plan.`}{" "}
-            La opción para ampliar el plan estará disponible próximamente.
+            {`Has alcanzado los ${datos.limitePlan} cursos de tu plan. Cuando termina el año lectivo de un curso, deja de contar para el límite.`}
           </Aviso>
         ))}
     </Pagina>
