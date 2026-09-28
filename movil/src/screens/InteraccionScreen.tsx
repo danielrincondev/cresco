@@ -60,7 +60,8 @@ import { parrafosLegibles } from "../lib/texto";
 import { useRegistrarVistos } from "../lib/useRegistrarVistos";
 import { tokenDeReautenticacion } from "../lib/reautenticar";
 import { registrarTelefono, useEstadoAvisos, type EstadoAvisos } from "../lib/avisosDelTelefono";
-import { cambiarModoOscuro } from "../lib/apariencia";
+import { cambiarTema } from "../lib/apariencia";
+import { preferenciaTema, type PreferenciaTema } from "../theme/modo";
 import {
   fechaHoraLegible,
   fechaISO,
@@ -68,7 +69,7 @@ import {
   hoyISO,
   plazoLegible,
 } from "../lib/fechas";
-import { Espacio, Radio, Semantico, Superficie, Tamano, Texto, modoOscuro } from "../theme/Theme";
+import { Espacio, Radio, Semantico, Superficie, Tamano, Texto } from "../theme/Theme";
 
 type Curso = FunctionReturnType<typeof api.nucleo.listarCursos>["cursos"][number];
 type CitaDocente = FunctionReturnType<typeof api.interaccion.misCitasDocente>[number];
@@ -1652,22 +1653,29 @@ function AvisosDelTelefono() {
   );
 }
 
+const OPCIONES_TEMA = [
+  { valor: "claro", texto: "Claro" },
+  { valor: "oscuro", texto: "Oscuro" },
+  { valor: "sistema", texto: "Como el teléfono" },
+] as const satisfies readonly { valor: PreferenciaTema; texto: string }[];
+
 /**
- * El modo oscuro (DP-014). El interruptor muestra lo que la persona pidió, no
- * la paleta de esta sesión: si el reinicio no llega a ocurrir, tiene que verse
+ * El tema (DP-014). Las opciones muestran lo que la persona pidió, no la
+ * paleta de esta sesión: si el reinicio no llega a ocurrir, tiene que verse
  * que el cambio quedó guardado y qué falta para verlo.
  */
 function Apariencia() {
-  const [pedido, setPedido] = useState(modoOscuro);
+  const [pedido, setPedido] = useState<PreferenciaTema>(preferenciaTema);
   const [aviso, setAviso] = useState<string | null>(null);
 
-  async function cambiar() {
-    const oscuro = !pedido;
-    setPedido(oscuro);
+  async function cambiar(tema: PreferenciaTema) {
+    if (tema === pedido) return;
+    const anterior = pedido;
+    setPedido(tema);
     setAviso(null);
-    const resultado = await cambiarModoOscuro(oscuro);
+    const resultado = await cambiarTema(tema);
     if (resultado === "SIN_GUARDAR") {
-      setPedido(!oscuro);
+      setPedido(anterior);
       setAviso("No pudimos guardar el cambio en este teléfono.");
     } else if (resultado === "CIERRA_Y_ABRE") {
       setAviso("Listo. Cierra la aplicación y vuelve a abrirla para verlo.");
@@ -1677,10 +1685,11 @@ function Apariencia() {
   return (
     <Tarjeta>
       <Subtitulo>Apariencia</Subtitulo>
-      <Interruptor etiqueta="Modo oscuro" encendido={pedido} onChange={() => void cambiar()} />
+      <Opciones valor={pedido} opciones={OPCIONES_TEMA} onChange={(tema) => void cambiar(tema)} />
       <Cuerpo>
-        Más cómodo de noche, por ejemplo para leer el reporte que llega a las
-        22:00. La aplicación se reinicia para aplicarlo.
+        El modo oscuro es más cómodo de noche, por ejemplo para leer el reporte
+        que llega a las 22:00. «Como el teléfono» sigue el modo oscuro del
+        sistema. La aplicación se reinicia para aplicar el cambio.
       </Cuerpo>
       {aviso && <Aviso>{aviso}</Aviso>}
     </Tarjeta>
