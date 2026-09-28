@@ -1,13 +1,14 @@
 # CI de Cresco — dueño: Persona C (infraestructura).
 #
 # Comprueba tipos, pruebas y que la app siga empaquetando, en cada PR. Un
-# solo job porque ahora hay un solo proyecto: Expo en la raíz con `convex/` dentro, un `package.json` por
-# workspace y nada más que orquestar.
+# solo job porque hay un solo proyecto: la app de Expo en `movil/`, con
+# `convex/` dentro, como único workspace de npm. No hay nada más que orquestar.
 #
-# ⚠️ Este archivo es solo la mitad del trabajo. Para que un PR en rojo **no se
-# pueda fusionar** hay que marcar el check como obligatorio en GitHub:
-#   Settings → Branches → regla sobre `main` → Require status checks.
-# Sin ese paso el CI se pone rojo y el botón de fusionar sigue verde.
+# Este archivo es solo la mitad del trabajo. Lo que impide fusionar un PR en
+# rojo es que el check esté marcado como obligatorio en la protección de
+# `main` (Settings → Branches), y lo está. GitHub lo busca por el nombre del
+# job, "Tipos y pruebas": si alguien lo renombra, hay que volver a elegirlo
+# ahí, o el CI se pone rojo y el botón de fusionar sigue verde.
 
 name: CI
 

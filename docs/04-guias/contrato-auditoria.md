@@ -11,7 +11,7 @@ cacheadas. Así que **la lectura la audita la pantalla**, llamando a una mutatio
 al abrirse. Si la pantalla no llama, no hay registro — y la bitácora es lo que se
 le enseña a un colegio cuando pregunta *"¿quién vio los datos de mi hijo?"*.
 
-## Los cuatro eventos de la v1 y quién los produce
+## Los cuatro eventos de la v1 y quién los produce (actualizado el 28 de septiembre)
 
 Un evento necesita **dos** piezas: la función que lo escribe y alguien que la
 llame. Tenerlas separadas es lo que hizo que `LOGIN` y `LEER_SENSIBLE`
@@ -22,32 +22,41 @@ Por eso esta tabla mira las dos.
 |---|---|---|---|
 | `APROBAR` estudiante | `nucleo.aprobarEstudiante` | la propia mutation | ✅ |
 | `CREAR` acción | `conducta.registrarAccion` | la propia mutation | ✅ desde el PR #39 |
+| `ANULAR` acción | `conducta.anularAccion`, e `interaccion.resolverInconformidad` cuando un reclamo termina en anulación | las propias mutations | ✅ |
 | `LOGIN` | `auditoria.registrarInicioSesion` | `useAuditoriaSesion` en `NucleoScreen` | ✅ |
-| `LEER_SENSIBLE` | `auditoria.registrarLecturaSensible` | `useLecturaSensible` en `AprobarForm` | ⚠️ parcial, ver abajo |
-| `ANULAR` acción | `conducta.anularAccion` | — | ⏳ falta la mutation (#9) |
+| `LEER_SENSIBLE` | `auditoria.registrarLecturaSensible` | `useLecturaSensible`, en cada pantalla de abajo | ✅ |
 
-### Lo que falta de `LEER_SENSIBLE`
+### Qué pantallas disparan `LEER_SENSIBLE`
 
-Hoy solo lo dispara **una** pantalla: la ficha de un estudiante pendiente que
-el docente abre para revisar y aprobar. Es la única que existe ahora mismo y
-que muestra los datos de un menor uno por uno.
+Cada pantalla que muestra los datos de un menor uno por uno lo llama al
+abrirse; si no, el acceso no queda registrado:
 
-Faltan las que aún no están construidas, y cada una tiene que llamarlo al
-abrirse o el acceso no queda registrado:
+| Pantalla | `recurso` |
+|---|---|
+| Ficha del estudiante pendiente que el docente revisa para aprobar (`NucleoScreen`) | `FICHA_ESTUDIANTE` |
+| Reporte del día y reportes anteriores del hijo (P4, `ReporteScreen`) | `REPORTE_ESTUDIANTE` |
+| Acumulado del parcial: puntaje y bitácora (P6, `ReporteScreen`) | `BITACORA_ACCIONES` |
 
-| Pantalla | `recurso` | Depende de |
-|---|---|---|
-| Reporte diario del hijo (P4) | `REPORTE_ESTUDIANTE` | `conducta.ts` (#10) |
-| Bitácora de acciones (P6) | `BITACORA_ACCIONES` | `conducta.ts` (#10) |
-| Puntaje del parcial (P6) | `PUNTAJE_PERIODO` | `conducta.ts` (#10) |
+El acumulado muestra el puntaje junto a la bitácora, así que un solo registro
+cubre los dos: `PUNTAJE_PERIODO` queda para una pantalla que muestre el
+puntaje por separado.
 
 La lista del curso (`Estudiantes`) **no** lo dispara a propósito: es un listado
 de nombres, no la apertura del expediente de una persona. Registrar cada
 scroll llenaría la bitácora de ruido y haría más difícil responder la pregunta
 que importa.
 
-`EXPORTAR` y `ALERTA` están diferidos a la v2 por DP-006. (`interaccion.ts` ya
-escribe `ALERTA`; es de más, no de menos.)
+### Además de los cuatro de DP-006
+
+DP-006 dejó el resto para la v2, pero estos eventos ya se registran porque
+cada uno es de más, no de menos:
+
+| Evento | Quién lo escribe |
+|---|---|
+| `ALERTA` | `interaccion.activarAlerta`, al publicar una alerta o un simulacro (queda marcado) |
+| `ACTUALIZAR` | `interaccion.resolverInconformidad`: siempre sobre el reclamo, y además sobre la acción cuando el reclamo la modifica |
+| `EXPORTAR` | `conducta.prepararInforme`: el informe en PDF saca de la aplicación los datos de un menor |
+| `ANULAR` curso | `nucleo.eliminarCurso`, con el número de matrículas retiradas |
 
 ## `registrarInicioSesion({ plataforma? })`
 

@@ -1,10 +1,13 @@
-# CONTEXT.md — Estado del proyecto Cresco
+# CONTEXT.md — Contexto del proyecto Cresco
 
-> **Reescrito el 22 de agosto de 2026.** La versión anterior describía el stack
-> retirado en su sección de arquitectura, y su "Estado del repositorio" y su
-> lista de "Pendiente de definir" habían quedado obsoletos (afirmaban que no
-> había commits, ni proyecto Expo, ni CI, ni pruebas — todo eso ya existe).
-> Se conserva en el historial: `git show ba3b4b8:Contexto/CONTEXT.md`.
+> **Reescrito el 22 de agosto de 2026 y recortado el 28 de septiembre.** Este
+> documento explica el objetivo, el alcance, la arquitectura y el porqué de las
+> reglas de negocio. **No lleva el estado del proyecto:** el estado vive en el
+> `README.md` de la raíz y lo pendiente, en los Issues de GitHub. Las secciones
+> "Estado del repositorio" y "Pendiente de definir" de agosto se quitaron
+> porque ya no eran ciertas (decían que no existían las funciones ni las
+> pantallas); siguen en el historial:
+> `git show c5ce997:Contexto/CONTEXT.md`.
 
 ---
 
@@ -120,8 +123,9 @@ numérico, para no depender solo del color.
 - El **representante** registra los datos de su hijo al canjear el código; el
   estudiante queda `PENDIENTE` hasta que el docente lo apruebe. Al aprobar nace la
   matrícula con puntaje 60.
-- Camino secundario: el docente puede importar la lista por CSV. El archivo se
-  parsea y **se descarta**; nunca se almacena.
+- Camino secundario, importar la lista por CSV: **diferido a la v2** por
+  DP-013. Si se construye, el archivo se parsea y **se descarta**; nunca se
+  almacena.
 - **Un solo representante legal por estudiante** en la v1
   (`exigirVinculo`; segundo intento = conflicto).
 - Un representante puede tener hijos en colegios distintos; cambia con una barra
@@ -147,7 +151,9 @@ numérico, para no depender solo del color.
   la acción a `MODIFICADA` (0 puntos) y devuelve los puntos.
 - **Citas:** el docente publica su horario, se parte en bloques de **15 minutos**.
   El representante reserva y nace `SOLICITADA`; **requiere confirmación** del
-  docente.
+  docente. El docente también puede **citar** a una familia: ella responde si
+  asistirá, y si no puede, tiene que decir por qué. Después de la reunión el
+  docente registra si la familia asistió y deja por escrito los acuerdos.
 - **Alertas de emergencia:** el docente debe **reautenticarse** antes de activar
   (se guarda `reautenticadoEn`). Alcance `CURSO` o `ESTUDIANTE`. Queda auditada.
   La app debe declarar visiblemente que **no sustituye al ECU 911**. El
@@ -169,84 +175,23 @@ numérico, para no depender solo del color.
 ### Datos y cumplimiento
 - Al retirarse un estudiante los datos se **archivan**: el representante pierde
   acceso, la institución conserva.
-- El representante puede descargar la información de su hijo en PDF (derecho de
-  acceso), generado en memoria y devuelto en la respuesta, sin almacenamiento.
+- El representante puede guardar en PDF el acumulado del parcial de su hijo:
+  el servidor devuelve los datos (`prepararInforme`) y el PDF se genera en el
+  teléfono, sin almacenarse en ninguna parte.
 - **No se guardan archivos ni fotos** en ninguna parte.
 - Auditoría en v1: `LOGIN`, `LEER_SENSIBLE`, `CREAR`/`ANULAR` acción, `APROBAR`
-  estudiante (DP-006). `EXPORTAR` y `ALERTA` van a v2.
+  estudiante (DP-006). Además ya se registran `ALERTA`, `EXPORTAR` y
+  `ACTUALIZAR`; el detalle está en `docs/04-guias/contrato-auditoria.md`.
 - Retención y derecho al olvido: se declara en el aviso de privacidad para v1;
   la anonimización real es v2 (DP-007).
 - Fechas del dominio en `America/Guayaquil`; marcas de tiempo en epoch ms UTC.
 
-## 6. Estado del repositorio
+## 6. Estado y pendientes
 
-Verificado el 22 de agosto de 2026 — `npm run typecheck` y `npm test` pasan
-limpios desde la raíz.
+No viven aquí, para que este documento no vuelva a quedar mintiendo:
 
-| Pieza | Estado |
-|---|---|
-| App Expo (`movil/`) | ✅ arranque, sesión y cierre de sesión |
-| Clerk → Convex | ✅ `auth.config.ts` + `viewer.ts` prueban que la identidad llega al backend |
-| Esquema (41 tablas) | ✅ `convex/schema.ts` |
-| Constantes de dominio | ✅ `convex/lib/enums.ts` |
-| Guardas de integridad | ✅ `convex/lib/guardas.ts` |
-| Capa de permisos | ✅ `convex/lib/permisos.ts` |
-| Datos semilla | ✅ `convex/semillas.ts`, cargadas en al menos un despliegue |
-| Webhook de RevenueCat | ✅ `convex/http.ts` + `suscripciones.ts`, con pruebas |
-| Tokens visuales | ✅ `movil/src/theme/Theme.ts` |
-| Integración continua | ✅ `.github/workflows/ci.yml` |
-| Propiedad por módulo | ✅ `.github/CODEOWNERS` |
-| `convex/nucleo.ts` (A) | ⬜ por escribir |
-| `convex/conducta.ts` (B) | ⬜ por escribir |
-| `convex/interaccion.ts` (C) | ⬜ por escribir |
-| **Las 31 pantallas** | ⬜ **es el grueso de lo que falta** |
-| Los 6 componentes base | ⬜ Persona A, sobre `Theme.ts` |
-
-La especificación de las operaciones del backend está archivada en
-`docs/99-archivo/openapi-v1.1.0-archivado.yaml` (32 rutas) — ya no es un contrato
-ejecutable, pero sigue siendo la descripción más completa de qué debe hacer cada
-función.
-
-## 7. Pendiente de definir — no asumir ni inventar
-
-### Bloqueantes
-1. **Validación con un profesor real.** Sigue sin ocurrir. Es el mayor riesgo
-   abierto del proyecto: ningún stack protege de que un docente diga "esto no es
-   lo que necesito". La presentación y el FAQ están escritos desde el 7 de agosto,
-   sin usar. Dueño: Persona C.
-2. **Configuración de GitHub pendiente de permisos de Admin** (Daniel): branch
-   protection sobre `main`, CI como check obligatorio, "Require review from Code
-   Owners", y borrado automático de ramas fusionadas. Ver
-   `docs/02-equipo/flujo-de-trabajo.md`.
-
-### Técnicas
-3. **Despliegue de Convex: ¿uno compartido o uno por desarrollador?** Hoy cada
-   quien corre su propio `npx convex dev`. Afecta a si `EXPO_PUBLIC_CONVEX_URL`
-   puede ser un único secreto compartido.
-4. **Vault de Bitwarden sin configurar.** `movil/.env.schema` apunta a UUID de
-   relleno; `npm run dev` falla sin `BITWARDEN_ACCESS_TOKEN`. Alternativa
-   funcionando: pasar las variables a mano.
-5. **Material Symbols como fuente variable.** Hay que probar
-   `fontVariationSettings` en un Android real **antes** de apoyar las 31 pantallas
-   sobre ese patrón — `@expo/vector-icons` no sirve (trae la versión clásica sin
-   eje de relleno).
-6. **Estrategia offline.** Identificada como necesaria, nunca decidida. Caso
-   relevante: un docente tomando asistencia sin señal.
-7. **Manejo de estado en la app Expo.** Convex trae reactividad propia, pero no se
-   ha decidido qué se maneja localmente.
-8. **Librería de gráficos** para el reporte acumulado (P6). Diferida
-   explícitamente.
-9. **Modelo del diferenciador de IA:** Claude Haiku 4.5 o GPT-5 Nano, tras probar
-   con notas reales de un docente (DP-008).
-
-### Legales y del piloto
-10. **Aviso de privacidad y texto de consentimiento**, con versión. Se necesita
-    **antes** de construir P3. Dueño: Persona C, comprometido para el 21 de
-    agosto.
-11. **Carta de acuerdo del piloto** con el profesor o el colegio. Es donde se
-    negocia la retención de datos (DP-007), no se decide unilateralmente.
-
-### Cuentas por crear
-12. RevenueCat (con Test Store y los 3 productos en un *offering* — sin ese paso
-    `getOfferings()` devuelve vacío), Expo/EAS, Devpost. Development build de
-    Expo: `react-native-purchases` es módulo nativo y no corre en Expo Go.
+- **Qué hace hoy la aplicación y en qué estado está cada pieza:** el
+  `README.md` de la raíz.
+- **Qué falta:** los Issues de GitHub, y
+  `docs/02-equipo/pendientes-proxima-build.md` para lo que espera una build
+  nueva de EAS.

@@ -1,19 +1,22 @@
 # Contrato de notificaciones push para la interfaz
 
-Dueño: Persona C. Lado servidor en `movil/convex/push.ts`; lo de aquí es lo que
-falta hacer en la app.
+Dueño: Persona C. Lado servidor en `movil/convex/push.ts`; lado de la app en
+`movil/src/lib/avisosDelTelefono.ts`. Funciona en un teléfono real desde el 28
+de septiembre de 2026.
 
 ## Lo que ya funciona sin que la app haga nada
 
 `interaccion.notificar()` crea la notificación en bandeja y **programa sola** su
 entrega al teléfono. Ninguna pantalla tiene que llamar a nada para que se envíe.
 
-## Lo que sí tiene que hacer la app
+## Lo que hace la app (`useAvisosDelTelefono`)
 
-**1. Registrar el token del dispositivo.** Al iniciar sesión, pedir permiso de
-notificaciones, obtener el token de Expo y mandarlo a
+**1. Registrar el token del dispositivo.** En cuanto hay perfil: crea el canal
+de Android, pide permiso de notificaciones (solo si todavía no lo tiene),
+obtiene el token de Expo y lo manda a
 `interaccion.registrarDispositivo({ tokenPush, plataforma, versionApp? })`. Si el
-token ya existía, la mutation lo reactiva en vez de duplicarlo.
+token ya existía, la mutation lo reactiva en vez de duplicarlo. El resultado,
+con el paso en que falló si falló, se ve en Ajustes → «Avisos en el teléfono».
 
 **2. Abrir la notificación correcta al tocarla.** El push trae en `data`:
 
@@ -22,7 +25,9 @@ token ya existía, la mutation lo reactiva en vez de duplicarlo.
 ```
 
 Con ese id se lee el contenido real desde Convex —con los permisos del usuario—
-y se navega a la entidad (`entidadTipo` y `entidadId` de la notificación).
+y se navega a la entidad (`entidadTipo` y `entidadId` de la notificación), igual
+que al tocar el aviso en la campana. También funciona con el aviso que abrió la
+app estando cerrada.
 
 ## Por qué el push llega "vacío"
 
@@ -47,8 +52,14 @@ desde Convex**: el push no lo trae y no lo va a traer.
 
 ## Detalles que conviene saber
 
-- **Solo la alerta de emergencia suena** (`sound: "default"`, `priority: "high"`).
-  El resto llega en silencio, para no despertar a nadie por un reporte diario.
+- **La alerta de emergencia se manda con `sound: "default"` y
+  `priority: "high"`; el resto, sin sonido y con prioridad normal**, para no
+  despertar a nadie por un reporte diario. Ojo: en Android 8 o superior el
+  sonido no lo decide el mensaje sino el **canal**, y hoy todos los avisos van
+  al único canal que crea la app (`default`, importancia alta). Lo más probable
+  es que en Android suenen todos. Separarlos exige un segundo canal en la app y
+  `channelId` en `push.ts`, y hay que desplegarlo con cuidado: un aviso dirigido
+  a un canal que el teléfono todavía no creó **no se muestra**.
 - **Un token muerto se apaga solo.** Se procesa `DeviceNotRegistered` tanto en
   tickets como en receipts. Un resultado antiguo no desactiva un dispositivo
   que se haya vuelto a registrar o cambiado de dueño desde el envío.
@@ -91,9 +102,21 @@ La nueva tabla se crea vacía al desplegar; no requiere migración. Las
 notificaciones anteriores que ya tengan `enviadaEn` y no tengan filas de
 seguimiento se conservan y no se reenvían automáticamente.
 
-## Lo que todavía no se puede probar
+## Cómo llega a Android, y cómo se probó
 
-El envío real **no funciona en Expo Go** con un proyecto propio: necesita el
-development build del issue #14. Las pruebas de `push.test.ts` cubren la lógica
-con la respuesta de Expo simulada — qué se manda, qué no se manda, qué pasa
-cuando falla— pero nadie ha visto todavía una notificación llegar a un teléfono.
+El envío real **no funciona en Expo Go** con un proyecto propio: necesita una
+build de EAS. En Android el transporte es Firebase Cloud Messaging:
+
+- Proyecto de Firebase solo para FCM (sin base de datos ni login de Firebase).
+- `google-services.json` **no se versiona**. En EAS es la variable secreta de
+  tipo archivo `GOOGLE_SERVICES_JSON`, que `movil/app.config.js` pasa como
+  `googleServicesFile`.
+- La clave de cuenta de servicio de FCM V1 está en las credenciales de Android
+  del proyecto en expo.dev. Sin ella el teléfono se registra, pero Expo no
+  puede entregar.
+
+Las pruebas de `push.test.ts` cubren la lógica con la respuesta de Expo
+simulada —qué se manda, qué no se manda, qué pasa cuando falla— y
+`avisosDelTelefono.test.ts` el registro en la app. El 28 de septiembre se
+comprobó la entrega real a un teléfono: Expo aceptó el mensaje y el recibo de
+FCM lo confirmó.

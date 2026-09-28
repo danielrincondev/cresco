@@ -53,6 +53,8 @@ lo que rompe un proyecto de seis semanas no es el atraso, es enterarse tarde.
 
 ## Nunca se sube al repositorio
 Claves de RevenueCat · credenciales de base de datos · keystore de firma ·
-archivos `.env` · **datos reales de estudiantes o representantes**. El Excel que
+archivos `.env` · `google-services.json` y la clave de cuenta de servicio de
+Firebase (van como secretos de EAS y en expo.dev) · **datos reales de
+estudiantes o representantes**. El Excel que
 les pase un profesor para probar la carga no entra al repositorio: se usan datos
 ficticios generados.
