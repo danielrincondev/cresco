@@ -152,7 +152,7 @@ type Ruta =
     }
   | {
       tipo:
-        | "curso" | "periodos" | "agenda" | "alerta" | "anotar"
+        | "curso" | "periodos" | "agenda" | "alerta" | "anotar" | "anioLectivo"
         // El cierre de jornada (D12, D13, D14): las tres son de un curso
         // concreto, a diferencia de los reclamos.
         | "asistencia" | "reporteDia" | "comunicado"
@@ -884,6 +884,11 @@ export function NucleoScreen() {
           <ReclamosDocente />
         ) : ruta.tipo === "agenda" ? (
           <AgendaDocente curso={ruta.curso} />
+        ) : ruta.tipo === "anioLectivo" ? (
+          <EditarAnioLectivo
+            curso={ruta.curso}
+            onVolver={() => setRuta({ tipo: "curso", curso: ruta.curso })}
+          />
         ) : ruta.tipo === "historialFamilia" ? (
           <HistorialFamilia
             estudianteId={ruta.estudianteId}
@@ -1538,9 +1543,14 @@ function DetalleCurso({
         <Icono nombre={masOpciones ? "chevron-up" : "chevron-down"} decorativo />
       </Pressable>
       {masOpciones && (
-        <Boton pendiente={op.pendiente} onPress={() => void invitarFamilias()}>
-          Invitar representantes
-        </Boton>
+        <>
+          <Boton pendiente={op.pendiente} onPress={() => void invitarFamilias()}>
+            Invitar representantes
+          </Boton>
+          <Boton secundario onPress={() => navegar({ tipo: "anioLectivo", curso })}>
+            Editar año lectivo
+          </Boton>
+        </>
       )}
       <ErrorMensaje mensaje={op.error} />
 
@@ -1649,6 +1659,62 @@ function Mas({ status, cargar }: { status: string; cargar: () => void }) {
   ) : status === "LoadingMore" ? (
     <Cargando />
   ) : null;
+}
+
+/**
+ * Corregir las fechas del año lectivo del curso. Las reglas las pone el
+ * servidor (`corregirAnioLectivo`): puede haber empezado pero no terminado,
+ * dura como máximo 400 días, y los parciales tienen que seguir cabiendo.
+ */
+function EditarAnioLectivo({ curso, onVolver }: { curso: Curso; onVolver: () => void }) {
+  const calendario = useQuery(api.nucleo.obtenerCalendarioCurso, { cursoId: curso.id });
+  const corregir = useMutation(api.nucleo.corregirAnioLectivo);
+  const [fechas, setFechas] = useState<{ inicio: string; fin: string }>();
+  const op = useOperacion();
+
+  if (calendario === undefined) return <Cargando mensaje="Cargando el año lectivo..." />;
+  const inicio = fechas?.inicio ?? calendario.fechaInicio;
+  const fin = fechas?.fin ?? calendario.fechaFin;
+
+  async function guardar() {
+    const r = await op.ejecutar(() => corregir({ cursoId: curso.id, fechaInicio: inicio, fechaFin: fin }));
+    if (r.ok) onVolver();
+  }
+
+  return (
+    <Pagina
+      titulo="Año lectivo"
+      descripcion={curso.nombre}
+      atras={{ onPress: onVolver }}
+    >
+      <Tarjeta>
+        <CampoFecha
+          etiqueta="Inicio"
+          valor={inicio}
+          onChange={(valor) => setFechas({ inicio: valor, fin })}
+          editable={!op.pendiente}
+        />
+        <CampoFecha
+          etiqueta="Fin"
+          valor={fin}
+          onChange={(valor) => setFechas({ inicio, fin: valor })}
+          ayuda="De hoy en adelante: un año lectivo que ya terminó no se puede editar ni crear."
+          editable={!op.pendiente}
+        />
+      </Tarjeta>
+      <Aviso>
+        Dura como máximo 400 días, y los parciales que ya definiste tienen que
+        quedar dentro de estas fechas.
+      </Aviso>
+      <ErrorMensaje mensaje={op.error} />
+      <Boton pendiente={op.pendiente} onPress={() => void guardar()}>
+        Guardar año lectivo
+      </Boton>
+      <Boton secundario onPress={onVolver}>
+        Volver
+      </Boton>
+    </Pagina>
+  );
 }
 
 /**

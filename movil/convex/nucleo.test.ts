@@ -408,3 +408,62 @@ describe("nucleo — periodos", () => {
     ).resolves.toHaveLength(2);
   });
 });
+
+describe("nucleo — el año lectivo: reglas y corrección", () => {
+  // Jueves 27 de agosto: el año del piloto (mayo a febrero) ya está en curso.
+  beforeEach(() => vi.useFakeTimers().setSystemTime(new Date("2026-08-27T15:00:00Z")));
+
+  it("un año que ya empezó se puede crear; uno que ya terminó, no", async () => {
+    const t = convexTest(schema, modules);
+    const { cliente } = await sembrarDocente(t);
+    await expect(cliente.mutation(api.nucleo.crearCurso, { ...datosCurso, anioInicio: "2025-05-05", anioFin: "2026-02-27" }))
+      .rejects.toThrow("El año lectivo ya terminó");
+    await expect(cliente.mutation(api.nucleo.crearCurso, datosCurso)).resolves.toBeDefined();
+  });
+
+  it("un año lectivo no dura más de 400 días", async () => {
+    const t = convexTest(schema, modules);
+    const { cliente } = await sembrarDocente(t);
+    await expect(cliente.mutation(api.nucleo.crearCurso, { ...datosCurso, anioInicio: "2026-05-04", anioFin: "2027-06-30" }))
+      .rejects.toThrow("no dura más de 400 días");
+  });
+
+  it("el titular corrige las fechas y el nombre del año se actualiza", async () => {
+    const t = convexTest(schema, modules);
+    const { cliente } = await sembrarDocente(t);
+    const { id: cursoId } = await cliente.mutation(api.nucleo.crearCurso, datosCurso);
+    await cliente.mutation(api.nucleo.corregirAnioLectivo, { cursoId, fechaInicio: "2026-04-27", fechaFin: "2027-03-05" });
+    const calendario = await cliente.query(api.nucleo.obtenerCalendarioCurso, { cursoId });
+    expect(calendario).toMatchObject({ fechaInicio: "2026-04-27", fechaFin: "2027-03-05" });
+    expect((await t.run((ctx) => ctx.db.query("anioLectivo").collect()))[0].nombre).toBe("2026–2027");
+  });
+
+  it("al corregir valen las mismas reglas que al crear", async () => {
+    const t = convexTest(schema, modules);
+    const { cliente } = await sembrarDocente(t);
+    const { id: cursoId } = await cliente.mutation(api.nucleo.crearCurso, datosCurso);
+    await expect(cliente.mutation(api.nucleo.corregirAnioLectivo, { cursoId, fechaInicio: "2025-09-01", fechaFin: "2026-08-20" }))
+      .rejects.toThrow("El año lectivo ya terminó");
+    await expect(cliente.mutation(api.nucleo.corregirAnioLectivo, { cursoId, fechaInicio: "2026-01-05", fechaFin: "2027-03-05" }))
+      .rejects.toThrow("no dura más de 400 días");
+  });
+
+  it("no deja fuera a un parcial ya definido", async () => {
+    const t = convexTest(schema, modules);
+    const { cliente } = await sembrarDocente(t);
+    const { id: cursoId } = await cliente.mutation(api.nucleo.crearCurso, datosCurso);
+    await cliente.mutation(api.nucleo.definirPeriodos, { cursoId, periodos: periodosValidos });
+    await expect(cliente.mutation(api.nucleo.corregirAnioLectivo, { cursoId, fechaInicio: "2026-06-01", fechaFin: "2027-02-26" }))
+      .rejects.toThrow("Primer parcial");
+  });
+
+  it("solo el titular corrige el año", async () => {
+    const t = convexTest(schema, modules);
+    const { cliente } = await sembrarDocente(t);
+    const { id: cursoId } = await cliente.mutation(api.nucleo.crearCurso, datosCurso);
+    const otro = await sembrarDocente(t, "docente_2");
+    await expect(otro.cliente.mutation(api.nucleo.corregirAnioLectivo, { cursoId, fechaInicio: "2026-05-04", fechaFin: "2027-02-26" }))
+      .rejects.toThrow("No eres el docente titular");
+  });
+});
+

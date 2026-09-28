@@ -227,6 +227,28 @@ function exigirFechaISO(fecha: string, campo: string): void {
   }
 }
 
+/** Ningún régimen del país tiene un año lectivo más largo que esto. */
+const ANIO_LECTIVO_MAX_DIAS = 400;
+
+/**
+ * Las reglas de un año lectivo, al crearlo y al corregirlo (pedido de Kenny,
+ * 27 de septiembre). Puede haber empezado —un docente que se registra en
+ * septiembre tiene un año que arrancó en mayo—, pero no puede haber terminado,
+ * y no dura más de 400 días.
+ */
+function exigirAnioLectivoValido(fechaInicio: string, fechaFin: string): void {
+  exigirFechaISO(fechaInicio, "La fecha de inicio del año lectivo");
+  exigirFechaISO(fechaFin, "La fecha de fin del año lectivo");
+  exigirRangoFechas(fechaInicio, fechaFin, "el año lectivo");
+  if (fechaFin < hoyEnGuayaquil()) {
+    throw new ErrorDominio("FECHAS_INVALIDAS", "El año lectivo ya terminó: su fecha de fin tiene que ser de hoy en adelante.");
+  }
+  const dias = (Date.parse(`${fechaFin}T00:00:00Z`) - Date.parse(`${fechaInicio}T00:00:00Z`)) / 86_400_000;
+  if (dias > ANIO_LECTIVO_MAX_DIAS) {
+    throw new ErrorDominio("FECHAS_INVALIDAS", `Un año lectivo no dura más de ${ANIO_LECTIVO_MAX_DIAS} días.`);
+  }
+}
+
 function nombreAnioLectivo(fechaInicio: string, fechaFin: string): string {
   return `${fechaInicio.slice(0, 4)}–${fechaFin.slice(0, 4)}`;
 }
@@ -373,9 +395,7 @@ export const crearCurso = mutation({
       );
     }
 
-    exigirFechaISO(args.anioInicio, "La fecha de inicio del año lectivo");
-    exigirFechaISO(args.anioFin, "La fecha de fin del año lectivo");
-    exigirRangoFechas(args.anioInicio, args.anioFin, "el año lectivo");
+    exigirAnioLectivoValido(args.anioInicio, args.anioFin);
     const nombreInstitucion = textoRequerido(args.nombreInstitucion, "El nombre de la institución");
     if (nombreInstitucion.length > 160) {
       throw new ErrorDominio("VALIDACION", "El nombre de la institución no puede superar 160 caracteres.");
@@ -576,6 +596,40 @@ export const definirPeriodos = mutation({
  * recalcular nada, así que el puntaje que ya leyeron dejaría de cuadrar con lo
  * que se ve. Se rechaza con un mensaje que lo dice.
  */
+/**
+ * Corregir las fechas del año lectivo de un curso. Cada curso tiene su propio
+ * año (B1), así que no afecta a ningún otro. Los parciales ya definidos tienen
+ * que seguir cabiendo: si alguno queda fuera, se corrige primero el parcial.
+ */
+export const corregirAnioLectivo = mutation({
+  args: { cursoId: v.id("curso"), fechaInicio: v.string(), fechaFin: v.string() },
+  handler: (ctx, args) => conErroresPublicos(async () => {
+    await exigirTitularDelCurso(ctx, args.cursoId);
+    const { curso, anio } = await contextoCurso(ctx, args.cursoId);
+    if (curso.estado !== "ACTIVO") {
+      throw new ErrorDominio("CURSO_INACTIVO", "Este curso ya no está activo.");
+    }
+    exigirAnioLectivoValido(args.fechaInicio, args.fechaFin);
+    const periodos = await ctx.db.query("periodoAcademico")
+      .withIndex("por_anio_orden", (q) => q.eq("anioLectivoId", anio._id)).collect();
+    for (const periodo of periodos) {
+      if (periodo.fechaInicio < args.fechaInicio || periodo.fechaFin > args.fechaFin) {
+        throw new ErrorDominio(
+          "FECHAS_INVALIDAS",
+          `El ${periodo.nombre} (del ${periodo.fechaInicio} al ${periodo.fechaFin}) quedaría fuera del año lectivo. Corrige primero sus fechas.`,
+        );
+      }
+    }
+    await ctx.db.patch("anioLectivo", anio._id, {
+      fechaInicio: args.fechaInicio,
+      fechaFin: args.fechaFin,
+      nombre: nombreAnioLectivo(args.fechaInicio, args.fechaFin),
+      actualizadoEn: Date.now(),
+    });
+    return null;
+  }),
+});
+
 export const corregirFechasPeriodos = mutation({
   args: {
     cursoId: v.id("curso"),
