@@ -32,6 +32,8 @@ const estado = vi.hoisted(() => ({
 // El módulo nativo no existe en pruebas: se guarda a quién avisar al tocar.
 vi.mock("../lib/avisosDelTelefono", () => ({
   useAvisosDelTelefono: (_perfil: unknown, alTocar: (id: string) => void) => { estado.alTocarAviso = alTocar; },
+  useEstadoAvisos: () => ({ resultado: "REGISTRADO" }),
+  registrarTelefono: async () => "REGISTRADO",
 }));
 vi.mock("react-native", async () => ({
   ...(await import("../test/mockReactNative")).reactNative(),

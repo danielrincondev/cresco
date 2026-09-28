@@ -21,7 +21,7 @@ vi.mock("expo-notifications", () => ({
     ({ data: `ExponentPushToken[${projectId}]` }),
 }));
 
-const { idDelAviso, registrarTelefono } = await import("./avisosDelTelefono");
+const { estadoDeAvisos, idDelAviso, registrarTelefono } = await import("./avisosDelTelefono");
 
 beforeEach(() => {
   estado.permiso = "undetermined";
@@ -64,3 +64,14 @@ it("lee el id de la notificación que viaja en el aviso, y nada más", () => {
   expect(idDelAviso({ notification: { request: { content: { data: {} } } } })).toBeNull();
   expect(idDelAviso(null)).toBeNull();
 });
+
+it("guarda el último resultado con el paso y el motivo del fallo, para mostrarlo en Ajustes", async () => {
+  estado.permiso = "granted";
+  const aviso = vi.spyOn(console, "warn").mockImplementation(() => {});
+  await registrarTelefono(async () => { throw new Error("sin red"); });
+  expect(estadoDeAvisos()).toEqual({ resultado: "ERROR", detalle: "Al guardarlo en el servidor: sin red" });
+  await registrarTelefono(async () => null);
+  expect(estadoDeAvisos()).toEqual({ resultado: "REGISTRADO" });
+  aviso.mockRestore();
+});
+

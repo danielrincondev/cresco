@@ -1,5 +1,5 @@
 import { useMutation } from "convex/react";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useSyncExternalStore } from "react";
 import { Platform } from "react-native";
 
 import { api } from "../../convex/_generated/api";
@@ -30,6 +30,27 @@ async function modulo(): Promise<Notificaciones | null> {
 
 export type ResultadoRegistro = "REGISTRADO" | "SIN_PERMISO" | "SIN_MODULO" | "ERROR";
 
+/**
+ * El último intento de registro, para mostrarlo en Ajustes. Sin esto, un
+ * fallo solo quedaba en la consola, que en una build instalada no ve nadie
+ * (así pasó el 28 de septiembre: permiso aceptado, Firebase dentro del APK, y
+ * ningún registro en el servidor, sin forma de saber por qué).
+ */
+export type EstadoAvisos = { resultado: ResultadoRegistro | "PENDIENTE"; detalle?: string };
+let estadoActual: EstadoAvisos = { resultado: "PENDIENTE" };
+const oyentes = new Set<() => void>();
+function fijarEstado(estado: EstadoAvisos): void {
+  estadoActual = estado;
+  for (const oyente of oyentes) oyente();
+}
+export const estadoDeAvisos = (): EstadoAvisos => estadoActual;
+export function useEstadoAvisos(): EstadoAvisos {
+  return useSyncExternalStore(
+    (oyente) => { oyentes.add(oyente); return () => { oyentes.delete(oyente); }; },
+    estadoDeAvisos,
+  );
+}
+
 type Registrar = (args: {
   tokenPush: string;
   plataforma: "ANDROID" | "IOS";
@@ -43,8 +64,15 @@ type Registrar = (args: {
  * Un fallo no se le muestra a nadie: la app funciona igual, con la campana.
  */
 export async function registrarTelefono(registrar: Registrar): Promise<ResultadoRegistro> {
+  const estado = await intentarRegistro(registrar);
+  fijarEstado(estado);
+  return estado.resultado as ResultadoRegistro;
+}
+
+async function intentarRegistro(registrar: Registrar): Promise<EstadoAvisos> {
   const N = await modulo();
-  if (N === null) return "SIN_MODULO";
+  if (N === null) return { resultado: "SIN_MODULO" };
+  let paso = "preparar el canal de avisos";
   try {
     if (Platform.OS === "android") {
       // Android 8+ agrupa los avisos por canal; sin uno propio caen en uno
@@ -54,24 +82,28 @@ export async function registrarTelefono(registrar: Registrar): Promise<Resultado
         importance: N.AndroidImportance.HIGH,
       });
     }
+    paso = "pedir el permiso";
     let { status } = await N.getPermissionsAsync();
     if (status !== "granted") ({ status } = await N.requestPermissionsAsync());
-    if (status !== "granted") return "SIN_PERMISO";
+    if (status !== "granted") return { resultado: "SIN_PERMISO" };
 
     const Constants = (await import("expo-constants")).default;
     const projectId =
       (Constants.expoConfig?.extra?.eas?.projectId as string | undefined) ??
       Constants.easConfig?.projectId;
+    paso = "obtener el token de Expo";
     const { data } = await N.getExpoPushTokenAsync({ projectId });
+    paso = "guardarlo en el servidor";
     await registrar({
       tokenPush: data,
       plataforma: Platform.OS === "ios" ? "IOS" : "ANDROID",
       versionApp: Constants.expoConfig?.version,
     });
-    return "REGISTRADO";
+    return { resultado: "REGISTRADO" };
   } catch (error) {
     console.warn("[avisos] no se pudo registrar el teléfono:", error);
-    return "ERROR";
+    const motivo = error instanceof Error ? error.message : String(error);
+    return { resultado: "ERROR", detalle: `Al ${paso}: ${motivo}` };
   }
 }
 

@@ -47,6 +47,11 @@ vi.mock("convex/react", () => ({
     return vi.fn();
   },
 }));
+const avisos = vi.hoisted(() => ({ estado: { resultado: "REGISTRADO" } as { resultado: string; detalle?: string }, reintentos: 0 }));
+vi.mock("../lib/avisosDelTelefono", () => ({
+  useEstadoAvisos: () => avisos.estado,
+  registrarTelefono: async () => { avisos.reintentos++; return "REGISTRADO"; },
+}));
 import { AgendaDocente, AlertaDocente, Ajustes, CitasFamilia, HistorialFamilia, Notificaciones, resumenDelHistorial } from "./InteraccionScreen";
 import { Boton, Campo, Casilla, Opciones } from "../components/NucleoUI";
 
@@ -600,5 +605,24 @@ it("la familia, al ver sus citaciones, deja constancia de que las vio", async ()
   ];
   await act(async () => { vista = create(<CitasFamilia />); });
   expect(estado.mutaciones["interaccion:marcarCitasVistas"]).toHaveBeenCalledWith({ citaIds: ["c1"] });
+});
+
+it("Ajustes muestra por qué no llegan los avisos, y deja reintentar", async () => {
+  avisos.estado = { resultado: "ERROR", detalle: "Al obtener el token de Expo: servicio no disponible" };
+  avisos.reintentos = 0;
+  await act(async () => { vista = create(<Ajustes />); });
+  const texto = JSON.stringify(vista.toJSON());
+  expect(texto).toContain("No se pudieron activar.");
+  expect(texto).toContain("Al obtener el token de Expo: servicio no disponible");
+  await act(async () => vista.root.findAllByType(Boton).find((b) => b.props.children === "Reintentar")!.props.onPress());
+  expect(avisos.reintentos).toBe(1);
+  avisos.estado = { resultado: "REGISTRADO" };
+});
+
+it("con los avisos activos, lo dice y no ofrece reintentar", async () => {
+  avisos.estado = { resultado: "REGISTRADO" };
+  await act(async () => { vista = create(<Ajustes />); });
+  expect(JSON.stringify(vista.toJSON())).toContain("Activos: este teléfono recibe los avisos de Cresco.");
+  expect(vista.root.findAllByType(Boton).some((b) => b.props.children === "Reintentar")).toBe(false);
 });
 

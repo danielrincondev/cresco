@@ -59,6 +59,7 @@ import {
 import { parrafosLegibles } from "../lib/texto";
 import { useRegistrarVistos } from "../lib/useRegistrarVistos";
 import { tokenDeReautenticacion } from "../lib/reautenticar";
+import { registrarTelefono, useEstadoAvisos, type EstadoAvisos } from "../lib/avisosDelTelefono";
 import {
   fechaHoraLegible,
   fechaISO,
@@ -1613,6 +1614,43 @@ export function ProfesorACargo({
  * tiene que encontrarse la verdad — si busca aquí y no halla nada, la promesa
  * queda como una mentira en vez de como un pendiente declarado.
  */
+const TEXTO_AVISOS: Record<EstadoAvisos["resultado"], string> = {
+  PENDIENTE: "Comprobando si este teléfono puede recibir avisos...",
+  REGISTRADO: "Activos: este teléfono recibe los avisos de Cresco.",
+  SIN_PERMISO: "Desactivados: permite las notificaciones de Cresco en los ajustes del teléfono y vuelve a intentarlo.",
+  SIN_MODULO: "Esta versión de la aplicación no puede recibir avisos. Instala la más reciente.",
+  ERROR: "No se pudieron activar.",
+};
+
+/**
+ * El estado real de los avisos en este teléfono, con el motivo si fallaron,
+ * y un botón para volver a intentarlo. Antes esta tarjeta decía que los
+ * avisos "todavía no estaban disponibles"; ahora lo están, y si a alguien no
+ * le llegan, aquí se ve por qué sin conectar el teléfono a una computadora.
+ */
+function AvisosDelTelefono() {
+  const estado = useEstadoAvisos();
+  const registrar = useMutation(api.interaccion.registrarDispositivo);
+  const op = useOperacion();
+  return (
+    <Tarjeta>
+      <Subtitulo>Avisos en el teléfono</Subtitulo>
+      <Cuerpo>{TEXTO_AVISOS[estado.resultado]}</Cuerpo>
+      {estado.detalle && <Text style={i.etiqueta}>{estado.detalle}</Text>}
+      <Cuerpo>Todo lo que llega también queda en la campana de la barra superior.</Cuerpo>
+      {estado.resultado !== "REGISTRADO" && estado.resultado !== "PENDIENTE" && (
+        <Boton
+          secundario
+          pendiente={op.pendiente}
+          onPress={() => void op.ejecutar(() => registrarTelefono((args) => registrar(args)))}
+        >
+          Reintentar
+        </Boton>
+      )}
+    </Tarjeta>
+  );
+}
+
 export function Ajustes({
   esRepresentante = false,
   barraInferiorActiva = true,
@@ -1646,17 +1684,7 @@ export function Ajustes({
         </Tarjeta>
       )}
 
-      <Tarjeta>
-        <Subtitulo>Avisos en el teléfono</Subtitulo>
-        <Cuerpo>
-          Las novedades ya te llegan a la bandeja de la aplicación. El aviso que
-          suena en el teléfono todavía no está disponible: necesita una versión
-          de la aplicación instalada, no la de desarrollo.
-        </Cuerpo>
-        <Cuerpo>
-          Mientras tanto, revisa Novedades desde la campana de la barra superior.
-        </Cuerpo>
-      </Tarjeta>
+      <AvisosDelTelefono />
 
       <Tarjeta>
         <Subtitulo>Privacidad y datos</Subtitulo>
