@@ -630,3 +630,14 @@ it("los cursos de un año terminado van plegados en 'Cursos anteriores', marcado
   expect(texto).toContain("Finalizado");
 });
 
+it("la campana está en cualquier pantalla, no solo en el inicio, y no en la propia bandeja", async () => {
+  estado.perfil = { ...perfil, representanteId: null, docenteId: "docente" as never };
+  estado.cursos = { cursos: [cursoDePrueba("curso-a", "Quinto A")], limitePlan: 1 };
+  estado.novedades = [avisoDeCita("curso-a")];
+  await montar();
+  await act(async () => vista!.root.findByProps({ accessibilityLabel: "Abrir Quinto A" }).props.onPress());
+  expect(vista!.root.findAllByProps({ accessibilityLabel: "Novedades, 1 sin leer" }).length).toBeGreaterThan(0);
+  await act(async () => vista!.root.findByProps({ accessibilityLabel: "Novedades, 1 sin leer" }).props.onPress());
+  expect(vista!.root.findAllByProps({ accessibilityLabel: "Novedades, 1 sin leer" })).toHaveLength(0);
+});
+

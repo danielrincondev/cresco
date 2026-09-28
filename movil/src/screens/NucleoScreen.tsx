@@ -805,7 +805,11 @@ export function NucleoScreen() {
               : "Tu comunidad educativa"}
           </Text>
         </View>
-        {perfil && ruta.tipo === "inicio" && (
+        {/* En todas las pantallas, no solo en el inicio (pedido de Kenny, 27
+            de septiembre): un aviso llega en cualquier momento, y sin la
+            campana ese rincón quedaba vacío. Solo se oculta en la propia
+            bandeja, donde apuntaría a sí misma. */}
+        {perfil && ruta.tipo !== "notificaciones" && (
           <>
             <Pressable
               accessibilityRole="button"
