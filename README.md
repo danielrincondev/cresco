@@ -24,6 +24,34 @@ categoría Next Gen.
 > ads. Built with Expo (React Native), Clerk and Convex. The app is in
 > Spanish; the demo video has English subtitles.
 
+### Run it yourself (English)
+
+You need Node.js 24, a free [Clerk](https://clerk.com) application and a free
+[Convex](https://convex.dev) account. No Docker, no database to install.
+
+1. `npm ci` at the repository root.
+2. From `movil/`, run `npx convex dev`. The first run logs you into Convex,
+   creates your own development deployment and writes `movil/.env.local`,
+   including `EXPO_PUBLIC_CONVEX_URL`. It will stop and ask for
+   `CLERK_JWT_ISSUER_DOMAIN`: that is the next step.
+3. In Clerk, enable the Native API, email and Google sign-in, and the Convex
+   integration (it adds `aud: "convex"` to session tokens). Keep *Force
+   organization selection* off. Then, from `movil/`:
+   `npx convex env set CLERK_JWT_ISSUER_DOMAIN <your Clerk Frontend API URL>`,
+   and run `npx convex dev` again; leave it running.
+4. Load the catalogues once (conduct bands, categories, plans, report
+   template); it is idempotent: `npx convex run semillas:cargar`.
+5. Add `EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_…` to `movil/.env.local`.
+6. From `movil/`, run `npx expo start`: scan the QR code with Expo Go on
+   Android, or press `w` for the web preview.
+
+Real purchases and ads need an EAS development build instead of Expo Go,
+because RevenueCat and AdMob are native SDKs. Without
+`EXPO_PUBLIC_REVENUECAT_API_KEY` the app still works and the paywalls are
+informative only. To check the code: `npm run typecheck` and `npm test` from
+the root (700+ tests); CI runs both, plus an Android bundle, on every pull
+request.
+
 ## Qué hace Cresco hoy
 
 **El docente**
@@ -176,7 +204,7 @@ despliegue de Convex. No hace falta instalar `mise`, Docker ni un devcontainer;
 las herramientas del proyecto se instalan con `npm ci`.
 
 ```bash
-git clone <repo> && cd cresco
+git clone https://github.com/danielrincondev/cresco && cd cresco
 npm ci
 npm run convex:dev
 ```
@@ -185,6 +213,11 @@ El primer `convex:dev` autentica la CLI y crea `movil/.env.local`. Ese archivo
 **no se comparte por git**: cada persona del equipo tiene su propio despliegue
 de desarrollo de Convex, igual que antes cada quien tenía su propia base de
 datos local.
+
+Un despliegue nuevo necesita los catálogos una vez (franjas, categorías de
+conducta, planes y plantilla del reporte): sin ellos no se puede anotar
+conducta ni ver un plan. Desde `movil/`, `npx convex run semillas:cargar`; es
+idempotente, así que repetirlo no duplica nada.
 
 > **Sobre las variables de entorno.** El equipo las trae de un vault de
 > Bitwarden Secrets Manager: `movil/.env.schema` las declara y `npm run dev`
