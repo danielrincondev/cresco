@@ -189,12 +189,14 @@ export const publicarDisponibilidad = mutation({
  * podría listar el horario de cualquier docente del sistema.
  */
 /**
- * P9: quien es el docente a cargo del hijo, con nombre y datos de contacto.
+ * P9: quien es el docente a cargo del hijo: nombre, título y horario de
+ * atención. **Nunca un medio de contacto personal** (DP-016): la familia llega
+ * al docente pidiendo una cita dentro de Cresco, y queda a su nombre.
  *
  * Recorre el mismo camino que `bloquesDisponibles` -- estudiante, matricula
  * CURSANDO, asignacion TITULAR vigente -- y por la misma razon empieza por
- * `exigirVinculo`: sin eso, cualquier representante podria consultar los datos
- * de contacto de cualquier docente del sistema pasando un `estudianteId` ajeno.
+ * `exigirVinculo`: sin eso, cualquier representante podria consultar la ficha
+ * de cualquier docente del sistema pasando un `estudianteId` ajeno.
  *
  * Devuelve `null` cuando no hay titular asignado, que es un estado normal al
  * principio del año lectivo y no un error que valga la pena mostrarle a nadie.
@@ -235,9 +237,11 @@ export const docenteACargo = query({
           : null,
       curso: curso?.nombre ?? null,
       tituloProfesional: docente.tituloProfesional ?? null,
-      correoContacto: docente.correoContacto ?? null,
-      telefonoContacto: docente.telefonoContacto ?? null,
       horarioAtencion: docente.horarioAtencion ?? null,
+      // Siempre null (DP-016). Siguen en la respuesta solo porque la pantalla
+      // de una build 1.0.0 los lee: con null no muestra ningún botón.
+      correoContacto: null,
+      telefonoContacto: null,
     };
   }),
 });

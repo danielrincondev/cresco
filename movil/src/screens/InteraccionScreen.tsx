@@ -1398,23 +1398,24 @@ export function AlertasFamilia() {
  * ======================================================================= */
 
 /**
- * Lo que el docente publica sobre si mismo, y que el representante ve en P9.
+ * Lo que el docente publica sobre si mismo, y que el representante ve en P9:
+ * su título y su horario de atención. Los dos son opcionales y se pueden
+ * borrar: dejar uno en blanco lo quita.
  *
- * Los cuatro campos son opcionales y **todos se pueden borrar**: dejar uno en
- * blanco lo quita. Un docente que publico su telefono personal y se arrepiente
- * tiene que poder deshacerlo sin pedirle permiso a nadie, y obligarlo a
- * publicarlo para usar la aplicacion seria pedirle un dato que el servicio no
- * necesita.
+ * **No hay correo ni teléfono (DP-016).** Hasta el 28 de septiembre este
+ * formulario los pedía y P9 los mostraba con botones para escribir y llamar.
+ * Un teléfono publicado a las familias lo puede sacar cualquiera que tome el
+ * celular de un padre, incluido el propio estudiante: es la puerta a las
+ * amenazas anónimas que Cresco existe para cerrar. Aquí la familia llega al
+ * docente pidiendo una cita, y todo queda a su nombre.
  *
  * El nombre no se edita aqui: vive en el perfil de la cuenta, junto al
- * documento, porque es la identidad y no un dato de contacto.
+ * documento, porque es la identidad.
  */
 export function PerfilDocente() {
   const guardar = useMutation(api.nucleo.actualizarDatosDocente);
   const perfil = useQuery(api.nucleo.obtenerPerfil);
   const [titulo, setTitulo] = useState("");
-  const [correo, setCorreo] = useState("");
-  const [telefono, setTelefono] = useState("");
   const [horario, setHorario] = useState("");
   const [guardado, setGuardado] = useState(false);
   const op = useOperacion();
@@ -1422,12 +1423,7 @@ export function PerfilDocente() {
   async function enviar() {
     setGuardado(false);
     const r = await op.ejecutar(() =>
-      guardar({
-        tituloProfesional: titulo,
-        correoContacto: correo,
-        telefonoContacto: telefono,
-        horarioAtencion: horario,
-      }),
+      guardar({ tituloProfesional: titulo, horarioAtencion: horario }),
     );
     if (r.ok) setGuardado(true);
   }
@@ -1462,28 +1458,10 @@ export function PerfilDocente() {
           editable={!op.pendiente}
         />
         <Campo
-          etiqueta="Correo de contacto"
-          value={correo}
-          onChangeText={setCorreo}
-          autoCapitalize="none"
-          keyboardType="email-address"
-          maxLength={120}
-          editable={!op.pendiente}
-        />
-        <Campo
-          etiqueta="Teléfono de contacto"
-          value={telefono}
-          onChangeText={setTelefono}
-          keyboardType="phone-pad"
-          ayuda="Solo si quieres que te escriban. Puedes dejarlo vacío."
-          maxLength={25}
-          editable={!op.pendiente}
-        />
-        <Campo
           etiqueta="Horario de atención"
           value={horario}
           onChangeText={setHorario}
-          ayuda="Por ejemplo: martes de 10:00 a 11:00."
+          ayuda="Por ejemplo: martes de 10:00 a 11:00. No escribas aquí tu teléfono ni tu correo."
           maxLength={120}
           editable={!op.pendiente}
         />
@@ -1491,6 +1469,16 @@ export function PerfilDocente() {
           Deja un campo vacío para quitarlo. Lo que borres deja de verse en la
           ficha que consultan los representantes.
         </Aviso>
+      </Tarjeta>
+
+      <Tarjeta>
+        <Subtitulo>Tu número y tu correo no se publican</Subtitulo>
+        <Cuerpo>
+          Las familias te contactan dentro de Cresco, pidiéndote una cita. Así
+          tu vida personal queda aparte, y todo lo que te llega queda registrado
+          con el nombre de la familia que lo envió: en Cresco no hay mensajes
+          anónimos.
+        </Cuerpo>
       </Tarjeta>
 
       <ErrorMensaje mensaje={op.error} />
@@ -1533,17 +1521,12 @@ export function ProfesorACargo({
       <Pagina titulo="Docente a cargo">
         <EstadoVacio icono="account-question" titulo="Todavía no hay docente asignado">
           Cuando la institución asigne al titular de {nombre}, vas a verlo aquí
-          con sus datos de contacto.
+          con su horario de atención.
         </EstadoVacio>
       </Pagina>
     );
   }
 
-  const sinDatos =
-    ficha.tituloProfesional === null &&
-    ficha.correoContacto === null &&
-    ficha.telefonoContacto === null &&
-    ficha.horarioAtencion === null;
 
   return (
     <Pagina
@@ -1561,35 +1544,20 @@ export function ProfesorACargo({
         )}
       </Tarjeta>
 
-      {sinDatos ? (
-        <Tarjeta>
-          <Cuerpo>
-            El docente todavía no publicó cómo prefiere que lo contacten. Puedes
-            pedirle una cita desde la sección Citas.
-          </Cuerpo>
-        </Tarjeta>
-      ) : (
-        <Tarjeta>
-          <Subtitulo>Cómo contactarlo</Subtitulo>
-          {ficha.horarioAtencion && <Cuerpo>Atiende: {ficha.horarioAtencion}</Cuerpo>}
-          {ficha.correoContacto && (
-            <Boton
-              secundario
-              onPress={() => void Linking.openURL(`mailto:${ficha.correoContacto}`)}
-            >
-              Escribirle al correo
-            </Boton>
-          )}
-          {ficha.telefonoContacto && (
-            <Boton
-              secundario
-              onPress={() => void Linking.openURL(`tel:${ficha.telefonoContacto}`)}
-            >
-              Llamar a {ficha.telefonoContacto}
-            </Boton>
-          )}
-        </Tarjeta>
-      )}
+      {/* Sin correo ni teléfono del docente (DP-016): la manera de hablar con
+          él es una cita, que queda registrada a nombre de la familia. */}
+      <Tarjeta>
+        <Subtitulo>Cómo hablar con el docente</Subtitulo>
+        {ficha.horarioAtencion ? (
+          <Cuerpo>Atiende: {ficha.horarioAtencion}</Cuerpo>
+        ) : (
+          <Cuerpo>El docente todavía no publicó su horario de atención.</Cuerpo>
+        )}
+        <Cuerpo>
+          Pídele una cita desde la sección Citas. Queda registrada a tu nombre,
+          igual que todo lo que envías por Cresco.
+        </Cuerpo>
+      </Tarjeta>
 
       <Aviso>
         Para algo urgente fuera del horario, usa los canales de la institución.

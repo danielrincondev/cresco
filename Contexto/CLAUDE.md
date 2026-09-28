@@ -107,7 +107,7 @@ cresco/
 │           ├── flags.ts          ← COMPARTIDO — banderas de activación
 │           └── revenuecat.ts
 └── docs/                         ← índice en docs/README.md
-    ├── 00-producto/decisiones/   ← DP-001..015, una por archivo
+    ├── 00-producto/decisiones/   ← DP-001..016, una por archivo
     ├── 01-arquitectura/adr/      ← ADR-001..008, una por archivo
     ├── 02-equipo/                ← flujo-de-trabajo.md, manual, backlog
     ├── 03-piloto/                ← aviso de privacidad, consentimiento, carta
@@ -171,7 +171,7 @@ Antes de responder "¿qué se decidió sobre X?", busca en este orden:
 | Pregunta | Fuente de verdad |
 |---|---|
 | ¿Cuál es el valor exacto de una regla? | El código: `convex/lib/enums.ts` (`REGLAS`), `schema.ts`, `Theme.ts` |
-| ¿Por qué se decidió así (producto)? | `docs/00-producto/decisiones/` (DP-001..015) |
+| ¿Por qué se decidió así (producto)? | `docs/00-producto/decisiones/` (DP-001..016) |
 | ¿Por qué se decidió así (arquitectura)? | `docs/01-arquitectura/adr/` (ADR-001..008) |
 | ¿Cómo trabaja el equipo? | `docs/02-equipo/flujo-de-trabajo.md` |
 | ¿Qué falta hacer? | GitHub Issues y el Project board |

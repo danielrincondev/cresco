@@ -11,7 +11,7 @@
 > | Para saber… | Consulta |
 > |---|---|
 > | Arquitectura vigente | `docs/01-arquitectura/adr/` (ADR-001..008) |
-> | Decisiones de producto vigentes | `docs/00-producto/decisiones/` (DP-001..015) |
+> | Decisiones de producto vigentes | `docs/00-producto/decisiones/` (DP-001..016) |
 > | Cómo trabaja el equipo | `docs/02-equipo/flujo-de-trabajo.md` |
 > | El valor exacto de una regla | El código: `enums.ts`, `schema.ts`, `Theme.ts` |
 >

@@ -14,7 +14,10 @@ categoría Next Gen.
 > interviews teachers told us that a WhatsApp message is not evidence ("what
 > counts is the written report"), so Cresco keeps a record of which families
 > saw each notice, who opened each daily report, and what was agreed at each
-> meeting. Monetisation runs on **RevenueCat**: a Premium entitlement for
+> meeting. Teachers never expose a personal phone number or email: families
+> reach them only inside the app, always under their own name (one school we
+> interviewed had banned parent WhatsApp groups because teachers' numbers were
+> being taken). Monetisation runs on **RevenueCat**: a Premium entitlement for
 > families (seven past reports instead of two, a printable PDF report, no ads)
 > and a PRO entitlement for teachers (up to five courses), confirmed
 > server-side by a RevenueCat webhook in Convex, with Test Store purchases
@@ -86,6 +89,9 @@ request.
   viendo un anuncio con premio en el plan gratuito.
 - Reclama una anotación con la que no está de acuerdo.
 - Pide citas, responde las citaciones del docente y recibe los acuerdos.
+- Ve quién es el docente de su hijo y su horario de atención, pero nunca su
+  teléfono ni su correo personal: a él se llega pidiendo una cita, siempre a
+  nombre propio ([DP-016](docs/00-producto/decisiones/016-sin-contacto-personal-del-docente.md)).
 - Recibe avisos en el teléfono: el reporte publicado, anotaciones, avisos del
   curso, citas y alertas.
 

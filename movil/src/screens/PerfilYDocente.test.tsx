@@ -50,20 +50,26 @@ it("sin titular asignado lo dice con el nombre del hijo, no deja la pantalla vac
 });
 
 /**
- * El docente puede no haber llenado nada. Una tarjeta de contacto vacia se lee
- * como un error de la aplicacion; decirlo con palabras, no.
+ * El docente puede no haber llenado nada. Una tarjeta vacia se lee como un
+ * error de la aplicacion; decirlo con palabras, no.
  */
-it("con ficha sin datos de contacto lo explica y no ofrece botones muertos", () => {
+it("sin horario publicado lo dice, y lleva a pedir una cita", () => {
   estado.ficha = {
     docenteId: "d1", nombre: "María Loor", curso: "Quinto A",
     tituloProfesional: null, correoContacto: null, telefonoContacto: null, horarioAtencion: null,
   };
   const v = pintar(<ProfesorACargo estudianteId={"e1" as never} nombre="Ana" />);
-  expect(texto(v)).toContain("todavía no publicó cómo prefiere que lo contacten");
+  expect(texto(v)).toContain("todavía no publicó su horario de atención");
+  expect(texto(v)).toContain("Pídele una cita desde la sección Citas");
   expect(v.root.findAllByType(Boton)).toHaveLength(0);
 });
 
-it("con ficha completa muestra nombre, curso y un boton por cada via de contacto", () => {
+/**
+ * DP-016: la ficha nunca ofrece escribir ni llamar al docente. Ni siquiera si
+ * el servidor mandara un correo o un teléfono (una versión vieja del backend
+ * los mandaba): la pantalla no los pinta.
+ */
+it("muestra nombre, curso y horario, y nunca un correo o un teléfono del docente", () => {
   estado.ficha = {
     docenteId: "d1", nombre: "María Loor", curso: "Quinto A",
     tituloProfesional: "Licenciada en Educación Básica",
@@ -75,7 +81,9 @@ it("con ficha completa muestra nombre, curso y un boton por cada via de contacto
   expect(t).toContain("María Loor");
   expect(t).toContain("Titular de Quinto A");
   expect(t).toContain("Martes de 10:00 a 11:00");
-  expect(v.root.findAllByType(Boton)).toHaveLength(2);
+  expect(t).not.toContain("mloor@colegio.edu.ec");
+  expect(t).not.toContain("0990000000");
+  expect(v.root.findAllByType(Boton)).toHaveLength(0);
 });
 
 /**
@@ -108,8 +116,14 @@ it("manda tambien los campos vacios, que es como se borra un dato", async () => 
   });
   expect(estado.guardar).toHaveBeenCalledWith({
     tituloProfesional: "Licenciada",
-    correoContacto: "",
-    telefonoContacto: "",
     horarioAtencion: "",
   });
+});
+
+it("el formulario del docente no pide correo ni teléfono, y le explica por qué", () => {
+  estado.ficha = null;
+  const v = pintar(<PerfilDocente />);
+  expect(v.root.findAllByType(Campo).map((c) => c.props.etiqueta)).toEqual(["Título profesional", "Horario de atención"]);
+  expect(texto(v)).toContain("Tu número y tu correo no se publican");
+  expect(texto(v)).toContain("en Cresco no hay mensajes anónimos");
 });

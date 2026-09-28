@@ -28,6 +28,7 @@ septiembre se retiraron del árbol y siguen en el historial de git
 | 013 | Importar la lista del curso por CSV (D9) se difiere a la v2 | Aceptada |
 | 014 | Modo oscuro opcional, desde Ajustes y apagado por defecto | Aceptada |
 | 015 | La aplicación en inglés se difiere a la v2 | Aceptada |
+| 016 | Cresco no pide ni muestra medios de contacto personales del docente | Aceptada |
 
 Cuándo escribir una DP nueva en vez de editar el código o un ADR: cuando la
 decisión es de **producto o negocio** (qué construye la app, para quién, con

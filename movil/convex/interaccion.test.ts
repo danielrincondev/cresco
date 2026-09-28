@@ -2069,15 +2069,28 @@ describe("interaccion — quien es el docente de mi hijo (P9, #52)", () => {
       nombre: "María Loor",
       curso: "Quinto A",
       tituloProfesional: "Licenciada en Educación Básica",
-      correoContacto: "mloor@colegio.edu.ec",
-      telefonoContacto: null,
+      horarioAtencion: "Martes de 10:00 a 11:00",
     });
   });
 
   /**
+   * DP-016: aunque un docente tenga guardado un correo de antes (el escenario
+   * se lo pone a propósito), la ficha que ve la familia nunca lo entrega.
+   */
+  it("nunca le entrega a la familia un correo ni un teléfono del docente", async () => {
+    const t = convexTest(schema, modules);
+    const e = await sembrarEscenario(t);
+    await darleNombreAlDocente(t, e.docenteId);
+
+    const ficha = await e.representante.query(api.interaccion.docenteACargo, { estudianteId: e.estudianteId });
+    expect(ficha).toMatchObject({ correoContacto: null, telefonoContacto: null });
+    expect(JSON.stringify(ficha)).not.toContain("mloor@colegio.edu.ec");
+  });
+
+  /**
    * La razon por la que esta consulta empieza por `exigirVinculo`: sin eso,
-   * cualquiera con una cuenta podria sacar el correo y el telefono de
-   * cualquier docente del sistema probando ids de estudiante.
+   * cualquiera con una cuenta podria sacar la ficha de cualquier docente del
+   * sistema probando ids de estudiante.
    */
   it("no la puede consultar un representante sin vinculo con ese estudiante", async () => {
     const t = convexTest(schema, modules);

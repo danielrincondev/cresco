@@ -24,7 +24,7 @@ en prosa se mantenga sincronizado a mano.
 | Antes | Ahora |
 |---|---|
 | `NEXT_STEPS.md` reescrito a mano cada vez | GitHub Issues |
-| Decisiones editadas encima en `registro-decisiones.md` | `docs/00-producto/decisiones/` — un archivo por decisión (DP-001 a DP-015), nunca se edita, se reemplaza |
+| Decisiones editadas encima en `registro-decisiones.md` | `docs/00-producto/decisiones/` — un archivo por decisión (DP-001 a DP-016), nunca se edita, se reemplaza |
 | Reglas de negocio descritas en prosa | Viven en el código: `convex/lib/enums.ts`, `guardas.ts` — el código no puede desincronizarse de sí mismo |
 | "Cada quien es dueño de su módulo" como frase del manual | `.github/CODEOWNERS` — GitHub pide la revisión correcta solo, sin depender de que alguien se acuerde |
 

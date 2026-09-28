@@ -137,51 +137,69 @@ describe("núcleo — datos profesionales del docente (#52)", () => {
    * y ninguna mutation los escribia: P9 mostraba una ficha vacia porque no
    * habia forma de llenarla.
    */
-  it("los guarda y los devuelve", async () => {
+  it("guarda el título y el horario", async () => {
     const t = convexTest(schema, modules);
     const cliente = await alta(t);
     await cliente.mutation(api.nucleo.actualizarDatosDocente, {
       tituloProfesional: "  Licenciado en Educación Básica  ",
-      correoContacto: "docente@colegio.edu.ec",
       horarioAtencion: "Martes de 10:00 a 11:00",
     });
     const docente = await t.run((ctx) => ctx.db.query("docente").unique());
     expect(docente).toMatchObject({
       tituloProfesional: "Licenciado en Educación Básica",
-      correoContacto: "docente@colegio.edu.ec",
       horarioAtencion: "Martes de 10:00 a 11:00",
     });
-    // Lo que no se mandó no se toca.
-    expect(docente?.telefonoContacto).toBeUndefined();
   });
 
   /**
-   * Un docente que publicó su teléfono personal y se arrepiente tiene que
-   * poder quitarlo. Cadena vacía lo borra; `undefined` significa "no lo
-   * toques", que es lo que manda un formulario que no edita ese campo.
+   * DP-016: Cresco no guarda ni publica un medio de contacto personal del
+   * docente. Una build 1.0.0 todavía manda correo y teléfono: se aceptan para
+   * que su formulario no falle, pero se descartan sin validarlos.
+   */
+  it("descarta el correo y el teléfono que manda una build anterior, sin rechazar el guardado", async () => {
+    const t = convexTest(schema, modules);
+    const cliente = await alta(t);
+    await cliente.mutation(api.nucleo.actualizarDatosDocente, {
+      tituloProfesional: "Licenciado",
+      correoContacto: "esto-ni-siquiera-es-un-correo",
+      telefonoContacto: "0990000000",
+    });
+    const docente = await t.run((ctx) => ctx.db.query("docente").unique());
+    expect(docente?.tituloProfesional).toBe("Licenciado");
+    expect(docente?.correoContacto).toBeUndefined();
+    expect(docente?.telefonoContacto).toBeUndefined();
+  });
+
+  it("un correo o un teléfono guardados antes de DP-016 se borran en el siguiente guardado", async () => {
+    const t = convexTest(schema, modules);
+    const cliente = await alta(t);
+    await t.run(async (ctx) => {
+      const docente = (await ctx.db.query("docente").unique())!;
+      await ctx.db.patch(docente._id, { correoContacto: "viejo@colegio.edu.ec", telefonoContacto: "0990000000" });
+    });
+    await cliente.mutation(api.nucleo.actualizarDatosDocente, { horarioAtencion: "Lunes" });
+    const docente = await t.run((ctx) => ctx.db.query("docente").unique());
+    expect(docente?.correoContacto).toBeUndefined();
+    expect(docente?.telefonoContacto).toBeUndefined();
+    expect(docente?.horarioAtencion).toBe("Lunes");
+  });
+
+  /**
+   * Un docente que publicó algo y se arrepiente tiene que poder quitarlo.
+   * Cadena vacía lo borra; `undefined` significa "no lo toques", que es lo
+   * que manda un formulario que no edita ese campo.
    */
   it("la cadena vacia borra el campo, y no mandarlo lo conserva", async () => {
     const t = convexTest(schema, modules);
     const cliente = await alta(t);
     await cliente.mutation(api.nucleo.actualizarDatosDocente, {
-      telefonoContacto: "0990000000", tituloProfesional: "Licenciado",
+      horarioAtencion: "Martes de 10:00 a 11:00", tituloProfesional: "Licenciado",
     });
-    await cliente.mutation(api.nucleo.actualizarDatosDocente, { telefonoContacto: "" });
+    await cliente.mutation(api.nucleo.actualizarDatosDocente, { horarioAtencion: "" });
 
     const docente = await t.run((ctx) => ctx.db.query("docente").unique());
-    expect(docente?.telefonoContacto).toBeUndefined();
+    expect(docente?.horarioAtencion).toBeUndefined();
     expect(docente?.tituloProfesional).toBe("Licenciado");
-  });
-
-  it.each([
-    { correoContacto: "esto-no-es-un-correo" },
-    { telefonoContacto: "abc" },
-  ])("rechaza datos de contacto mal escritos (%j)", async (args) => {
-    const t = convexTest(schema, modules);
-    const cliente = await alta(t);
-    await expect(
-      cliente.mutation(api.nucleo.actualizarDatosDocente, args),
-    ).rejects.toThrow("VALIDACION");
   });
 
   it("un representante no puede editar la ficha de un docente", async () => {
