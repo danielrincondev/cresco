@@ -120,6 +120,31 @@ informe debe dar a entender que reemplaza el expediente en papel del plantel.
 
 ---
 
+## 2. Lo que marca `expo-doctor` — después del Shipaton
+
+**Estado:** anotado el 28 de septiembre, en la revisión general del repo.
+`npx expo-doctor` pasa 19 de 21 comprobaciones. Las dos que fallan no rompen
+nada hoy (la build del 27 de septiembre funciona), pero las dos exigen build
+nueva y reinstalar en cada teléfono de prueba, así que **no se tocan antes de
+enviar**: una build a última hora es el riesgo, no el arreglo.
+
+- **`splash` en `app.json`.** El esquema de configuración de Expo SDK 57 ya no
+  acepta la clave `splash` en la raíz; la pantalla de arranque se configura con
+  el plugin `expo-splash-screen`. Moverla ahí, con la misma imagen y el mismo
+  fondo (`#EBF4FA`).
+- **Nueve paquetes con un parche por detrás** de lo que pide el SDK 57: `expo`
+  57.0.13 → ~57.0.25, `react-native` 0.86.2 → 0.86.3, y `expo-auth-session`,
+  `expo-crypto`, `expo-dev-client`, `expo-font`, `expo-secure-store`,
+  `expo-updates` y `expo-web-browser`. Se actualizan todos juntos con
+  `npx expo install --check`, **sin** tocar `react-native-google-mobile-ads`,
+  que sigue fijado en 17.0.0 por el issue #903 de ese paquete.
+
+**Cuándo está terminado:** `npx expo-doctor` pasa las 21, la build nueva
+arranca con el splash de siempre, y las pruebas de siempre en el teléfono
+(sesión, reporte del día, compra en "Beta", avisos) siguen pasando.
+
+---
+
 ## Al hacer la tanda
 
 1. Instalar las dependencias nativas de todos los puntos de arriba de una vez.
