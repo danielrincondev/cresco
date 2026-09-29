@@ -111,7 +111,7 @@ limit is actually reached — never at launch.
   deleting a course.
 - **RevenueCat**, **AdMob**, **Expo Notifications with Firebase Cloud
   Messaging**, **EAS Build** and **EAS Update**.
-- **Quality:** 749 automated tests of the server functions and the screens;
+- **Quality:** 756 automated tests of the server functions and the screens;
   type checks and an Android bundle on every pull request; code owners per
   module; and 16 product and 8 architecture decision records in the repository,
   written as we decided.
