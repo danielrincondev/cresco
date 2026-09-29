@@ -65,8 +65,8 @@ campo en una tabla ajena, se pide al dueño; no se agrega.
   `useSignIn`), no los componentes nativos de su SDK de Expo, que siguen en beta.
 - **Expo / React Native** (`movil/`) — una sola app con enrutado por rol.
 - **RevenueCat SDK** + **Test Store** — suscripciones; requisito del hackathon.
-- **NativeWind** para estilos, con `movil/src/theme/Theme.ts` como única fuente
-  de tokens visuales.
+- **`StyleSheet` de React Native** para estilos, con `movil/src/theme/Theme.ts`
+  como única fuente de tokens visuales.
 
 **No se debe reintroducir** `servidor/`, `db/`, Next.js, Better Auth, PostgreSQL,
 Drizzle, RLS ni `openapi.yaml` como contrato ejecutable.
@@ -90,14 +90,16 @@ cresco/
 │   │   ├── App.tsx
 │   │   └── theme/Theme.ts        ← tokens visuales, única fuente de #hex
 │   └── convex/
-│       ├── schema.ts             ← COMPARTIDO — 41 tablas
+│       ├── schema.ts             ← COMPARTIDO — 43 tablas
 │       ├── auth.config.ts        ← valida los JWT de Clerk
 │       ├── http.ts               ← webhook de RevenueCat
 │       ├── semillas.ts           ← datos semilla, idempotentes
 │       ├── suscripciones.ts
-│       ├── nucleo.ts             ← Persona A  (por escribir)
-│       ├── conducta.ts           ← Persona B  (por escribir)
-│       ├── interaccion.ts        ← Persona C  (por escribir)
+│       ├── nucleo.ts             ← Persona A
+│       ├── conducta.ts           ← Persona B
+│       ├── interaccion.ts        ← Persona C
+│       ├── push.ts · auditoria.ts ← Persona C
+│       ├── crons.ts              ← un bloque por dueño
 │       └── lib/
 │           ├── enums.ts          ← COMPARTIDO — estados y REGLAS
 │           ├── guardas.ts        ← COMPARTIDO — validaciones de dominio
@@ -105,10 +107,13 @@ cresco/
 │           ├── flags.ts          ← COMPARTIDO — banderas de activación
 │           └── revenuecat.ts
 └── docs/                         ← índice en docs/README.md
-    ├── 00-producto/decisiones/   ← DP-001..008, una por archivo
+    ├── 00-producto/decisiones/   ← DP-001..013, una por archivo
     ├── 01-arquitectura/adr/      ← ADR-001..008, una por archivo
     ├── 02-equipo/                ← flujo-de-trabajo.md, manual, backlog
-    └── 99-archivo/               ← reemplazados, nunca borrados
+    ├── 03-piloto/                ← aviso de privacidad, consentimiento, carta
+    ├── 04-guias/                 ← contratos para la interfaz, RevenueCat
+    ├── 05-validacion/            ← entrevistas y hallazgos
+    └── 06-entrega/               ← material para Devpost
 ```
 
 ## Convenciones de código
@@ -166,19 +171,21 @@ Antes de responder "¿qué se decidió sobre X?", busca en este orden:
 | Pregunta | Fuente de verdad |
 |---|---|
 | ¿Cuál es el valor exacto de una regla? | El código: `convex/lib/enums.ts` (`REGLAS`), `schema.ts`, `Theme.ts` |
-| ¿Por qué se decidió así (producto)? | `docs/00-producto/decisiones/` (DP-001..008) |
+| ¿Por qué se decidió así (producto)? | `docs/00-producto/decisiones/` (DP-001..013) |
 | ¿Por qué se decidió así (arquitectura)? | `docs/01-arquitectura/adr/` (ADR-001..008) |
 | ¿Cómo trabaja el equipo? | `docs/02-equipo/flujo-de-trabajo.md` |
 | ¿Qué falta hacer? | GitHub Issues y el Project board |
 
 **Un DP o un ADR nunca se edita.** Si una decisión cambia, se escribe uno nuevo
-que reemplaza al anterior, y el viejo pasa a `Reemplazada`. Lo mismo con los
-documentos: se marcan `Reemplazado` y se mueven a `docs/99-archivo/`, no se
-borran.
+que reemplaza al anterior, y el viejo pasa a `Reemplazada`. Los demás
+documentos, cuando dejan de valer, se retiran del árbol en un commit que diga
+por qué: git conserva el texto (la antigua carpeta `docs/99-archivo/` está en
+`git show c5ce997:docs/99-archivo/`).
 
-`Contexto/CONTEXT.md` y `Contexto/DECISIONS.md` contienen decisiones de producto
-todavía válidas, pero **sus secciones de arquitectura son históricas** — ambos
-lo advierten en su cabecera.
+`Contexto/CONTEXT.md` explica el objetivo, el alcance y el porqué de las reglas
+de negocio; no lleva el estado del proyecto, que está en el `README.md`.
+`Contexto/DECISIONS.md` contiene decisiones de producto todavía válidas, pero
+**su sección de arquitectura es histórica** — lo advierte en su cabecera.
 
 ## Definición de "terminado"
 

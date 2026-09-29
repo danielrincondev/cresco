@@ -26,14 +26,15 @@ assert(perfiles.every((p) => p.perfilUsuarioId === perfiles[0].perfilUsuarioId))
 for (const [subject, documento] of [[representante, `REP-${sufijo}`], [otro, `OTR-${sufijo}`]]) {
   await cliente(subject).mutation(anyApi.nucleo.completarPerfil, { nombres: "Representante", apellidos: "Sintético", tipoDocumento: "PASAPORTE", numeroDocumento: documento, roles: ["REPRESENTANTE"] });
 }
-const anio = new Date().getUTCFullYear();
+// Fechas relativas a hoy: un año lectivo no puede haber terminado ni durar más de 400 días.
+const dia = (desplazamiento) => new Date(Date.now() + desplazamiento * 86_400_000).toISOString().slice(0, 10);
 const curso = await cliente(docente).mutation(anyApi.nucleo.crearCurso, {
   nombreInstitucion: "Escuela sintética de pruebas", nombreCurso: "Curso de prueba", nivel: "5", paralelo: "A",
-  anioInicio: `${anio}-01-01`, anioFin: `${anio + 1}-12-31`,
+  anioInicio: dia(-30), anioFin: dia(300),
 });
 await cliente(docente).mutation(anyApi.nucleo.definirPeriodos, { cursoId: curso.id, periodos: [
-  { nombre: "Actual", orden: 1, fechaInicio: `${anio}-01-01`, fechaFin: `${anio}-12-31` },
-  { nombre: "Próximo", orden: 2, fechaInicio: `${anio + 1}-01-01`, fechaFin: `${anio + 1}-12-31` },
+  { nombre: "Actual", orden: 1, fechaInicio: dia(-30), fechaFin: dia(120) },
+  { nombre: "Próximo", orden: 2, fechaInicio: dia(121), fechaFin: dia(300) },
 ] });
 const invitaciones = await Promise.all(Array.from({ length: 3 }, () => cliente(docente).mutation(anyApi.nucleo.crearInvitacion, { cursoId: curso.id })));
 assert(invitaciones.every((i) => i.invitacionId === invitaciones[0].invitacionId));

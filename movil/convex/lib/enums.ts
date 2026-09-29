@@ -17,7 +17,8 @@ export const TIPO_DOCUMENTO = ["CEDULA", "PASAPORTE", "SIN_DOCUMENTO"] as const;
 export const ESTADO_ANIO_LECTIVO = ["PLANIFICADO", "EN_CURSO", "CERRADO"] as const;
 export const ESTADO_PERIODO = ["PLANIFICADO", "EN_CURSO", "CERRADO"] as const;
 export const JORNADA = ["MATUTINA", "VESPERTINA", "NOCTURNA"] as const;
-export const ESTADO_CURSO = ["ACTIVO", "ARCHIVADO"] as const;
+/** ARCHIVADO: su año lectivo terminó ("Finalizado"). ELIMINADO: lo ocultó su titular; sus datos se conservan (DP-007). */
+export const ESTADO_CURSO = ["ACTIVO", "ARCHIVADO", "ELIMINADO"] as const;
 export const ROL_ASIGNACION = ["TITULAR", "COLABORADOR"] as const;
 
 /** Origen del registro del estudiante (A1 + D1: ambos caminos) */
@@ -121,7 +122,7 @@ export const PLATAFORMA = ["ANDROID", "IOS", "WEB"] as const;
 export const TIPO_NOTIFICACION = [
   "REPORTE_DIARIO", "ACCION_NEGATIVA", "ACCION_POSITIVA", "NOTA_DOCENTE",
   "COMUNICADO", "CITACION", "RESPUESTA_INCONFORMIDAD", "ALERTA_EMERGENCIA",
-  "RECORDATORIO_CITA", "ESTUDIANTE_APROBADO", "SISTEMA",
+  "RECORDATORIO_CITA", "ESTUDIANTE_APROBADO", "RESUMEN_SEMANAL", "SISTEMA",
 ] as const;
 
 export const ACCION_AUDITORIA = [

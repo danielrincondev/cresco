@@ -1,69 +1,63 @@
 # Documentación de Cresco
 
 Índice de toda la documentación del proyecto. **Este archivo se actualiza cada vez
-que se agrega un documento.** Un documento que no está en esta tabla, no existe
-para el equipo.
+que se agrega o se retira un documento.** Un documento que no está en esta tabla,
+no existe para el equipo.
 
 > **Arquitectura vigente desde el 16 de agosto de 2026:** Expo + Clerk + Convex.
-> Los manuales y documentos de planificación anteriores se conservan como
-> contexto histórico cuando describen Next.js, Better Auth, PostgreSQL o Drizzle.
-> Para el runtime actual mandan el `README.md` de la raíz y `movil/`.
+> Para el runtime actual mandan el `README.md` de la raíz y el código de `movil/`.
+> Los documentos que describían el stack anterior (Next.js, Better Auth,
+> PostgreSQL, Drizzle) y los que ya estaban reemplazados se retiraron del árbol
+> el 28 de septiembre de 2026. Siguen completos en el historial de git:
+> `git show c5ce997:docs/99-archivo/`.
 
-Estado: `✅ listo` · `🚧 en progreso` · `⬜ pendiente` · `📦 archivado`
+Estado: `✅ vigente` · `🚧 borrador o abierto` · `📦 histórico`
 
 ---
 
-## Contexto/ — lo que se lee al empezar cualquier sesión
+## Contexto/ — lo que se lee al empezar una sesión con Claude Code
 
-Vive fuera de `docs/` porque Claude Code lo carga en cada sesión.
+Vive fuera de `docs/` porque es el contexto de trabajo del asistente, no
+documentación del producto.
 
 | Documento | Estado | Dueño |
 |---|---|---|
-| `../Contexto/CLAUDE.md` | ✅ reescrito el 22-ago para el stack vigente | Todos |
-| `../Contexto/CONTEXT.md` | ✅ reescrito el 22-ago: estado real y pendientes | Todos |
+| `../Contexto/CLAUDE.md` | ✅ instrucciones permanentes para el asistente | Todos |
+| `../Contexto/CONTEXT.md` | ✅ objetivo, alcance, arquitectura y reglas de negocio, con su porqué | Todos |
 | `../Contexto/DECISIONS.md` | 📦 registro histórico; sus IDs (C2, D2, F3…) los cita el código | Todos |
-| `../Contexto/NEXT_STEPS.md` | 🚧 plan de retoma; se sustituye por Issues | Persona C |
 | `../Contexto/reglas-shipaton-next-gen.md` | ✅ reglas oficiales verificadas | Persona C |
 
 ## 00-producto — ¿Qué construimos y por qué?
 
 | Documento | Estado | Dueño |
 |---|---|---|
-| `decisiones/` (8 decisiones de producto, DP-001 a DP-008) | ✅ vigente — una decisión por archivo, misma disciplina que los ADR | Persona C |
-| `glosario.md` | ⬜ | Todos |
-
-> Cuatro documentos de esta carpeta se archivaron el 22 de agosto:
-> `registro-decisiones.md` y `decisiones-pendientes.md` (sus decisiones vigentes
-> están en `decisiones/`), `cuestionario-direccion-visual.md` (el tema ya está
-> escrito en `movil/src/theme/Theme.ts`) y `cuestionario-definiciones.md` (ya
-> estaba marcado `Reemplazado`, pero seguía fuera del archivo).
+| `decisiones/` (13 decisiones de producto, DP-001 a DP-013) | ✅ una decisión por archivo, misma disciplina que los ADR | Persona C |
 
 ## 01-arquitectura — ¿Cómo está construido?
 
 | Documento | Estado | Dueño |
 |---|---|---|
-| `adr/` (8 decisiones; ADR-001 a ADR-004 reemplazados) | ✅ actualizado | Todos |
-| `matriz-permisos.md` | ✅ actualizado el 22-ago: `permisos.ts` en vez de RLS | Persona A |
-| `modelo-datos.md` | ⬜ — lo cubre `movil/convex/schema.ts`, que está comentado tabla por tabla | Persona A |
+| `adr/` (8 decisiones; ADR-001 a ADR-004 reemplazados) | ✅ | Todos |
+| `matriz-permisos.md` | ✅ quién ve qué; lo aplica `movil/convex/lib/permisos.ts` | Persona A |
 
-> El esquema y las funciones ejecutables viven en `movil/convex/`. No existe un
-> contrato OpenAPI ni una base PostgreSQL separados en la arquitectura vigente.
+> El modelo de datos es `movil/convex/schema.ts`, comentado tabla por tabla. No
+> existe un contrato OpenAPI ni una base PostgreSQL separados.
 
 ## 02-equipo — ¿Cómo trabajamos?
 
 | Documento | Estado | Dueño |
 |---|---|---|
-| `manual-equipo.md` | ✅ | Todos |
+| `manual-equipo.md` | ✅ propiedad, ramas, ritmo y lo que nunca se sube | Todos |
 | `flujo-de-trabajo.md` | ✅ ramas, PR, CODEOWNERS, banderas — qué hace cada uno paso a paso | Todos |
-| `backlog-y-reparto.md` | ✅ se actualiza cada lunes | Todos |
-| `registro-riesgos.md` | ⬜ | Persona C |
+| `backlog-y-reparto.md` | ✅ inventario de las 31 pantallas, historias MoSCoW y reparto | Todos |
+| `pendientes-proxima-build.md` | 🚧 lo que espera una build nueva de EAS | Persona C |
 
 ## 03-piloto — ¿Qué firmamos y aceptamos?
 
 | Documento | Estado | Dueño |
 |---|---|---|
-| `aviso-privacidad.md` | 🚧 borrador completo, versión `2026-09-v1` — **pendiente de revisión jurídica** | Persona C |
-| `texto-consentimiento.md` | 🚧 borrador, versión `2026-09-v1` — se guarda la versión, no un booleano | Persona C |
+| `aviso-privacidad.md` | 🚧 borrador completo, versión `2026-09-v2` — **pendiente de revisión jurídica** | Persona C |
+| `texto-consentimiento.md` | 🚧 borrador, versión `2026-09-v2` — se guarda la versión, no un booleano | Persona C |
 | `carta-acuerdo-piloto.md` | 🚧 borrador `2026-09-v1` — los puntos 🔲 se acuerdan con la institución | Persona C |
 | `firmados/` | 🚫 ignorada por Git | — |
 
@@ -71,16 +65,11 @@ Vive fuera de `docs/` porque Claude Code lo carga en cada sesión.
 
 | Documento | Estado | Dueño |
 |---|---|---|
-| `guia-docente.md` | ⬜ semana 5 | Persona B |
-| `guia-representante.md` | ⬜ semana 5 | Persona B |
 | `integracion-revenuecat.md` | ✅ development build + RevenueCat, con las trampas conocidas | Persona C |
-
-> **Los cuatro manuales de rol (v1.1, 8 de agosto) se archivaron el 22 de agosto**
-> en `99-archivo/manuales-v1.1-stack-retirado/`. Instruían instalar Better Auth,
-> correr `drizzle-kit` y construir `db/acceso/` — seguirlos hoy reintroduce el
-> stack abandonado. Lo que los reemplaza está en el `README.md` de esa carpeta.
-> Esta sección queda para las guías de **uso del producto**, que son otra cosa:
-> se escriben en Markdown y el PDF es una salida, nunca una fuente.
+| `contrato-nucleo.md` | ✅ funciones del núcleo para la interfaz, y su prueba de humo local | Persona A |
+| `contrato-auditoria.md` | ✅ qué registra la bitácora y quién produce cada evento | Persona C |
+| `contrato-push.md` | ✅ avisos al teléfono: servidor, app, Firebase y privacidad del texto | Persona C |
+| `vencimiento-reclamos.md` | ✅ el plazo de 30 días de cada reclamo, programado en Convex | Persona C |
 
 ## 05-validacion — ¿Qué nos dijeron los usuarios?
 
@@ -90,17 +79,11 @@ Vive fuera de `docs/` porque Claude Code lo carga en cada sesión.
 | `guion-entrevistas.md` | ✅ diseño antes/después, individual por persona | Todos |
 | `hallazgos.md` | ✅ 4 docentes entrevistados el 1-sep; 8 hallazgos, 3 candidatos a DP | Persona C |
 
-## 99-archivo — Documentos reemplazados
+## 06-entrega — La sumisión al Shipaton
 
 | Documento | Estado | Dueño |
 |---|---|---|
-| `ERRATA-2026-08.md` | 📦 reemplazado — su contenido ya está en los manuales v1.1, hoy archivados | Persona C |
-| `manuales-v1.1-stack-retirado/` | 📦 los 4 manuales de rol y sus fuentes HTML: describen el stack retirado | Persona C |
-| `openapi-v1.1.0-archivado.yaml` | 📦 contrato de 32 rutas; ya no es ejecutable, pero sigue siendo la mejor especificación de qué hace cada función | Persona C |
-| `registro-decisiones.md` | 📦 reemplazado — sus decisiones vigentes están en `00-producto/decisiones/` | Persona C |
-| `decisiones-pendientes.md` | 📦 reemplazado — todos sus bloques quedaron resueltos, ver `00-producto/decisiones/` | Persona C |
-| `cuestionario-direccion-visual.md` | 📦 reemplazado — el tema ya está escrito en `movil/src/theme/Theme.ts` | Persona A |
-| `cuestionario-definiciones.md` | 📦 reemplazado — registro de qué se preguntó; las respuestas vigentes están en los DP | Todos |
+| `borrador-devpost.md` | 🚧 material para el texto de Devpost (#55) | Persona D |
 
 ---
 
@@ -134,14 +117,16 @@ entregarle algo a un colegio. Los PDF generados están en `.gitignore`.
 **`03-piloto/firmados/` no se sube.** Los acuerdos ya firmados llevan nombres,
 firmas y cédulas. Van a un Drive con acceso restringido, nunca al repositorio.
 
-**Documentos archivados:** no se borran. Se les cambia el estado a `Reemplazado`
-en la cabecera y se mueve el archivo a `docs/99-archivo/`. Los ADR nunca se editan
-una vez aceptados: si la decisión cambia, se escribe uno nuevo.
+**Documentos que dejan de valer:** se retiran del árbol en un commit que diga
+por qué, y se quitan de este índice. Git conserva el texto completo: nada se
+pierde, y el árbol solo muestra lo vigente. Las DP y los ADR son la excepción:
+nunca se editan ni se borran; si la decisión cambia, se escribe una nueva y la
+anterior queda `Reemplazada`.
 
 ---
 
 ## Regla de mantenimiento
 
 Un documento que no se actualiza es peor que uno que no existe, porque miente con
-autoridad. Si en semana 3 algo ya no refleja la realidad, o se actualiza o se
-marca como `Reemplazado`. No se deja mintiendo.
+autoridad. Si algo ya no refleja la realidad, o se actualiza o se retira. No se
+deja mintiendo.

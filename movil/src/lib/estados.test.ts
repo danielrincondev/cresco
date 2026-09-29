@@ -12,6 +12,7 @@ import {
   etiquetaAccion,
   etiquetaAlerta,
   etiquetaCita,
+  etiquetaCitaAl,
   etiquetaFranja,
   etiquetaReclamo,
   reclamoRespondible,
@@ -104,6 +105,14 @@ describe("estados — citas", () => {
     expect(etiquetaCita("SOLICITADA").tono).toBe("atencion");
     expect(etiquetaCita("SOLICITADA").texto).toContain("Esperando");
     expect(etiquetaCita("CONFIRMADA").tono).toBe("positivo");
+  });
+
+  it("una solicitud cuya hora pasó sin respuesta deja de decir que espera", () => {
+    const hora = Date.UTC(2026, 8, 10, 17, 30);
+    expect(etiquetaCitaAl("SOLICITADA", hora, hora - 1).texto).toContain("Esperando");
+    expect(etiquetaCitaAl("SOLICITADA", hora, hora)).toEqual({ tono: "neutro", texto: "Sin respuesta" });
+    // Lo demás no depende de la hora.
+    expect(etiquetaCitaAl("CONFIRMADA", hora, hora + 1)).toEqual(etiquetaCita("CONFIRMADA"));
   });
 });
 

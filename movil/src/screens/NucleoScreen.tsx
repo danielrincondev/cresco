@@ -74,6 +74,7 @@ import {
 } from "./ReporteScreen";
 import {
   AgendaDocente,
+  HistorialFamilia,
   Ajustes,
   PerfilDocente,
   ProfesorACargo,
@@ -81,6 +82,7 @@ import {
   AlertasFamilia,
   CitasFamilia,
   Notificaciones,
+  type Notificacion,
   ReclamosDocente,
 } from "./InteraccionScreen";
 import { parrafosLegibles } from "../lib/texto";
@@ -101,6 +103,10 @@ import {
   guardarBarraInferior,
   leerBarraInferior,
 } from "../lib/preferenciasFamilia";
+import { fechaISO } from "../lib/fechas";
+import { useAvisosDelTelefono } from "../lib/avisosDelTelefono";
+import { Chip } from "../components/Estado";
+import { EliminarCurso } from "./EliminarCursoScreen";
 
 type Rol = "DOCENTE" | "REPRESENTANTE";
 type Curso = FunctionReturnType<
@@ -135,6 +141,8 @@ type Ruta =
       tipo: "docenteACargo" | "reporteHoy" | "reportesAnteriores" | "acumulado";
       estudianteId: Id<"estudiante">;
       nombre: string;
+      /** Solo "reporteHoy", cuando un aviso lleva al reporte de otro día. */
+      fecha?: string;
     }
   // P7 lleva la anotacion entera y no solo su id: la bitacora ya la trajo, y
   // volver a pedirla al servidor para pintar lo mismo seria trabajo de mas.
@@ -146,15 +154,26 @@ type Ruta =
     }
   | {
       tipo:
-        | "curso" | "periodos" | "agenda" | "alerta" | "anotar"
+        | "curso" | "periodos" | "agenda" | "alerta" | "anotar" | "anioLectivo" | "eliminarCurso"
         // El cierre de jornada (D12, D13, D14): las tres son de un curso
         // concreto, a diferencia de los reclamos.
         | "asistencia" | "reporteDia" | "comunicado"
         | "recientes";
       curso: Curso;
     }
+  // Lleva el curso para que "atrás" vuelva a él, como las demás de un curso.
+  | { tipo: "historialFamilia"; curso: Curso; estudianteId: Id<"estudiante">; nombre: string }
   | { tipo: "invitacion"; invitacion: Invitacion; curso: Curso }
   | { tipo: "aprobar"; curso: Curso; alumno: Alumno };
+
+/**
+ * Los avisos que hablan de **un día**: al tocarlos se abre el reporte de ese
+ * día, no el de hoy. Un comunicado no está en la lista porque se ve desde el
+ * reporte de cualquier día mientras siga vigente.
+ */
+const DE_UN_DIA = new Set<Notificacion["tipo"]>([
+  "REPORTE_DIARIO", "ACCION_POSITIVA", "ACCION_NEGATIVA", "RESUMEN_SEMANAL",
+]);
 
 const documentosAdulto = [
   { valor: "CEDULA", texto: "Cédula" },
@@ -474,6 +493,59 @@ export function NucleoScreen() {
     (h) => h.estadoVerificacion === "APROBADO",
   );
   /**
+   * QA del 26 de septiembre: "al apretar una notificación debería enviar a
+   * la pantalla que corresponde a esa notificación". Antes solo se marcaba
+   * leída y no pasaba nada más.
+   *
+   * Se resuelve con lo que la propia notificación ya trae —`tipo`,
+   * `entidadTipo`, `entidadId`— sin pedir nada nuevo al servidor. Para lo que
+   * habla de un hijo concreto (una acción, un reporte, un comunicado),
+   * `entidadTipo` es "estudiante" y `entidadId` su id: así se decidió al
+   * emitirlas en `conducta.ts`, precisamente para que esto pudiera resolverse
+   * en el cliente. El nombre sale de `hijosAprobados` cuando está disponible;
+   * si no, se usa el propio título de la notificación antes que dejar la
+   * pantalla en blanco.
+   */
+  const navegarDesdeNotificacion = (n: Notificacion) => {
+    if (n.tipo === "ALERTA_EMERGENCIA") {
+      setRuta({ tipo: "alertas" });
+      return;
+    }
+    if (n.tipo === "CITACION" || n.tipo === "RECORDATORIO_CITA") {
+      if (rol === "REPRESENTANTE") {
+        setRuta({ tipo: "citas" });
+        return;
+      }
+      // La agenda del docente vive dentro de un curso (D16). El servidor
+      // manda el de la cita en `cursoId`; si no llega, sirve el único curso
+      // del docente. Con varios y ninguno identificado, se queda en la
+      // campana en vez de adivinar.
+      const suyos = cursos?.cursos ?? [];
+      const curso =
+        suyos.find((c) => c.id === n.cursoId) ??
+        (suyos.length === 1 ? suyos[0] : undefined);
+      if (curso) setRuta({ tipo: "agenda", curso });
+      return;
+    }
+    if (n.tipo === "RESPUESTA_INCONFORMIDAD") {
+      if (rol === "DOCENTE") setRuta({ tipo: "reclamos" });
+      return;
+    }
+    if (n.entidadTipo === "estudiante" && n.entidadId) {
+      const hijo = hijosAprobados.find((h) => h.estudianteId === n.entidadId);
+      setRuta({
+        tipo: "reporteHoy",
+        estudianteId: n.entidadId as Id<"estudiante">,
+        nombre: hijo?.nombre ?? n.titulo,
+        // Lo que habla de un día concreto abre ese día: el reporte de las
+        // 22:00 casi siempre se toca a la mañana siguiente, y ahí "hoy" ya
+        // es otro día, todavía sin nada. Los avisos del curso no: se ven
+        // mientras sigan vigentes, desde el reporte de cualquier día.
+        ...(DE_UN_DIA.has(n.tipo) ? { fecha: fechaISO(n._creationTime) } : {}),
+      });
+    }
+  };
+  /**
    * Con al menos un hijo aprobado, la aplicación abre en **su reporte de
    * hoy**, no en "Mis hijos". Es a lo que una familia entra cada tarde; "Mis
    * hijos" tiene funciones que solo hacen falta al inicio del año lectivo
@@ -499,6 +571,24 @@ export function NucleoScreen() {
    * de verdad hacia dónde se va: con un representante, eso es esperar a que
    * `estadoHijos` deje de estar en su primera carga.
    */
+  /**
+   * Tocar un aviso en el teléfono hace lo mismo que tocarlo en la campana:
+   * lo marca leído y abre su pantalla. Si la app estaba cerrada, el aviso
+   * llega antes que la bandeja; se guarda y se resuelve en cuanto carga.
+   */
+  const marcarLeida = useMutation(api.interaccion.marcarNotificacionLeida);
+  const [avisoTocado, setAvisoTocado] = useState<string>();
+  useAvisosDelTelefono(perfil?.perfilUsuarioId, setAvisoTocado);
+  useEffect(() => {
+    if (!avisoTocado || !novedades) return;
+    setAvisoTocado(undefined);
+    const tocada = novedades.find((n) => n._id === avisoTocado);
+    if (!tocada) return;
+    if (tocada.leidaEn === undefined) {
+      void marcarLeida({ notificacionId: tocada._id }).catch(() => {});
+    }
+    navegarDesdeNotificacion(tocada);
+  }, [avisoTocado, novedades]);
   const [decisionTomada, setDecisionTomada] = useState(false);
   const esperandoHijos = !!perfil?.representanteId && estadoHijos === "LoadingFirstPage";
   useEffect(() => {
@@ -715,7 +805,11 @@ export function NucleoScreen() {
               : "Tu comunidad educativa"}
           </Text>
         </View>
-        {perfil && ruta.tipo === "inicio" && (
+        {/* En todas las pantallas, no solo en el inicio (pedido de Kenny, 27
+            de septiembre): un aviso llega en cualquier momento, y sin la
+            campana ese rincón quedaba vacío. Solo se oculta en la propia
+            bandeja, donde apuntaría a sí misma. */}
+        {perfil && ruta.tipo !== "notificaciones" && (
           <>
             <Pressable
               accessibilityRole="button"
@@ -785,7 +879,7 @@ export function NucleoScreen() {
         ) : ruta.tipo === "registro" ? (
           <RegistroForm perfil={perfil} onGuardar={volver} />
         ) : ruta.tipo === "notificaciones" ? (
-          <Notificaciones />
+          <Notificaciones onAbrir={(n) => navegarDesdeNotificacion(n)} />
         ) : ruta.tipo === "ajustes" ? (
           <Ajustes
             esRepresentante={rol === "REPRESENTANTE"}
@@ -796,6 +890,23 @@ export function NucleoScreen() {
           <ReclamosDocente />
         ) : ruta.tipo === "agenda" ? (
           <AgendaDocente curso={ruta.curso} />
+        ) : ruta.tipo === "eliminarCurso" ? (
+          <EliminarCurso
+            curso={ruta.curso}
+            onEliminado={() => setRuta({ tipo: "inicio" })}
+            onVolver={() => setRuta({ tipo: "curso", curso: ruta.curso })}
+          />
+        ) : ruta.tipo === "anioLectivo" ? (
+          <EditarAnioLectivo
+            curso={ruta.curso}
+            onVolver={() => setRuta({ tipo: "curso", curso: ruta.curso })}
+          />
+        ) : ruta.tipo === "historialFamilia" ? (
+          <HistorialFamilia
+            estudianteId={ruta.estudianteId}
+            nombre={ruta.nombre}
+            onVolver={() => setRuta({ tipo: "curso", curso: ruta.curso })}
+          />
         ) : ruta.tipo === "alerta" ? (
           <AlertaDocente curso={ruta.curso} />
         ) : ruta.tipo === "anotar" ? (
@@ -832,6 +943,10 @@ export function NucleoScreen() {
           <ReporteDeHoy
             estudianteId={ruta.estudianteId}
             nombre={ruta.nombre}
+            fecha={ruta.fecha}
+            onVerHoy={() =>
+              setRuta({ tipo: "reporteHoy", estudianteId: ruta.estudianteId, nombre: ruta.nombre })
+            }
             hijos={hijosAprobados}
             onCambiarHijo={(estudianteId, nombre) =>
               setRuta({ tipo: "reporteHoy", estudianteId: estudianteId as Id<"estudiante">, nombre })
@@ -1104,6 +1219,8 @@ function Cursos({
   navegar: (ruta: Ruta) => void;
 }) {
   const datos = useQuery(api.nucleo.listarCursos);
+  const [verAnteriores, setVerAnteriores] = useState(false);
+  const anteriores = datos?.anteriores ?? [];
   return (
     <Pagina
       titulo={nombre ? `Hola, ${nombre}` : "Tus cursos"}
@@ -1148,6 +1265,34 @@ function Cursos({
           </Pressable>
         ))
       )}
+      {/* Los cursos de un año lectivo que ya terminó: no cuentan para el
+          plan, así que el del año siguiente se puede abrir de inmediato. Van
+          plegados para que la pantalla muestre primero lo del año en curso. */}
+      {anteriores.length > 0 && (
+        <Boton secundario onPress={() => setVerAnteriores(!verAnteriores)}>
+          {verAnteriores ? "Ocultar cursos anteriores" : `Cursos anteriores (${anteriores.length})`}
+        </Boton>
+      )}
+      {verAnteriores &&
+        anteriores.map((curso) => (
+          <Pressable
+            key={curso.id}
+            accessibilityRole="button"
+            accessibilityLabel={`Abrir ${curso.nombre}, finalizado`}
+            onPress={() => navegar({ tipo: "curso", curso })}
+          >
+            <Tarjeta>
+              <View style={styles.sectionRow}>
+                <Subtitulo>{curso.nombre}</Subtitulo>
+                <Chip etiqueta={{ tono: "neutro", texto: "Finalizado" }} />
+              </View>
+              <Cuerpo>{curso.institucion}</Cuerpo>
+              <Text style={styles.etiqueta}>
+                {curso.totalEstudiantes} estudiantes · {curso.nivel}
+              </Text>
+            </Tarjeta>
+          </Pressable>
+        ))}
       {/* Vive aqui y no dentro de un curso porque cubre todos: con el plan
           PRO son hasta cinco, y abrirla desde uno hacia creer lo contrario. */}
       <Boton secundario onPress={() => navegar({ tipo: "reclamos" })}>
@@ -1255,9 +1400,25 @@ function DetalleCurso({
   const calendario = useQuery(api.nucleo.obtenerCalendarioCurso, {
     cursoId: curso.id,
   });
-  const [pestana, setPestana] = useState<"PENDIENTES" | "ESTUDIANTES">(
-    "PENDIENTES",
+  // QA del 26 de septiembre: "debería ir primero el botón de 'estudiante' en
+  // vez del botón 'por aprobar'" — es lo que un docente mira más seguido, una
+  // vez que el curso ya tiene alumnos matriculados.
+  const [pestana, setPestana] = useState<"ESTUDIANTES" | "PENDIENTES">(
+    "ESTUDIANTES",
   );
+  const [masOpciones, setMasOpciones] = useState(false);
+  // QA del 27 de septiembre: "conocer los 3 estudiantes con más acciones
+  // negativas... que no falle y salga que es por falta de conexión". Se
+  // pide en cuanto se conoce el curso, no solo cuando se despliega: así el
+  // aviso de "sin ninguna anotación" (que sí va siempre a la vista) no
+  // depende de que el docente haya abierto el desplegable primero.
+  const panorama = useQuery(
+    api.conducta.panoramaDelCurso,
+    calendario && calendario.periodos.length > 0 ? { cursoId: curso.id } : "skip",
+  );
+  const [verTop, setVerTop] = useState(false);
+  const avisos = useQuery(api.interaccion.familiasSinAvisos, { cursoId: curso.id });
+  const [verSinAvisos, setVerSinAvisos] = useState(false);
   const invitar = useMutation(api.nucleo.crearInvitacion);
   const op = useOperacion();
   async function invitarFamilias() {
@@ -1298,6 +1459,88 @@ function DetalleCurso({
         Reporte del día
       </Boton>
 
+      {/* QA del 27 de septiembre. Un conteo, sin nombres, y solo cuando hay
+          algo que señalar -- el silencio (todos tienen al menos una
+          anotación) no necesita un aviso. */}
+      {panorama && panorama.hayPeriodo && panorama.sinAnotaciones > 0 && (
+        <Aviso>
+          {panorama.sinAnotaciones === 1
+            ? "1 estudiante sin ninguna anotación este parcial."
+            : `${panorama.sinAnotaciones} estudiantes sin ninguna anotación este parcial.`}
+        </Aviso>
+      )}
+
+      {/* Las constancias de Cresco (quién vio, quién abrió) y los
+          recordatorios dependen de que el aviso llegue: a quien no le llega,
+          el docente tiene que decírselo en persona. */}
+      {avisos && avisos.sinAvisos.length > 0 && (
+        <Tarjeta>
+          <Subtitulo>
+            {avisos.sinAvisos.length === avisos.familias
+              ? avisos.familias === 1
+                ? "La familia del curso no recibe avisos en el teléfono"
+                : "Ninguna familia del curso recibe avisos en el teléfono"
+              : `${avisos.sinAvisos.length} de ${avisos.familias} familias no ${
+                  avisos.sinAvisos.length === 1 ? "recibe" : "reciben"
+                } avisos en el teléfono`}
+          </Subtitulo>
+          <Cuerpo>
+            Cresco solo puede avisar en el teléfono a quien lo tiene registrado.
+            Mientras tanto, lo ven todo al abrir la aplicación.
+          </Cuerpo>
+          {verSinAvisos ? (
+            <>
+              <Cuerpo>{`${avisos.sinAvisos.map((f) => f.nombre).join(", ")}.`}</Cuerpo>
+              <Boton secundario onPress={() => setVerSinAvisos(false)}>
+                Ocultar
+              </Boton>
+            </>
+          ) : (
+            <Boton secundario onPress={() => setVerSinAvisos(true)}>
+              {`Ver quiénes (${avisos.sinAvisos.length})`}
+            </Boton>
+          )}
+        </Tarjeta>
+      )}
+
+      {/* A diferencia del aviso de arriba, esto sí nombra a estudiantes
+          concretos -- por eso va detrás de un desplegable que el docente
+          elige abrir, no algo que se le presenta de entrada cada vez. */}
+      {calendario && calendario.periodos.length > 0 && (
+        <>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Quién tiene más anotaciones negativas este parcial"
+            accessibilityState={{ expanded: verTop }}
+            onPress={() => setVerTop(!verTop)}
+            style={styles.masOpciones}
+          >
+            <Text style={styles.masOpcionesTexto}>Quién tiene más anotaciones negativas</Text>
+            <Icono nombre={verTop ? "chevron-up" : "chevron-down"} decorativo />
+          </Pressable>
+          {verTop && (
+            <Tarjeta>
+              {!panorama ? (
+                <Cargando />
+              ) : !panorama.hayPeriodo ? (
+                <Cuerpo>No hay un parcial en curso todavía.</Cuerpo>
+              ) : panorama.totalEstudiantes === 0 ? (
+                <Cuerpo>Aún no hay estudiantes matriculados.</Cuerpo>
+              ) : panorama.topNegativos.length === 0 ? (
+                <Cuerpo>Nadie tiene anotaciones negativas este parcial.</Cuerpo>
+              ) : (
+                panorama.topNegativos.map((fila) => (
+                  <View key={fila.estudianteId} style={styles.filaTop}>
+                    <Text style={styles.filaTopNombre}>{fila.nombre}</Text>
+                    <Text style={styles.filaTopCantidad}>{fila.cantidad}</Text>
+                  </View>
+                ))
+              )}
+            </Tarjeta>
+          )}
+        </>
+      )}
+
       {/* El contenido, no al final. Un docente entra a ver a sus estudiantes:
           tenerlos debajo de nueve botones obligaba a recorrer la navegacion
           entera para llegar a lo que vino a buscar. */}
@@ -1305,8 +1548,8 @@ function DetalleCurso({
       <Opciones
         valor={pestana}
         opciones={[
-          { valor: "PENDIENTES", texto: "Por aprobar" },
           { valor: "ESTUDIANTES", texto: "Estudiantes" },
+          { valor: "PENDIENTES", texto: "Por aprobar" },
         ]}
         onChange={setPestana}
       />
@@ -1316,11 +1559,44 @@ function DetalleCurso({
           aprobar={(alumno) => navegar({ tipo: "aprobar", curso, alumno })}
         />
       ) : (
-        <Estudiantes curso={curso} />
+        <Estudiantes
+          curso={curso}
+          onVerHistorial={(estudianteId, nombre) =>
+            navegar({ tipo: "historialFamilia", curso, estudianteId, nombre })
+          }
+        />
       )}
-      <Boton pendiente={op.pendiente} onPress={() => void invitarFamilias()}>
-        Invitar representantes
-      </Boton>
+
+      {/*
+       * QA del 26 de septiembre: "invitar representante y alerta deberían
+       * ocultarse en 'más opciones'". Solo invitar se pliega — la alerta de
+       * emergencia se queda siempre visible (ver más abajo): ya vive también
+       * en el menú lateral, así que plegarla aquí sería redundante, y en una
+       * emergencia los segundos cuentan.
+       */}
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Más opciones"
+        accessibilityState={{ expanded: masOpciones }}
+        onPress={() => setMasOpciones(!masOpciones)}
+        style={styles.masOpciones}
+      >
+        <Text style={styles.masOpcionesTexto}>Más opciones</Text>
+        <Icono nombre={masOpciones ? "chevron-up" : "chevron-down"} decorativo />
+      </Pressable>
+      {masOpciones && (
+        <>
+          <Boton pendiente={op.pendiente} onPress={() => void invitarFamilias()}>
+            Invitar representantes
+          </Boton>
+          <Boton secundario onPress={() => navegar({ tipo: "anioLectivo", curso })}>
+            Editar año lectivo
+          </Boton>
+          <Boton secundario tono="NEGATIVA" onPress={() => navegar({ tipo: "eliminarCurso", curso })}>
+            Eliminar curso
+          </Boton>
+        </>
+      )}
       <ErrorMensaje mensaje={op.error} />
 
       {/* Se queda en la pantalla, no solo en el menú: en una emergencia los
@@ -1377,7 +1653,13 @@ function Pendientes({
     </>
   );
 }
-function Estudiantes({ curso }: { curso: Curso }) {
+function Estudiantes({
+  curso,
+  onVerHistorial,
+}: {
+  curso: Curso;
+  onVerHistorial: (estudianteId: Id<"estudiante">, nombre: string) => void;
+}) {
   const { results, status, loadMore } = usePaginatedQuery(
     api.nucleo.listarEstudiantes,
     { cursoId: curso.id },
@@ -1401,6 +1683,12 @@ function Estudiantes({ curso }: { curso: Curso }) {
               {a.nombres} {a.apellidos}
             </Subtitulo>
             <Cuerpo>Matrícula activa</Cuerpo>
+            <Boton
+              secundario
+              onPress={() => onVerHistorial(a.estudianteId, `${a.nombres} ${a.apellidos}`)}
+            >
+              Historial de la familia
+            </Boton>
           </Tarjeta>
         ))
       )}
@@ -1416,6 +1704,62 @@ function Mas({ status, cargar }: { status: string; cargar: () => void }) {
   ) : status === "LoadingMore" ? (
     <Cargando />
   ) : null;
+}
+
+/**
+ * Corregir las fechas del año lectivo del curso. Las reglas las pone el
+ * servidor (`corregirAnioLectivo`): puede haber empezado pero no terminado,
+ * dura como máximo 400 días, y los parciales tienen que seguir cabiendo.
+ */
+function EditarAnioLectivo({ curso, onVolver }: { curso: Curso; onVolver: () => void }) {
+  const calendario = useQuery(api.nucleo.obtenerCalendarioCurso, { cursoId: curso.id });
+  const corregir = useMutation(api.nucleo.corregirAnioLectivo);
+  const [fechas, setFechas] = useState<{ inicio: string; fin: string }>();
+  const op = useOperacion();
+
+  if (calendario === undefined) return <Cargando mensaje="Cargando el año lectivo..." />;
+  const inicio = fechas?.inicio ?? calendario.fechaInicio;
+  const fin = fechas?.fin ?? calendario.fechaFin;
+
+  async function guardar() {
+    const r = await op.ejecutar(() => corregir({ cursoId: curso.id, fechaInicio: inicio, fechaFin: fin }));
+    if (r.ok) onVolver();
+  }
+
+  return (
+    <Pagina
+      titulo="Año lectivo"
+      descripcion={curso.nombre}
+      atras={{ onPress: onVolver }}
+    >
+      <Tarjeta>
+        <CampoFecha
+          etiqueta="Inicio"
+          valor={inicio}
+          onChange={(valor) => setFechas({ inicio: valor, fin })}
+          editable={!op.pendiente}
+        />
+        <CampoFecha
+          etiqueta="Fin"
+          valor={fin}
+          onChange={(valor) => setFechas({ inicio, fin: valor })}
+          ayuda="De hoy en adelante: un año lectivo que ya terminó no se puede editar ni crear."
+          editable={!op.pendiente}
+        />
+      </Tarjeta>
+      <Aviso>
+        Dura como máximo 400 días, y los parciales que ya definiste tienen que
+        quedar dentro de estas fechas.
+      </Aviso>
+      <ErrorMensaje mensaje={op.error} />
+      <Boton pendiente={op.pendiente} onPress={() => void guardar()}>
+        Guardar año lectivo
+      </Boton>
+      <Boton secundario onPress={onVolver}>
+        Volver
+      </Boton>
+    </Pagina>
+  );
 }
 
 /**
@@ -2196,6 +2540,36 @@ function TextoDocumento({ texto }: { texto: string }) {
 
 const styles = StyleSheet.create({
   pantalla: { flex: 1, backgroundColor: Superficie.fondo },
+  masOpciones: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: Espacio.xs,
+    minHeight: 44,
+  },
+  masOpcionesTexto: {
+    color: Marca.base,
+    fontFamily: "Inter-Semibold",
+    fontSize: Tamano.base,
+  },
+  filaTop: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: Espacio.xs,
+    borderTopWidth: 1,
+    borderTopColor: Superficie.separador,
+  },
+  filaTopNombre: {
+    color: Texto.primario,
+    fontFamily: "Inter",
+    fontSize: Tamano.base,
+  },
+  filaTopCantidad: {
+    color: Texto.primario,
+    fontFamily: "Inter-Semibold",
+    fontSize: Tamano.base,
+  },
   barra: {
     flexDirection: "row",
     alignItems: "center",

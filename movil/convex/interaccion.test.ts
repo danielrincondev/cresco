@@ -7,6 +7,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 
 import { api, internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
+import { momentoRecordatorioCitacion, momentosDeRecordatorio } from "./interaccion";
 import schema from "./schema";
 import { exportJWK, generateKeyPair, SignJWT } from "jose";
 
@@ -179,6 +180,8 @@ describe("interaccion — citas", () => {
     expect(estado.cita.estado).toBe("SOLICITADA");
     expect(estado.cita.origen).toBe("SOLICITADA_POR_REPRESENTANTE");
     expect(estado.bloque?.estado).toBe("RESERVADO");
+    const [aviso] = await e.docente.query(api.interaccion.misNotificaciones);
+    expect(aviso.cuerpo).toBe("La familia de Ana Pérez pidió una cita para el jueves 10 de septiembre a las 12:30.");
   });
 
   it("un representante sin vinculo no puede reservar para ese estudiante", async () => {
@@ -253,6 +256,755 @@ describe("interaccion — citas", () => {
     }));
     expect(estado.cita?.estado).toBe("RECHAZADA");
     expect(estado.bloque?.estado).toBe("DISPONIBLE");
+  });
+});
+
+describe("interaccion — recordatorios de cita", () => {
+  // AHORA es lunes 7 a las 10:00 de Guayaquil. La cita, jueves 10 a las 12:30.
+  const INICIO = new Date("2026-09-10T12:30:00-05:00").getTime();
+  const VISPERA = new Date("2026-09-09T19:00:00-05:00").getTime();
+  const UNA_HORA_ANTES = new Date("2026-09-10T11:30:00-05:00").getTime();
+
+  async function citaConfirmada(t: ReturnType<typeof convexTest>, lugarOEnlace?: string) {
+    const e = await sembrarEscenario(t);
+    const bloqueId = await e.docente.mutation(api.interaccion.publicarDisponibilidad, {
+      fecha: "2026-09-10", horaInicio: "12:30", horaFin: "12:45", lugarOEnlace,
+    });
+    const citaId = await e.representante.mutation(api.interaccion.solicitarCita, {
+      disponibilidadDocenteId: bloqueId, estudianteId: e.estudianteId,
+    });
+    await e.docente.mutation(api.interaccion.responderCita, { citaId, aceptar: true });
+    return { e, citaId };
+  }
+
+  const recordatorios = async (e: Awaited<ReturnType<typeof sembrarEscenario>>) => ({
+    representante: (await e.representante.query(api.interaccion.misNotificaciones))
+      .filter((n) => n.tipo === "RECORDATORIO_CITA"),
+    docente: (await e.docente.query(api.interaccion.misNotificaciones))
+      .filter((n) => n.tipo === "RECORDATORIO_CITA"),
+  });
+
+  it("la víspera se avisa a las 19:00 y el otro aviso una hora antes", async () => {
+    expect(momentosDeRecordatorio(INICIO, AHORA.getTime())).toEqual([
+      { momento: "VISPERA", en: VISPERA },
+      { momento: "UNA_HORA", en: UNA_HORA_ANTES },
+    ]);
+    // Confirmada a las 21:00 de la víspera: ya no tiene sentido avisar "mañana".
+    const tarde = new Date("2026-09-09T21:00:00-05:00").getTime();
+    expect(momentosDeRecordatorio(INICIO, tarde)).toEqual([{ momento: "UNA_HORA", en: UNA_HORA_ANTES }]);
+    // Confirmada con menos de una hora de margen: ninguno.
+    expect(momentosDeRecordatorio(INICIO, UNA_HORA_ANTES + 1)).toEqual([]);
+  });
+
+  it("confirmar programa los dos recordatorios", async () => {
+    const t = convexTest(schema, modules);
+    const { citaId } = await citaConfirmada(t);
+    const tareas = (await t.run((ctx) => ctx.db.system.query("_scheduled_functions").collect()))
+      .filter((p) => p.name === "interaccion:recordarCita");
+    expect(tareas.map((p) => p.scheduledTime).sort()).toEqual([VISPERA, UNA_HORA_ANTES]);
+    expect(tareas[0].args[0]).toMatchObject({ citaId, fechaHoraInicio: INICIO });
+  });
+
+  it("rechazar no programa ningún recordatorio", async () => {
+    const t = convexTest(schema, modules);
+    const e = await sembrarEscenario(t);
+    const bloqueId = await e.docente.mutation(api.interaccion.publicarDisponibilidad, {
+      fecha: "2026-09-10", horaInicio: "12:30", horaFin: "12:45",
+    });
+    const citaId = await e.representante.mutation(api.interaccion.solicitarCita, {
+      disponibilidadDocenteId: bloqueId, estudianteId: e.estudianteId,
+    });
+    await e.docente.mutation(api.interaccion.responderCita, { citaId, aceptar: false });
+    const tareas = await t.run((ctx) => ctx.db.system.query("_scheduled_functions").collect());
+    expect(tareas.some((p) => p.name === "interaccion:recordarCita")).toBe(false);
+  });
+
+  it("a su hora, avisa a los dos con el estudiante, la hora y el lugar", async () => {
+    const t = convexTest(schema, modules);
+    const { e } = await citaConfirmada(t, "Aula 5B");
+    await terminarTareas(t);
+    const { representante, docente } = await recordatorios(e);
+    expect(representante.map((n) => n.titulo).sort()).toEqual(["Tu cita es en una hora", "Tu cita es mañana"]);
+    expect(docente).toHaveLength(2);
+    expect(representante[0].cuerpo).toBe(
+      "Con el docente de Ana Pérez. A las 12:30, presencial. Lugar o enlace: Aula 5B.",
+    );
+    expect(docente[0].cuerpo).toContain("Con el representante de Ana Pérez.");
+    expect(representante[0]).toMatchObject({ entidadTipo: "cita" });
+  });
+
+  it.each(["CANCELADA", "ATENDIDA", "NO_ASISTIO"] as const)("una cita %s no recuerda nada", async (estado) => {
+    const t = convexTest(schema, modules);
+    const { e, citaId } = await citaConfirmada(t);
+    await t.run((ctx) => ctx.db.patch(citaId, { estado }));
+    await terminarTareas(t);
+    expect(await recordatorios(e)).toEqual({ representante: [], docente: [] });
+  });
+
+  it("si la cita cambió de hora, el recordatorio viejo no sale", async () => {
+    const t = convexTest(schema, modules);
+    const { e, citaId } = await citaConfirmada(t);
+    await t.run((ctx) => ctx.db.patch(citaId, { fechaHoraInicio: INICIO + DIA, fechaHoraFin: INICIO + DIA + 15 * 60_000 }));
+    vi.setSystemTime(VISPERA);
+    expect(await t.mutation(internal.interaccion.recordarCita, {
+      citaId, fechaHoraInicio: INICIO, momento: "VISPERA",
+    })).toBe(false);
+    expect((await recordatorios(e)).representante).toHaveLength(0);
+  });
+});
+
+/** Un bloque de 15 minutos del docente, el jueves 10 a las 12:30. */
+async function bloqueDelDocente(e: Awaited<ReturnType<typeof sembrarEscenario>>, lugarOEnlace?: string) {
+  return await e.docente.mutation(api.interaccion.publicarDisponibilidad, {
+    fecha: "2026-09-10", horaInicio: "12:30", horaFin: "12:45", lugarOEnlace,
+  });
+}
+
+type Cliente = ReturnType<ReturnType<typeof convexTest>["withIdentity"]>;
+const avisosDe = (quien: Cliente) => quien.query(api.interaccion.misNotificaciones);
+
+describe("interaccion — citación del docente", () => {
+  const INICIO = new Date("2026-09-10T12:30:00-05:00").getTime();
+
+  it("nace SOLICITADA, reserva el bloque y le avisa a la familia con fecha y motivo", async () => {
+    const t = convexTest(schema, modules);
+    const e = await sembrarEscenario(t);
+    const bloqueId = await bloqueDelDocente(e);
+    const citaId = await e.docente.mutation(api.interaccion.citarFamilia, {
+      disponibilidadDocenteId: bloqueId, estudianteId: e.estudianteId, motivo: "  Conversar sobre las tareas  ",
+    });
+
+    const { cita, bloque } = await t.run(async (ctx) => ({
+      cita: await ctx.db.get(citaId), bloque: await ctx.db.get(bloqueId),
+    }));
+    expect(cita).toMatchObject({
+      origen: "CITACION_DOCENTE", estado: "SOLICITADA", motivo: "Conversar sobre las tareas",
+      representanteId: e.representanteId, fechaHoraInicio: INICIO,
+    });
+    expect(bloque?.estado).toBe("RESERVADO");
+    const [aviso] = await avisosDe(e.representante);
+    expect(aviso.titulo).toBe("El docente te citó");
+    expect(aviso.cuerpo).toBe(
+      "Por Ana Pérez: jueves 10 de septiembre a las 12:30, presencial. " +
+        "Motivo: Conversar sobre las tareas. Confírmale en Cresco si puedes asistir.",
+    );
+  });
+
+  it("sin motivo no se cita", async () => {
+    const t = convexTest(schema, modules);
+    const e = await sembrarEscenario(t);
+    const bloqueId = await bloqueDelDocente(e);
+    await expect(e.docente.mutation(api.interaccion.citarFamilia, {
+      disponibilidadDocenteId: bloqueId, estudianteId: e.estudianteId, motivo: "   ",
+    })).rejects.toThrow("El motivo de la citación es obligatorio");
+  });
+
+  it("un docente de otro curso no puede citar a esa familia", async () => {
+    const t = convexTest(schema, modules);
+    const e = await sembrarEscenario(t);
+    const bloqueId = await bloqueDelDocente(e);
+    await t.run(async (ctx) => {
+      const perfil = await ctx.db.insert("perfilUsuario", {
+        authSubject: "https://convex.test|docente_2", tipoDocumento: "CEDULA", numeroDocumento: "0900000009",
+        actualizadoEn: Date.now(),
+      });
+      await ctx.db.insert("docente", { perfilUsuarioId: perfil, actualizadoEn: Date.now() });
+    });
+    await expect(t.withIdentity({ subject: "docente_2" }).mutation(api.interaccion.citarFamilia, {
+      disponibilidadDocenteId: bloqueId, estudianteId: e.estudianteId, motivo: "Hablar",
+    })).rejects.toThrow("no pertenece a un curso tuyo");
+  });
+
+  it("sin representante vinculado lo dice, en vez de citar a nadie", async () => {
+    const t = convexTest(schema, modules);
+    const e = await sembrarEscenario(t);
+    const bloqueId = await bloqueDelDocente(e);
+    await t.run(async (ctx) => {
+      const vinculos = await ctx.db.query("vinculoRepresentacion").collect();
+      for (const vinculo of vinculos) await ctx.db.patch(vinculo._id, { estado: "REVOCADO" });
+    });
+    await expect(e.docente.mutation(api.interaccion.citarFamilia, {
+      disponibilidadDocenteId: bloqueId, estudianteId: e.estudianteId, motivo: "Hablar",
+    })).rejects.toThrow("todavía no tiene un representante");
+    expect((await t.run((ctx) => ctx.db.get(bloqueId)))?.estado).toBe("DISPONIBLE");
+  });
+
+  it("el docente no puede confirmarla en nombre de la familia", async () => {
+    const t = convexTest(schema, modules);
+    const e = await sembrarEscenario(t);
+    const citaId = await e.docente.mutation(api.interaccion.citarFamilia, {
+      disponibilidadDocenteId: await bloqueDelDocente(e), estudianteId: e.estudianteId, motivo: "Hablar",
+    });
+    await expect(e.docente.mutation(api.interaccion.responderCita, { citaId, aceptar: true }))
+      .rejects.toThrow("Esa citación la confirma la familia");
+  });
+
+  it("la familia confirma: queda CONFIRMADA, con recordatorios, y el docente se entera", async () => {
+    const t = convexTest(schema, modules);
+    const e = await sembrarEscenario(t);
+    const citaId = await e.docente.mutation(api.interaccion.citarFamilia, {
+      disponibilidadDocenteId: await bloqueDelDocente(e), estudianteId: e.estudianteId, motivo: "Hablar",
+    });
+    await e.representante.mutation(api.interaccion.responderCitacion, { citaId, asistira: true });
+
+    expect((await t.run((ctx) => ctx.db.get(citaId)))?.estado).toBe("CONFIRMADA");
+    const tareas = await t.run((ctx) => ctx.db.system.query("_scheduled_functions").collect());
+    expect(tareas.filter((p) => p.name === "interaccion:recordarCita")).toHaveLength(2);
+    const avisos = await avisosDe(e.docente);
+    expect(avisos.map((n) => n.titulo)).toContain("La familia confirmó la citación");
+  });
+
+  it("la familia declina con un mensaje: el bloque se libera y el docente lo lee", async () => {
+    const t = convexTest(schema, modules);
+    const e = await sembrarEscenario(t);
+    const bloqueId = await bloqueDelDocente(e);
+    const citaId = await e.docente.mutation(api.interaccion.citarFamilia, {
+      disponibilidadDocenteId: bloqueId, estudianteId: e.estudianteId, motivo: "Hablar",
+    });
+    await expect(e.representante.mutation(api.interaccion.responderCitacion, { citaId, asistira: false }))
+      .rejects.toThrow("El mensaje para el docente es obligatorio");
+
+    await e.representante.mutation(api.interaccion.responderCitacion, {
+      citaId, asistira: false, mensaje: "Trabajo a esa hora, ¿puede ser el viernes?",
+    });
+    const { cita, bloque } = await t.run(async (ctx) => ({
+      cita: await ctx.db.get(citaId), bloque: await ctx.db.get(bloqueId),
+    }));
+    expect(cita).toMatchObject({ estado: "RECHAZADA", mensajeRepresentante: "Trabajo a esa hora, ¿puede ser el viernes?" });
+    expect(bloque?.estado).toBe("DISPONIBLE");
+    const aviso = (await avisosDe(e.docente)).find((n) => n.titulo === "La familia no puede asistir a la citación");
+    expect(aviso?.cuerpo).toBe(
+      'Ana Pérez, jueves 10 de septiembre a las 12:30. Escribió: "Trabajo a esa hora, ¿puede ser el viernes?"',
+    );
+  });
+
+  it("una cita que pidió la familia no se responde como citación", async () => {
+    const t = convexTest(schema, modules);
+    const e = await sembrarEscenario(t);
+    const citaId = await e.representante.mutation(api.interaccion.solicitarCita, {
+      disponibilidadDocenteId: await bloqueDelDocente(e), estudianteId: e.estudianteId,
+    });
+    await expect(e.representante.mutation(api.interaccion.responderCitacion, { citaId, asistira: true }))
+      .rejects.toThrow("Esa cita la confirma el docente");
+  });
+
+  it("el docente ve sus bloques libres para elegir, y el citado deja de estarlo", async () => {
+    const t = convexTest(schema, modules);
+    const e = await sembrarEscenario(t);
+    await e.docente.mutation(api.interaccion.publicarDisponibilidad, {
+      fecha: "2026-09-10", horaInicio: "12:30", horaFin: "13:00",
+    });
+    const libres = await e.docente.query(api.interaccion.misBloquesLibres, { desde: "2026-09-07" });
+    expect(libres.map((b) => b.horaInicio)).toEqual(["12:30", "12:45"]);
+    await e.docente.mutation(api.interaccion.citarFamilia, {
+      disponibilidadDocenteId: libres[0].id, estudianteId: e.estudianteId, motivo: "Hablar",
+    });
+    const despues = await e.docente.query(api.interaccion.misBloquesLibres, { desde: "2026-09-07" });
+    expect(despues.map((b) => b.horaInicio)).toEqual(["12:45"]);
+  });
+
+  it("una citación sin respuesta se recuerda la víspera a las 19:00, o dos horas antes si ya es tarde", () => {
+    const VISPERA = new Date("2026-09-09T19:00:00-05:00").getTime();
+    expect(momentoRecordatorioCitacion(INICIO, AHORA.getTime())).toBe(VISPERA);
+    // Enviada el miércoles a las 20:00: la víspera ya pasó.
+    expect(momentoRecordatorioCitacion(INICIO, new Date("2026-09-09T20:00:00-05:00").getTime()))
+      .toBe(new Date("2026-09-10T10:30:00-05:00").getTime());
+    // Enviada con menos de dos horas de margen: no hay recordatorio que valga.
+    expect(momentoRecordatorioCitacion(INICIO, new Date("2026-09-10T11:00:00-05:00").getTime())).toBeNull();
+  });
+
+  it("si la familia no respondió, la víspera se le recuerda a ella y se le avisa al docente", async () => {
+    const t = convexTest(schema, modules);
+    const e = await sembrarEscenario(t);
+    const citaId = await e.docente.mutation(api.interaccion.citarFamilia, {
+      disponibilidadDocenteId: await bloqueDelDocente(e), estudianteId: e.estudianteId, motivo: "Hablar",
+    });
+    const tareas = (await t.run((ctx) => ctx.db.system.query("_scheduled_functions").collect()))
+      .filter((p) => p.name === "interaccion:recordarCitacionSinRespuesta");
+    expect(tareas).toHaveLength(1);
+    expect(tareas[0].scheduledTime).toBe(new Date("2026-09-09T19:00:00-05:00").getTime());
+
+    vi.setSystemTime(tareas[0].scheduledTime);
+    expect(await t.mutation(internal.interaccion.recordarCitacionSinRespuesta, { citaId, fechaHoraInicio: INICIO })).toBe(true);
+    const aFamilia = (await avisosDe(e.representante)).find((n) => n.titulo === "Tienes una citación sin responder");
+    expect(aFamilia?.cuerpo).toBe("El docente de Ana Pérez te citó para mañana a las 12:30. Confírmale si puedes asistir.");
+    expect(aFamilia?.tipo).toBe("RECORDATORIO_CITA");
+    const alDocente = (await avisosDe(e.docente)).find((n) => n.titulo === "La familia todavía no responde");
+    expect(alDocente?.cuerpo).toBe("Ana Pérez: citación de mañana a las 12:30, sin respuesta. Se lo recordamos a la familia.");
+  });
+
+  it("enviada tarde, el recordatorio de dos horas antes dice 'hoy'", async () => {
+    vi.setSystemTime(new Date("2026-09-09T20:00:00-05:00"));
+    const t = convexTest(schema, modules);
+    const e = await sembrarEscenario(t);
+    const citaId = await e.docente.mutation(api.interaccion.citarFamilia, {
+      disponibilidadDocenteId: await bloqueDelDocente(e), estudianteId: e.estudianteId, motivo: "Hablar",
+    });
+    vi.setSystemTime(new Date("2026-09-10T10:30:00-05:00"));
+    await t.mutation(internal.interaccion.recordarCitacionSinRespuesta, { citaId, fechaHoraInicio: INICIO });
+    const aviso = (await avisosDe(e.representante)).find((n) => n.titulo === "Tienes una citación sin responder");
+    expect(aviso?.cuerpo).toContain("te citó para hoy a las 12:30");
+  });
+
+  it.each([
+    ["la familia ya confirmó", "confirmar"],
+    ["la familia ya dijo que no puede", "declinar"],
+    ["el docente la retiró", "retirar"],
+  ] as const)("si %s, no se recuerda nada", async (_caso, accion) => {
+    const t = convexTest(schema, modules);
+    const e = await sembrarEscenario(t);
+    const citaId = await e.docente.mutation(api.interaccion.citarFamilia, {
+      disponibilidadDocenteId: await bloqueDelDocente(e), estudianteId: e.estudianteId, motivo: "Hablar",
+    });
+    if (accion === "confirmar") {
+      await e.representante.mutation(api.interaccion.responderCitacion, { citaId, asistira: true });
+    } else if (accion === "declinar") {
+      await e.representante.mutation(api.interaccion.responderCitacion, { citaId, asistira: false, mensaje: "No puedo" });
+    } else {
+      await e.docente.mutation(api.interaccion.cancelarCita, { citaId, como: "DOCENTE", motivo: "Ya no hace falta" });
+    }
+    await terminarTareas(t);
+    const avisos = [...await avisosDe(e.representante), ...await avisosDe(e.docente)];
+    expect(avisos.map((n) => n.titulo)).not.toContain("Tienes una citación sin responder");
+    expect(avisos.map((n) => n.titulo)).not.toContain("La familia todavía no responde");
+  });
+
+  it("las agendas traen el nombre del estudiante y el lugar del bloque", async () => {
+    const t = convexTest(schema, modules);
+    const e = await sembrarEscenario(t);
+    await e.docente.mutation(api.interaccion.citarFamilia, {
+      disponibilidadDocenteId: await bloqueDelDocente(e, "Aula 5B"), estudianteId: e.estudianteId, motivo: "Hablar",
+    });
+    const [delDocente] = await e.docente.query(api.interaccion.misCitasDocente);
+    const [deLaFamilia] = await e.representante.query(api.interaccion.misCitasRepresentante);
+    expect(delDocente).toMatchObject({ estudianteNombre: "Ana Pérez", lugarOEnlace: "Aula 5B" });
+    expect(deLaFamilia).toMatchObject({ estudianteNombre: "Ana Pérez", lugarOEnlace: "Aula 5B", origen: "CITACION_DOCENTE" });
+  });
+});
+
+describe("interaccion — cancelar una cita y registrar si la familia vino", () => {
+  const INICIO = new Date("2026-09-10T12:30:00-05:00").getTime();
+
+  async function citaConfirmada(t: ReturnType<typeof convexTest>) {
+    const e = await sembrarEscenario(t);
+    const bloqueId = await bloqueDelDocente(e);
+    const citaId = await e.representante.mutation(api.interaccion.solicitarCita, {
+      disponibilidadDocenteId: bloqueId, estudianteId: e.estudianteId,
+    });
+    await e.docente.mutation(api.interaccion.responderCita, { citaId, aceptar: true });
+    return { e, citaId, bloqueId };
+  }
+
+  it("si cancela la familia, el bloque vuelve a ofrecerse y el docente recibe el motivo", async () => {
+    const t = convexTest(schema, modules);
+    const { e, citaId, bloqueId } = await citaConfirmada(t);
+    await e.representante.mutation(api.interaccion.cancelarCita, {
+      citaId, como: "REPRESENTANTE", motivo: "Ana está enferma",
+    });
+    const { cita, bloque } = await t.run(async (ctx) => ({
+      cita: await ctx.db.get(citaId), bloque: await ctx.db.get(bloqueId),
+    }));
+    expect(cita).toMatchObject({ estado: "CANCELADA", canceladaPor: "REPRESENTANTE", motivoCancelacion: "Ana está enferma" });
+    expect(bloque?.estado).toBe("DISPONIBLE");
+    const aviso = (await avisosDe(e.docente)).find((n) => n.titulo === "La familia canceló la cita");
+    expect(aviso?.cuerpo).toBe("Ana Pérez, jueves 10 de septiembre a las 12:30. Motivo: Ana está enferma");
+  });
+
+  it("si cancela el docente, el bloque no se reofrece pero la franja se puede volver a publicar", async () => {
+    const t = convexTest(schema, modules);
+    const { e, citaId, bloqueId } = await citaConfirmada(t);
+    await e.docente.mutation(api.interaccion.cancelarCita, {
+      citaId, como: "DOCENTE", motivo: "Tengo junta de área",
+    });
+    expect((await t.run((ctx) => ctx.db.get(bloqueId)))?.estado).toBe("CANCELADO");
+    expect(await e.representante.query(api.interaccion.bloquesDisponibles, {
+      estudianteId: e.estudianteId, desde: "2026-09-07",
+    })).toEqual([]);
+    const avisos = await avisosDe(e.representante);
+    expect(avisos.map((n) => n.titulo)).toContain("El docente canceló la cita");
+    // Si el docente vuelve a estar libre a esa hora, publica la franja otra vez.
+    await expect(bloqueDelDocente(e)).resolves.toBeDefined();
+  });
+
+  it("cancelar exige motivo, y solo puede hacerlo alguna de las dos partes", async () => {
+    const t = convexTest(schema, modules);
+    const { e, citaId } = await citaConfirmada(t);
+    await expect(e.representante.mutation(api.interaccion.cancelarCita, {
+      citaId, como: "REPRESENTANTE", motivo: " ",
+    })).rejects.toThrow("El motivo de la cancelación es obligatorio");
+
+    await t.run(async (ctx) => {
+      const perfil = await ctx.db.insert("perfilUsuario", {
+        authSubject: "https://convex.test|rep_2", tipoDocumento: "CEDULA", numeroDocumento: "0900000003",
+        actualizadoEn: Date.now(),
+      });
+      await ctx.db.insert("representante", { perfilUsuarioId: perfil, actualizadoEn: Date.now() });
+    });
+    await expect(t.withIdentity({ subject: "rep_2" }).mutation(api.interaccion.cancelarCita, {
+      citaId, como: "REPRESENTANTE", motivo: "No",
+    })).rejects.toThrow("Esa cita no es tuya");
+  });
+
+  it("cancelar apaga los recordatorios ya programados", async () => {
+    const t = convexTest(schema, modules);
+    const { e, citaId } = await citaConfirmada(t);
+    await e.docente.mutation(api.interaccion.cancelarCita, { citaId, como: "DOCENTE", motivo: "Junta" });
+    await terminarTareas(t);
+    const avisos = await avisosDe(e.representante);
+    expect(avisos.filter((n) => n.tipo === "RECORDATORIO_CITA")).toEqual([]);
+  });
+
+  it("una cita que ya empezó no se cancela: se registra", async () => {
+    const t = convexTest(schema, modules);
+    const { e, citaId } = await citaConfirmada(t);
+    vi.setSystemTime(INICIO + 60_000);
+    await expect(e.docente.mutation(api.interaccion.cancelarCita, {
+      citaId, como: "DOCENTE", motivo: "Tarde",
+    })).rejects.toThrow("Registra si la familia asistió");
+  });
+
+  it("la asistencia no se registra antes de la hora", async () => {
+    const t = convexTest(schema, modules);
+    const { e, citaId } = await citaConfirmada(t);
+    await expect(e.docente.mutation(api.interaccion.registrarAsistenciaCita, { citaId, asistio: false }))
+      .rejects.toThrow("todavía no empieza");
+  });
+
+  it("un 'no asistió' se le avisa a la familia; un 'asistió' no hace ruido", async () => {
+    const t = convexTest(schema, modules);
+    const primera = await citaConfirmada(t);
+    vi.setSystemTime(INICIO + 20 * 60_000);
+    const antes = (await avisosDe(primera.e.representante)).length;
+
+    await primera.e.docente.mutation(api.interaccion.registrarAsistenciaCita, { citaId: primera.citaId, asistio: false });
+    expect((await t.run((ctx) => ctx.db.get(primera.citaId)))?.estado).toBe("NO_ASISTIO");
+    const avisos = await avisosDe(primera.e.representante);
+    expect(avisos).toHaveLength(antes + 1);
+    expect(avisos.find((n) => n.titulo === "Quedó registrado que no asististe")?.cuerpo).toBe(
+      "A la cita por Ana Pérez del jueves 10 de septiembre a las 12:30. Si hubo un error, conversa con el docente.",
+    );
+    await expect(primera.e.docente.mutation(api.interaccion.registrarAsistenciaCita, { citaId: primera.citaId, asistio: true }))
+      .rejects.toThrow("Ya registraste esta cita");
+
+    vi.setSystemTime(AHORA);
+    const t2 = convexTest(schema, modules);
+    const segunda = await citaConfirmada(t2);
+    vi.setSystemTime(INICIO + 20 * 60_000);
+    const antes2 = (await avisosDe(segunda.e.representante)).length;
+    await segunda.e.docente.mutation(api.interaccion.registrarAsistenciaCita, { citaId: segunda.citaId, asistio: true });
+    expect((await t2.run((ctx) => ctx.db.get(segunda.citaId)))?.estado).toBe("ATENDIDA");
+    expect(await avisosDe(segunda.e.representante)).toHaveLength(antes2);
+  });
+
+  it("los acuerdos de una reunión atendida llegan a la familia y quedan en la cita", async () => {
+    const t = convexTest(schema, modules);
+    const { e, citaId } = await citaConfirmada(t);
+    vi.setSystemTime(INICIO + 20 * 60_000);
+    await e.docente.mutation(api.interaccion.registrarAsistenciaCita, { citaId, asistio: true });
+    await e.docente.mutation(api.interaccion.anotarAcuerdos, {
+      citaId, acuerdos: "  Revisar la agenda cada noche; volver a conversar en dos semanas.  ",
+    });
+
+    expect((await t.run((ctx) => ctx.db.get(citaId)))?.acuerdos)
+      .toBe("Revisar la agenda cada noche; volver a conversar en dos semanas.");
+    const aviso = (await avisosDe(e.representante)).find((n) => n.titulo === "Acuerdos de la reunión");
+    expect(aviso?.cuerpo).toBe(
+      "Reunión por Ana Pérez del jueves 10 de septiembre a las 12:30: " +
+        "Revisar la agenda cada noche; volver a conversar en dos semanas.",
+    );
+    const [deLaFamilia] = await e.representante.query(api.interaccion.misCitasRepresentante);
+    expect(deLaFamilia.acuerdos).toBe("Revisar la agenda cada noche; volver a conversar en dos semanas.");
+  });
+
+  it("los acuerdos se anotan una sola vez, y no vacíos", async () => {
+    const t = convexTest(schema, modules);
+    const { e, citaId } = await citaConfirmada(t);
+    vi.setSystemTime(INICIO + 20 * 60_000);
+    await e.docente.mutation(api.interaccion.registrarAsistenciaCita, { citaId, asistio: true });
+    await expect(e.docente.mutation(api.interaccion.anotarAcuerdos, { citaId, acuerdos: "  " }))
+      .rejects.toThrow("Lo que acordaron es obligatorio");
+    await e.docente.mutation(api.interaccion.anotarAcuerdos, { citaId, acuerdos: "Primera versión" });
+    await expect(e.docente.mutation(api.interaccion.anotarAcuerdos, { citaId, acuerdos: "Otra versión" }))
+      .rejects.toThrow("ya quedaron registrados");
+    expect((await t.run((ctx) => ctx.db.get(citaId)))?.acuerdos).toBe("Primera versión");
+  });
+
+  it("no hay acuerdos de una reunión que no ocurrió", async () => {
+    const t = convexTest(schema, modules);
+    const { e, citaId } = await citaConfirmada(t);
+    await expect(e.docente.mutation(api.interaccion.anotarAcuerdos, { citaId, acuerdos: "Algo" }))
+      .rejects.toThrow("a la que la familia asistió");
+    vi.setSystemTime(INICIO + 20 * 60_000);
+    await e.docente.mutation(api.interaccion.registrarAsistenciaCita, { citaId, asistio: false });
+    await expect(e.docente.mutation(api.interaccion.anotarAcuerdos, { citaId, acuerdos: "Algo" }))
+      .rejects.toThrow("a la que la familia asistió");
+  });
+
+  it("otro docente no anota acuerdos en una cita ajena", async () => {
+    const t = convexTest(schema, modules);
+    const { e, citaId } = await citaConfirmada(t);
+    vi.setSystemTime(INICIO + 20 * 60_000);
+    await e.docente.mutation(api.interaccion.registrarAsistenciaCita, { citaId, asistio: true });
+    await t.run(async (ctx) => {
+      const perfil = await ctx.db.insert("perfilUsuario", {
+        authSubject: "https://convex.test|docente_2", tipoDocumento: "CEDULA", numeroDocumento: "0900000009",
+        actualizadoEn: Date.now(),
+      });
+      await ctx.db.insert("docente", { perfilUsuarioId: perfil, actualizadoEn: Date.now() });
+    });
+    await expect(t.withIdentity({ subject: "docente_2" }).mutation(api.interaccion.anotarAcuerdos, {
+      citaId, acuerdos: "Algo",
+    })).rejects.toThrow("Esa cita no es tuya");
+  });
+
+  it("cada aviso de cita trae el curso de la cita; los que no son de citas, ninguno", async () => {
+    const t = convexTest(schema, modules);
+    const { e } = await citaConfirmada(t);
+    await abrirReclamo(t, e);
+    const avisos = await avisosDe(e.docente);
+    const deCita = avisos.filter((n) => n.entidadTipo === "cita");
+    const otros = avisos.filter((n) => n.entidadTipo !== "cita");
+    expect(deCita.length).toBeGreaterThan(0);
+    expect(deCita.every((n) => n.cursoId === e.cursoId)).toBe(true);
+    expect(otros.length).toBeGreaterThan(0);
+    expect(otros.every((n) => n.cursoId === null)).toBe(true);
+  });
+
+  it("el docente no confirma una solicitud cuya hora ya pasó", async () => {
+    const t = convexTest(schema, modules);
+    const e = await sembrarEscenario(t);
+    const citaId = await e.representante.mutation(api.interaccion.solicitarCita, {
+      disponibilidadDocenteId: await bloqueDelDocente(e), estudianteId: e.estudianteId,
+    });
+    vi.setSystemTime(INICIO + 60_000);
+    await expect(e.docente.mutation(api.interaccion.responderCita, { citaId, aceptar: true }))
+      .rejects.toThrow("Esa cita ya pasó");
+  });
+});
+
+describe("interaccion — historial de la familia", () => {
+  const INICIO = new Date("2026-09-10T12:30:00-05:00").getTime();
+
+  /** Dos avisos del curso (uno visto) y dos reportes (uno abierto). */
+  async function sembrarAvisosYReportes(t: ReturnType<typeof convexTest>, e: Awaited<ReturnType<typeof sembrarEscenario>>) {
+    await t.run(async (ctx) => {
+      const aviso = (titulo: string) => ctx.db.insert("comunicadoCurso", {
+        cursoId: e.cursoId, tipo: "NOTA_PROFESOR", alcance: "CURSO", titulo, contenido: "Texto",
+        visibleDesde: "2026-09-07", visibleHasta: "2026-09-08", creadoPorDocenteId: e.docenteId,
+        activo: true, actualizadoEn: Date.now(),
+      });
+      const visto = await aviso("Reunión de padres");
+      await aviso("Traer materiales");
+      await ctx.db.insert("vistaComunicado", {
+        comunicadoCursoId: visto, representanteId: e.representanteId, estudianteId: e.estudianteId, vistoEn: Date.now(),
+      });
+      for (const [fecha, abierto] of [["2026-09-07", true], ["2026-09-08", false]] as const) {
+        const reporte = await ctx.db.insert("reporteEstudiante", {
+          matriculaId: e.matriculaId, periodoAcademicoId: e.periodoAcademicoId, fecha,
+          tieneNovedades: false, puntajeAlCierre: 60, generadoEn: Date.now(),
+        });
+        await ctx.db.insert("entregaReporte", {
+          reporteEstudianteId: reporte, representanteId: e.representanteId, entregadoEn: Date.now(),
+          ...(abierto ? { leidoEn: Date.now() } : {}),
+        });
+      }
+    });
+  }
+
+  it("junta las citas con este docente, los avisos que vio, los reportes que abrió y sus reclamos", async () => {
+    const t = convexTest(schema, modules);
+    const e = await sembrarEscenario(t);
+    // Una citación a la que la familia fue, con sus acuerdos...
+    const citacion = await e.docente.mutation(api.interaccion.citarFamilia, {
+      disponibilidadDocenteId: await bloqueDelDocente(e), estudianteId: e.estudianteId, motivo: "Hablar de las tareas",
+    });
+    await e.representante.mutation(api.interaccion.responderCitacion, { citaId: citacion, asistira: true });
+    // ...y una cita que pidió la familia y el docente no pudo aceptar.
+    const otroBloque = await e.docente.mutation(api.interaccion.publicarDisponibilidad, {
+      fecha: "2026-09-10", horaInicio: "12:45", horaFin: "13:00",
+    });
+    const pedida = await e.representante.mutation(api.interaccion.solicitarCita, {
+      disponibilidadDocenteId: otroBloque, estudianteId: e.estudianteId,
+    });
+    await e.docente.mutation(api.interaccion.responderCita, { citaId: pedida, aceptar: false });
+    await sembrarAvisosYReportes(t, e);
+    await abrirReclamo(t, e);
+    vi.setSystemTime(INICIO + 20 * 60_000);
+    await e.docente.mutation(api.interaccion.registrarAsistenciaCita, { citaId: citacion, asistio: true });
+    await e.docente.mutation(api.interaccion.anotarAcuerdos, { citaId: citacion, acuerdos: "Revisar la agenda" });
+
+    const historial = await e.docente.query(api.interaccion.historialDeLaFamilia, { estudianteId: e.estudianteId });
+    expect(historial).toMatchObject({
+      estudiante: "Ana Pérez",
+      // El perfil del representante de prueba no tiene nombres: se dice así, sin inventar uno.
+      representante: { nombre: null },
+      reportes: { entregados: 2, abiertos: 1 },
+      reclamos: { total: 1, sinResolver: 1 },
+    });
+    expect(historial.citas.map((c) => [c.origen, c.estado])).toEqual([
+      ["SOLICITADA_POR_REPRESENTANTE", "RECHAZADA"],
+      ["CITACION_DOCENTE", "ATENDIDA"],
+    ]);
+    expect(historial.citas[1]).toMatchObject({ acuerdos: "Revisar la agenda", estudianteNombre: "Ana Pérez" });
+    expect(historial.avisos.map((a) => [a.titulo, a.visto])).toEqual([
+      ["Traer materiales", false],
+      ["Reunión de padres", true],
+    ]);
+  });
+
+  it("sin representante vinculado lo dice, y no cuenta nada como visto ni abierto", async () => {
+    const t = convexTest(schema, modules);
+    const e = await sembrarEscenario(t);
+    await sembrarAvisosYReportes(t, e);
+    await t.run(async (ctx) => {
+      for (const vinculo of await ctx.db.query("vinculoRepresentacion").collect()) {
+        await ctx.db.patch(vinculo._id, { estado: "REVOCADO" });
+      }
+    });
+    const historial = await e.docente.query(api.interaccion.historialDeLaFamilia, { estudianteId: e.estudianteId });
+    expect(historial.representante).toBeNull();
+    expect(historial.avisos.every((a) => !a.visto)).toBe(true);
+    expect(historial.reportes).toEqual({ entregados: 0, abiertos: 0 });
+  });
+
+  it("las citas que la familia tiene con otro docente del curso no entran", async () => {
+    const t = convexTest(schema, modules);
+    const e = await sembrarEscenario(t);
+    await t.run(async (ctx) => {
+      const perfil = await ctx.db.insert("perfilUsuario", {
+        authSubject: "https://convex.test|docente_2", tipoDocumento: "CEDULA", numeroDocumento: "0900000009",
+        actualizadoEn: Date.now(),
+      });
+      const docenteId = await ctx.db.insert("docente", { perfilUsuarioId: perfil, actualizadoEn: Date.now() });
+      await ctx.db.insert("asignacionDocente", {
+        cursoId: e.cursoId, docenteId, rol: "COLABORADOR", vigenteDesde: "2026-05-04", actualizadoEn: Date.now(),
+      });
+    });
+    const colaborador = t.withIdentity({ subject: "docente_2" });
+    const bloque = await colaborador.mutation(api.interaccion.publicarDisponibilidad, {
+      fecha: "2026-09-10", horaInicio: "10:00", horaFin: "10:15",
+    });
+    await colaborador.mutation(api.interaccion.citarFamilia, {
+      disponibilidadDocenteId: bloque, estudianteId: e.estudianteId, motivo: "Tareas de inglés",
+    });
+    expect((await e.docente.query(api.interaccion.historialDeLaFamilia, { estudianteId: e.estudianteId })).citas).toEqual([]);
+    expect((await colaborador.query(api.interaccion.historialDeLaFamilia, { estudianteId: e.estudianteId })).citas).toHaveLength(1);
+  });
+
+  it("un docente sin ese curso no puede ver el historial", async () => {
+    const t = convexTest(schema, modules);
+    const e = await sembrarEscenario(t);
+    await t.run(async (ctx) => {
+      const perfil = await ctx.db.insert("perfilUsuario", {
+        authSubject: "https://convex.test|docente_3", tipoDocumento: "CEDULA", numeroDocumento: "0900000010",
+        actualizadoEn: Date.now(),
+      });
+      await ctx.db.insert("docente", { perfilUsuarioId: perfil, actualizadoEn: Date.now() });
+    });
+    await expect(t.withIdentity({ subject: "docente_3" }).query(api.interaccion.historialDeLaFamilia, {
+      estudianteId: e.estudianteId,
+    })).rejects.toThrow("no pertenece a un curso tuyo");
+  });
+});
+
+describe("interaccion — familias que no reciben avisos en el teléfono", () => {
+  const registrarTelefono = (e: Awaited<ReturnType<typeof sembrarEscenario>>) =>
+    e.representante.mutation(api.interaccion.registrarDispositivo, {
+      tokenPush: "ExponentPushToken[telefono-de-prueba]", plataforma: "ANDROID",
+    });
+
+  it("sin teléfono registrado aparece, y al registrar uno deja de aparecer", async () => {
+    const t = convexTest(schema, modules);
+    const e = await sembrarEscenario(t);
+    expect(await e.docente.query(api.interaccion.familiasSinAvisos, { cursoId: e.cursoId })).toEqual({
+      familias: 1, sinAvisos: [{ estudianteId: e.estudianteId, nombre: "Ana Pérez" }],
+    });
+    await registrarTelefono(e);
+    expect(await e.docente.query(api.interaccion.familiasSinAvisos, { cursoId: e.cursoId }))
+      .toEqual({ familias: 1, sinAvisos: [] });
+  });
+
+  it("un teléfono dado de baja vuelve a contar como sin avisos", async () => {
+    const t = convexTest(schema, modules);
+    const e = await sembrarEscenario(t);
+    await registrarTelefono(e);
+    // Lo que hace push.ts cuando Expo responde DeviceNotRegistered.
+    await t.run(async (ctx) => {
+      for (const d of await ctx.db.query("dispositivo").collect()) await ctx.db.patch(d._id, { activo: false });
+    });
+    const { sinAvisos } = await e.docente.query(api.interaccion.familiasSinAvisos, { cursoId: e.cursoId });
+    expect(sinAvisos.map((f) => f.nombre)).toEqual(["Ana Pérez"]);
+  });
+
+  it("un estudiante sin representante no es una familia a la que avisar", async () => {
+    const t = convexTest(schema, modules);
+    const e = await sembrarEscenario(t);
+    await t.run(async (ctx) => {
+      for (const vinculo of await ctx.db.query("vinculoRepresentacion").collect()) {
+        await ctx.db.patch(vinculo._id, { estado: "REVOCADO" });
+      }
+    });
+    expect(await e.docente.query(api.interaccion.familiasSinAvisos, { cursoId: e.cursoId }))
+      .toEqual({ familias: 0, sinAvisos: [] });
+  });
+
+  it("el historial de la familia también lo dice", async () => {
+    const t = convexTest(schema, modules);
+    const e = await sembrarEscenario(t);
+    const antes = await e.docente.query(api.interaccion.historialDeLaFamilia, { estudianteId: e.estudianteId });
+    expect(antes.representante?.recibeAvisos).toBe(false);
+    await registrarTelefono(e);
+    const despues = await e.docente.query(api.interaccion.historialDeLaFamilia, { estudianteId: e.estudianteId });
+    expect(despues.representante?.recibeAvisos).toBe(true);
+  });
+
+  it("solo el titular del curso ve a quién no le llegan los avisos", async () => {
+    const t = convexTest(schema, modules);
+    const e = await sembrarEscenario(t);
+    await t.run(async (ctx) => {
+      const perfil = await ctx.db.insert("perfilUsuario", {
+        authSubject: "https://convex.test|docente_4", tipoDocumento: "CEDULA", numeroDocumento: "0900000011",
+        actualizadoEn: Date.now(),
+      });
+      await ctx.db.insert("docente", { perfilUsuarioId: perfil, actualizadoEn: Date.now() });
+    });
+    await expect(t.withIdentity({ subject: "docente_4" }).query(api.interaccion.familiasSinAvisos, {
+      cursoId: e.cursoId,
+    })).rejects.toThrow("No eres el docente titular de este curso");
+  });
+});
+
+describe("interaccion — el docente sabe si la familia vio la citación", () => {
+  it("se marca la primera vez que la familia la tiene en pantalla, y el docente lo ve", async () => {
+    const t = convexTest(schema, modules);
+    const e = await sembrarEscenario(t);
+    const citaId = await e.docente.mutation(api.interaccion.citarFamilia, {
+      disponibilidadDocenteId: await bloqueDelDocente(e), estudianteId: e.estudianteId, motivo: "Hablar",
+    });
+    expect((await e.docente.query(api.interaccion.misCitasDocente))[0].vistaPorFamiliaEn).toBeUndefined();
+    expect(await e.representante.mutation(api.interaccion.marcarCitasVistas, { citaIds: [citaId] })).toBe(1);
+    const vista = (await e.docente.query(api.interaccion.misCitasDocente))[0].vistaPorFamiliaEn;
+    expect(vista).toBe(AHORA.getTime());
+    vi.setSystemTime(AHORA.getTime() + 60_000);
+    expect(await e.representante.mutation(api.interaccion.marcarCitasVistas, { citaIds: [citaId] })).toBe(0);
+    expect((await e.docente.query(api.interaccion.misCitasDocente))[0].vistaPorFamiliaEn).toBe(vista);
+  });
+
+  it("una cita que pidió la familia no se marca, ni la de otra familia", async () => {
+    const t = convexTest(schema, modules);
+    const e = await sembrarEscenario(t);
+    const pedida = await e.representante.mutation(api.interaccion.solicitarCita, {
+      disponibilidadDocenteId: await bloqueDelDocente(e), estudianteId: e.estudianteId,
+    });
+    expect(await e.representante.mutation(api.interaccion.marcarCitasVistas, { citaIds: [pedida] })).toBe(0);
+    await t.run(async (ctx) => {
+      const perfil = await ctx.db.insert("perfilUsuario", {
+        authSubject: "https://convex.test|rep_2", tipoDocumento: "CEDULA", numeroDocumento: "0900000003", actualizadoEn: Date.now(),
+      });
+      await ctx.db.insert("representante", { perfilUsuarioId: perfil, actualizadoEn: Date.now() });
+    });
+    await t.run((ctx) => ctx.db.patch(pedida, { origen: "CITACION_DOCENTE" }));
+    expect(await t.withIdentity({ subject: "rep_2" }).mutation(api.interaccion.marcarCitasVistas, { citaIds: [pedida] })).toBe(0);
   });
 });
 

@@ -176,7 +176,19 @@ async function exigirAccesoAlEstudiante(
  * mitad de la respuesta cuando un colegio pregunta quién vio a un menor.
  */
 export const registrarLecturaSensible = mutation({
-  args: { estudianteId: v.id("estudiante"), recurso: recursoSensible },
+  args: {
+    estudianteId: v.id("estudiante"),
+    recurso: recursoSensible,
+    /**
+     * Solo para REPORTE_ESTUDIANTE: el reporte concreto que se abrió. Con
+     * esto se marca `entregaReporte.leidoEn` -- el dato que alimenta
+     * `fraseDeLecturas` (QA del 27 de septiembre, "que la app sea un
+     * motivador para que los padres estén acompañando"). Antes de este
+     * cambio nada escribía ese campo: la columna existía desde DP-006 y se
+     * quedaba siempre vacía.
+     */
+    reporteEstudianteId: v.optional(v.id("reporteEstudiante")),
+  },
   handler: async (ctx, args) => {
     const { perfil, rol } = await exigirAccesoAlEstudiante(ctx, args.estudianteId, args.recurso);
     const estudiante = await ctx.db.get(args.estudianteId);
@@ -187,12 +199,16 @@ export const registrarLecturaSensible = mutation({
 
     const ahora = Date.now();
     const recientes = await eventosRecientes(ctx, perfil._id, ahora - VENTANA_LECTURA);
-    const yaRegistrada = recientes.some(
-      (evento) =>
-        evento.accion === "LEER_SENSIBLE" &&
-        evento.entidadId === args.estudianteId &&
-        (evento.datosDespues as { recurso?: string } | undefined)?.recurso === args.recurso,
-    );
+    // El id del reporte entra en la comparación: sin esto, abrir el reporte
+    // de ayer y luego el de hoy dentro de la misma ventana de 5 minutos
+    // contaba como "ya registrada" la segunda vez, y `entregaReporte.leidoEn`
+    // del segundo nunca se marcaba. Para el resto de los recursos (sin id)
+    // `undefined === undefined` deja el agrupado de siempre intacto.
+    const yaRegistrada = recientes.some((evento) => {
+      if (evento.accion !== "LEER_SENSIBLE" || evento.entidadId !== args.estudianteId) return false;
+      const datos = evento.datosDespues as { recurso?: string; reporteEstudianteId?: string } | undefined;
+      return datos?.recurso === args.recurso && datos?.reporteEstudianteId === args.reporteEstudianteId;
+    });
     if (yaRegistrada) return { registrado: false };
 
     await auditar(ctx, {
@@ -200,8 +216,19 @@ export const registrarLecturaSensible = mutation({
       entidadTipo: "estudiante",
       entidadId: args.estudianteId,
       institucionId: estudiante.institucionId,
-      datosDespues: { recurso: args.recurso, rol },
+      datosDespues: { recurso: args.recurso, rol, reporteEstudianteId: args.reporteEstudianteId },
     });
+
+    if (args.recurso === "REPORTE_ESTUDIANTE" && rol === "REPRESENTANTE" && args.reporteEstudianteId) {
+      const representante = await ctx.db.query("representante").withIndex("por_perfil", (q) => q.eq("perfilUsuarioId", perfil._id)).unique();
+      const entrega = representante && await ctx.db.query("entregaReporte")
+        .withIndex("por_reporte_representante", (q) => q.eq("reporteEstudianteId", args.reporteEstudianteId!).eq("representanteId", representante._id))
+        .unique();
+      if (entrega && entrega.leidoEn === undefined) {
+        await ctx.db.patch(entrega._id, { leidoEn: ahora });
+      }
+    }
+
     return { registrado: true };
   },
 });

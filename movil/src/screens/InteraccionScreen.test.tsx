@@ -13,6 +13,10 @@ const estado = vi.hoisted(() => ({
   hijos: [] as { estudianteId: string; nombres: string; apellidos: string }[],
   loadMore: vi.fn(),
   citas: [] as any[],
+  notificaciones: [] as any[],
+  bloques: [] as any[],
+  historial: undefined as any,
+  mutaciones: {} as Record<string, ReturnType<typeof vi.fn>>,
 }));
 vi.mock("react-native", async () => ({
   ...(await import("../test/mockReactNative")).reactNative(),
@@ -27,15 +31,28 @@ vi.mock("@clerk/expo", () => ({
 }));
 vi.mock("../theme/Icono", () => ({ Icono: "Icono" }));
 vi.mock("convex/react", () => ({
-  useQuery: () => estado.citas,
+  useQuery: (ref: Parameters<typeof getFunctionName>[0]) => {
+    const nombre = getFunctionName(ref);
+    if (nombre === "interaccion:misNotificaciones") return estado.notificaciones;
+    if (nombre === "interaccion:misBloquesLibres") return estado.bloques;
+    if (nombre === "interaccion:historialDeLaFamilia") return estado.historial;
+    return estado.citas;
+  },
   usePaginatedQuery: () => ({ results: estado.hijos, status: estado.status, loadMore: estado.loadMore }),
-  useMutation: () => vi.fn(),
+  // Una por función, para poder preguntar después con qué se llamó cada una.
+  useMutation: (ref: Parameters<typeof getFunctionName>[0]) =>
+    (estado.mutaciones[getFunctionName(ref)] ??= vi.fn()),
   useAction: (ref: Parameters<typeof getFunctionName>[0]) => {
     if (getFunctionName(ref) === "interaccion:activarAlerta") return estado.activar;
     return vi.fn();
   },
 }));
-import { AgendaDocente, AlertaDocente, Ajustes, CitasFamilia } from "./InteraccionScreen";
+const avisos = vi.hoisted(() => ({ estado: { resultado: "REGISTRADO" } as { resultado: string; detalle?: string }, reintentos: 0 }));
+vi.mock("../lib/avisosDelTelefono", () => ({
+  useEstadoAvisos: () => avisos.estado,
+  registrarTelefono: async () => { avisos.reintentos++; return "REGISTRADO"; },
+}));
+import { AgendaDocente, AlertaDocente, Ajustes, CitasFamilia, HistorialFamilia, Notificaciones, resumenDelHistorial } from "./InteraccionScreen";
 import { Boton, Campo, Casilla, Opciones } from "../components/NucleoUI";
 
 let vista: ReactTestRenderer;
@@ -48,6 +65,10 @@ beforeEach(() => {
   estado.status = "CanLoadMore";
   estado.hijos = [];
   estado.citas = [];
+  estado.notificaciones = [];
+  estado.bloques = [];
+  estado.historial = undefined;
+  estado.mutaciones = {};
   estado.startVerification.mockResolvedValue({ supportedFirstFactors: [{ strategy: "password" }] });
   estado.attemptFirstFactorVerification.mockResolvedValue({ status: "complete" });
   estado.getToken.mockResolvedValue("existing-session-token");
@@ -156,7 +177,7 @@ it("organiza las citas del docente en pendientes, próximas ascendentes e histor
   estado.citas = [
     {
       _id: "pasada-antigua",
-      estado: "CONFIRMADA",
+      estado: "ATENDIDA",
       fechaHoraInicio: ahora - 10 * 86400000,
       fechaHoraFin: ahora - 10 * 86400000 + 1800000,
       modalidad: "PRESENCIAL",
@@ -164,7 +185,7 @@ it("organiza las citas del docente en pendientes, próximas ascendentes e histor
     },
     {
       _id: "pasada-reciente",
-      estado: "CONFIRMADA",
+      estado: "ATENDIDA",
       fechaHoraInicio: ahora - 86400000,
       fechaHoraFin: ahora - 86400000 + 1800000,
       modalidad: "PRESENCIAL",
@@ -220,7 +241,7 @@ it("acota el historial a 5 citas y permite expandirlo", async () => {
   const ahora = Date.now();
   estado.citas = Array.from({ length: 7 }, (_, i) => ({
     _id: `pasada-${i}`,
-    estado: "CONFIRMADA",
+    estado: "ATENDIDA",
     fechaHoraInicio: ahora - (i + 1) * 86400000,
     fechaHoraFin: ahora - (i + 1) * 86400000 + 1800000,
     modalidad: "PRESENCIAL",
@@ -249,6 +270,174 @@ it("acota el historial a 5 citas y permite expandirlo", async () => {
   expect(texto).toContain("Motivo 6");
   expect(texto).toContain("Motivo 7");
   expect(texto).toContain("Ver menos citas");
+});
+
+/* ---------- Citaciones, cancelaciones y asistencia ---------- */
+
+const HORA = 3600000;
+const botonQueDice = (texto: string) =>
+  vista.root.findAllByType(Boton).find((b) => b.props.children === texto);
+const tocar = async (texto: string) => {
+  const boton = botonQueDice(texto);
+  expect(boton, `no hay un botón "${texto}"`).toBeDefined();
+  await act(async () => boton!.props.onPress());
+};
+const escribir = async (etiqueta: string, valor: string) =>
+  act(async () => vista.root.findAllByType(Campo).find((c) => c.props.etiqueta === etiqueta)!.props.onChangeText(valor));
+const cita = (extra: Record<string, unknown>) => ({
+  _id: "c1", estado: "CONFIRMADA", origen: "SOLICITADA_POR_REPRESENTANTE",
+  fechaHoraInicio: Date.now() + 2 * 86400000, fechaHoraFin: Date.now() + 2 * 86400000 + 900000,
+  modalidad: "PRESENCIAL", estudianteNombre: "Ana Pérez", lugarOEnlace: null, ...extra,
+});
+
+it("una cita confirmada cuya hora llegó pregunta si la familia vino, y lo registra", async () => {
+  estado.citas = [cita({ fechaHoraInicio: Date.now() - HORA, fechaHoraFin: Date.now() - HORA + 900000 })];
+  await act(async () => { vista = create(<AgendaDocente curso={curso} />); });
+  const texto = JSON.stringify(vista.toJSON());
+  expect(texto).toContain("¿Vino la familia?");
+  expect(texto).toContain("Ana Pérez");
+  await tocar("No vino");
+  expect(estado.mutaciones["interaccion:registrarAsistenciaCita"]).toHaveBeenCalledWith({ citaId: "c1", asistio: false });
+});
+
+it("tras 'Sí, vino' pregunta qué acordaron, y guarda los acuerdos", async () => {
+  estado.citas = [cita({ fechaHoraInicio: Date.now() - HORA, fechaHoraFin: Date.now() - HORA + 900000 })];
+  await act(async () => { vista = create(<AgendaDocente curso={curso} />); });
+  await tocar("Sí, vino");
+  expect(estado.mutaciones["interaccion:registrarAsistenciaCita"]).toHaveBeenCalledWith({ citaId: "c1", asistio: true });
+  expect(JSON.stringify(vista.toJSON())).toContain("¿Qué acordaron?");
+  expect(botonQueDice("Guardar acuerdos")!.props.disabled).toBe(true);
+  await escribir("Acuerdos", "Revisar la agenda cada noche");
+  await tocar("Guardar acuerdos");
+  expect(estado.mutaciones["interaccion:anotarAcuerdos"]).toHaveBeenCalledWith({
+    citaId: "c1", acuerdos: "Revisar la agenda cada noche",
+  });
+});
+
+it("los acuerdos se pueden dejar para después sin perder la asistencia", async () => {
+  estado.citas = [cita({ fechaHoraInicio: Date.now() - HORA, fechaHoraFin: Date.now() - HORA + 900000 })];
+  await act(async () => { vista = create(<AgendaDocente curso={curso} />); });
+  await tocar("Sí, vino");
+  await tocar("Ahora no");
+  expect(estado.mutaciones["interaccion:anotarAcuerdos"]).not.toHaveBeenCalled();
+  expect(JSON.stringify(vista.toJSON())).toContain("Atención a familias");
+});
+
+it("en el historial, una reunión sin acuerdos ofrece anotarlos y una con acuerdos los muestra", async () => {
+  estado.citas = [
+    cita({ _id: "sin", estado: "ATENDIDA", fechaHoraInicio: Date.now() - 2 * HORA }),
+    cita({ _id: "con", estado: "ATENDIDA", fechaHoraInicio: Date.now() - 3 * HORA, acuerdos: "Volver a conversar en dos semanas" }),
+  ];
+  await act(async () => { vista = create(<AgendaDocente curso={curso} />); });
+  expect(JSON.stringify(vista.toJSON())).toContain("Acuerdos de la reunión: Volver a conversar en dos semanas");
+  expect(vista.root.findAllByType(Boton).filter((b) => b.props.children === "Anotar acuerdos")).toHaveLength(1);
+  await tocar("Anotar acuerdos");
+  expect(JSON.stringify(vista.toJSON())).toContain("¿Qué acordaron?");
+});
+
+it("la familia lee los acuerdos en su lista de citas", async () => {
+  estado.status = "Exhausted";
+  estado.citas = [cita({ estado: "ATENDIDA", fechaHoraInicio: Date.now() - HORA, acuerdos: "Revisar la agenda" })];
+  await act(async () => { vista = create(<CitasFamilia />); });
+  expect(JSON.stringify(vista.toJSON())).toContain("Acuerdos de la reunión: Revisar la agenda");
+});
+
+it("el docente cancela una próxima cita solo después de escribir el motivo", async () => {
+  estado.citas = [cita({})];
+  await act(async () => { vista = create(<AgendaDocente curso={curso} />); });
+  await tocar("Cancelar la cita");
+  // Ahora es la pantalla del motivo: sin texto, el botón no hace nada.
+  expect(botonQueDice("Cancelar la cita")!.props.disabled).toBe(true);
+  await escribir("Motivo", "Tengo junta de área");
+  expect(botonQueDice("Cancelar la cita")!.props.disabled).toBe(false);
+  await tocar("Cancelar la cita");
+  expect(estado.mutaciones["interaccion:cancelarCita"]).toHaveBeenCalledWith({
+    citaId: "c1", como: "DOCENTE", motivo: "Tengo junta de área",
+  });
+});
+
+it("una citación enviada espera a la familia y se puede retirar", async () => {
+  estado.citas = [cita({ estado: "SOLICITADA", origen: "CITACION_DOCENTE", motivo: "Hablar de las tareas" })];
+  await act(async () => { vista = create(<AgendaDocente curso={curso} />); });
+  const texto = JSON.stringify(vista.toJSON());
+  expect(texto).toContain("Citaciones enviadas");
+  expect(texto).toContain("Esperando que la familia confirme");
+  // No aparece entre lo que el docente tiene que confirmar: eso le toca a la familia.
+  expect(botonQueDice("Confirmar")).toBeUndefined();
+  expect(botonQueDice("Retirar la citación")).toBeDefined();
+});
+
+it("citar a una familia: estudiante, motivo y uno de sus bloques libres", async () => {
+  estado.hijos = [{ estudianteId: "e1", nombres: "Ana", apellidos: "Pérez" }];
+  estado.status = "Exhausted";
+  estado.bloques = [
+    { id: "pasado", fecha: "2020-01-01", horaInicio: "12:30", horaFin: "12:45", modalidad: "PRESENCIAL" },
+    { id: "b1", fecha: "2099-09-10", horaInicio: "12:30", horaFin: "12:45", modalidad: "PRESENCIAL", lugarOEnlace: "Aula 5B" },
+  ];
+  await act(async () => { vista = create(<AgendaDocente curso={curso} />); });
+  await tocar("Citar a una familia");
+  await tocar("Citar a su familia");
+  const texto = JSON.stringify(vista.toJSON());
+  expect(texto).toContain("Citar a la familia de Ana Pérez");
+  expect(texto).toContain("Aula 5B");
+  // El bloque cuya hora ya pasó no se ofrece.
+  expect(vista.root.findAllByType(Boton).filter((b) => b.props.children === "Citar en este horario")).toHaveLength(1);
+  expect(botonQueDice("Citar en este horario")!.props.disabled).toBe(true);
+  await escribir("Motivo", "Conversar sobre las tareas");
+  await tocar("Citar en este horario");
+  expect(estado.mutaciones["interaccion:citarFamilia"]).toHaveBeenCalledWith({
+    disponibilidadDocenteId: "b1", estudianteId: "e1", motivo: "Conversar sobre las tareas",
+  });
+  expect(JSON.stringify(vista.toJSON())).toContain("Citación enviada");
+});
+
+it("sin bloques libres, citar explica que primero hay que publicar una franja", async () => {
+  estado.hijos = [{ estudianteId: "e1", nombres: "Ana", apellidos: "Pérez" }];
+  estado.status = "Exhausted";
+  await act(async () => { vista = create(<AgendaDocente curso={curso} />); });
+  await tocar("Citar a una familia");
+  await tocar("Citar a su familia");
+  expect(JSON.stringify(vista.toJSON())).toContain("No tienes bloques libres");
+});
+
+it("la familia ve la citación arriba y confirma que va", async () => {
+  estado.status = "Exhausted";
+  estado.citas = [cita({ estado: "SOLICITADA", origen: "CITACION_DOCENTE", motivo: "Hablar de las tareas" })];
+  await act(async () => { vista = create(<CitasFamilia />); });
+  const texto = JSON.stringify(vista.toJSON());
+  expect(texto.indexOf("El docente te citó")).toBeLessThan(texto.indexOf("Pedir una cita"));
+  expect(texto).toContain("Hablar de las tareas");
+  await tocar("Voy a asistir");
+  expect(estado.mutaciones["interaccion:responderCitacion"]).toHaveBeenCalledWith({ citaId: "c1", asistira: true });
+});
+
+it("decir que no puede asistir exige un mensaje para el docente", async () => {
+  estado.status = "Exhausted";
+  estado.citas = [cita({ estado: "SOLICITADA", origen: "CITACION_DOCENTE", motivo: "Hablar" })];
+  await act(async () => { vista = create(<CitasFamilia />); });
+  await tocar("No puedo asistir");
+  expect(botonQueDice("Enviar al docente")!.props.disabled).toBe(true);
+  await escribir("Tu mensaje para el docente", "Trabajo a esa hora");
+  await tocar("Enviar al docente");
+  expect(estado.mutaciones["interaccion:responderCitacion"]).toHaveBeenCalledWith({
+    citaId: "c1", asistira: false, mensaje: "Trabajo a esa hora",
+  });
+});
+
+it("en el historial se lee quién canceló y por qué, y una solicitud vencida no dice que espera", async () => {
+  estado.status = "Exhausted";
+  estado.citas = [
+    cita({ _id: "x1", estado: "CANCELADA", canceladaPor: "DOCENTE", motivoCancelacion: "Junta de área" }),
+    cita({ _id: "x2", estado: "SOLICITADA", fechaHoraInicio: Date.now() - HORA, fechaHoraFin: Date.now() - HORA + 900000 }),
+  ];
+  await act(async () => { vista = create(<CitasFamilia />); });
+  const texto = JSON.stringify(vista.toJSON());
+  expect(texto).toContain("La canceló el docente: Junta de área");
+  expect(texto).toContain("Sin respuesta");
+  expect(texto).not.toContain("No vayas hasta que el docente");
+  // Nada de lo que ya pasó se puede cancelar.
+  expect(botonQueDice("Cancelar la cita")).toBeUndefined();
+  expect(botonQueDice("Retirar la solicitud")).toBeUndefined();
 });
 
 /* ---------- Ajustes: el interruptor de la barra inferior ---------- */
@@ -290,3 +479,150 @@ it("tocar el interruptor avisa con el valor invertido, sin decidir nada por su c
   await act(async () => interruptor.props.onPress());
   expect(cambios).toEqual([false]);
 });
+
+/**
+ * QA del 26 de septiembre: "al apretar una notificación debería enviar a la
+ * pantalla que corresponde a esa notificación". Antes tocar una notificación
+ * solo la marcaba leída y no navegaba a ningún sitio.
+ */
+it("al tocar una notificación, avisa con ella para que quien la use decida a dónde ir", async () => {
+  estado.notificaciones = [
+    { _id: "n1", tipo: "CITACION", titulo: "Tu cita fue confirmada", cuerpo: "", entidadTipo: "cita", entidadId: "c1", leidaEn: undefined, _creationTime: Date.now() },
+  ];
+  const abiertas: unknown[] = [];
+  await act(async () => {
+    vista = create(<Notificaciones onAbrir={(n) => abiertas.push(n)} />);
+  });
+  const fila = vista.root.findByProps({ accessibilityLabel: "Tu cita fue confirmada, sin leer" });
+  await act(async () => fila.props.onPress());
+  expect(abiertas).toEqual([expect.objectContaining({ tipo: "CITACION", entidadId: "c1" })]);
+});
+
+it("sin onAbrir, tocar una notificación solo la marca leída y no revienta", async () => {
+  estado.notificaciones = [
+    { _id: "n1", tipo: "SISTEMA", titulo: "Aviso", cuerpo: "", leidaEn: undefined, _creationTime: Date.now() },
+  ];
+  await act(async () => { vista = create(<Notificaciones />); });
+  const fila = vista.root.findByProps({ accessibilityLabel: "Aviso, sin leer" });
+  await expect(act(async () => fila.props.onPress())).resolves.toBeUndefined();
+});
+
+/* ---------- Historial de una familia ---------- */
+
+const historialVacio = {
+  estudiante: "Ana Pérez", representante: { nombre: "María Pérez" }, citas: [] as any[],
+  avisos: [] as any[], reportes: { entregados: 0, abiertos: 0 }, reclamos: { total: 0, sinResolver: 0 },
+};
+
+it("el historial resume la relación con la familia y avisa que no es el expediente", async () => {
+  estado.historial = {
+    ...historialVacio,
+    citas: [
+      cita({ _id: "a", estado: "ATENDIDA", origen: "CITACION_DOCENTE", fechaHoraInicio: Date.now() - 2 * 86400000, acuerdos: "Revisar la agenda" }),
+      cita({ _id: "b", estado: "NO_ASISTIO", origen: "CITACION_DOCENTE", fechaHoraInicio: Date.now() - 9 * 86400000 }),
+      cita({ _id: "c", estado: "RECHAZADA", fechaHoraInicio: Date.now() - 20 * 86400000 }),
+    ],
+    avisos: [
+      { id: "k1", titulo: "Reunión de padres", publicadoEn: Date.UTC(2026, 8, 15, 15), visto: true },
+      { id: "k2", titulo: "Traer materiales", publicadoEn: Date.UTC(2026, 8, 16, 15), visto: false },
+    ],
+    reportes: { entregados: 10, abiertos: 7 },
+    reclamos: { total: 2, sinResolver: 1 },
+  };
+  await act(async () => { vista = create(<HistorialFamilia estudianteId={"e1" as never} nombre="Ana Pérez" onVolver={() => {}} />); });
+  const texto = JSON.stringify(vista.toJSON());
+  for (const linea of [
+    "María Pérez",
+    "3 citas contigo, 2 citadas por ti.",
+    "Asistió a 1 y faltó a 1.",
+    "Vio 1 de los 2 avisos más recientes del curso.",
+    "Abrió 7 de sus últimos 10 reportes.",
+    "2 reclamos sobre tus anotaciones, 1 sin resolver.",
+    "No reemplaza",
+    "Acuerdos de la reunión: Revisar la agenda",
+  ]) expect(texto).toContain(linea);
+  // Solo el aviso que no vio va en la lista de pendientes.
+  expect(texto).toContain("Avisos que no vio");
+  expect(texto).toContain("Traer materiales");
+  expect(texto.split("Reunión de padres").length).toBe(1);
+});
+
+it("un historial sin nada todavía lo dice con frases, no con ceros", () => {
+  expect(resumenDelHistorial(historialVacio as never)).toEqual([
+    "Todavía no tuvo citas contigo.",
+    "Todavía no hay avisos del curso.",
+    "Todavía no recibió reportes.",
+    "Sin reclamos sobre tus anotaciones.",
+  ]);
+});
+
+it("el resumen no fuerza plurales ni ceros", () => {
+  const una = { ...historialVacio, citas: [cita({ estado: "ATENDIDA", origen: "CITACION_DOCENTE" })],
+    avisos: [{ id: "k", titulo: "Aviso", publicadoEn: 0, visto: false }],
+    reportes: { entregados: 1, abiertos: 1 }, reclamos: { total: 1, sinResolver: 0 } };
+  expect(resumenDelHistorial(una as never)).toEqual([
+    "1 cita contigo, citada por ti.",
+    "Asistió a 1.",
+    "No vio el último aviso del curso.",
+    "Abrió su último reporte.",
+    "1 reclamo sobre tus anotaciones, ya resueltos.",
+  ]);
+});
+
+it("sin representante vinculado, el historial lo dice", async () => {
+  estado.historial = { ...historialVacio, representante: null };
+  await act(async () => { vista = create(<HistorialFamilia estudianteId={"e1" as never} nombre="Ana Pérez" onVolver={() => {}} />); });
+  const texto = JSON.stringify(vista.toJSON());
+  expect(texto).toContain("Sin representante vinculado en Cresco.");
+  expect(texto).toContain("Sin citas todavía");
+});
+
+it("el historial dice si la familia recibe los avisos en el teléfono", async () => {
+  estado.historial = { ...historialVacio, representante: { nombre: "María Pérez", recibeAvisos: false } };
+  await act(async () => { vista = create(<HistorialFamilia estudianteId={"e1" as never} nombre="Ana Pérez" onVolver={() => {}} />); });
+  expect(JSON.stringify(vista.toJSON())).toContain("No tiene un teléfono registrado para avisos");
+  estado.historial = { ...historialVacio, representante: { nombre: "María Pérez", recibeAvisos: true } };
+  await act(async () => vista.update(<HistorialFamilia estudianteId={"e1" as never} nombre="Ana Pérez" onVolver={() => {}} />));
+  expect(JSON.stringify(vista.toJSON())).toContain("Recibe los avisos en el teléfono.");
+});
+
+it("en la agenda, el docente ve si la familia vio su citación", async () => {
+  estado.citas = [
+    cita({ _id: "v", estado: "SOLICITADA", origen: "CITACION_DOCENTE", motivo: "Vista", vistaPorFamiliaEn: Date.UTC(2026, 8, 15, 17, 30) }),
+    cita({ _id: "n", estado: "SOLICITADA", origen: "CITACION_DOCENTE", motivo: "Sin ver", fechaHoraInicio: Date.now() + 3 * 86400000 }),
+  ];
+  await act(async () => { vista = create(<AgendaDocente curso={curso} />); });
+  const texto = JSON.stringify(vista.toJSON());
+  expect(texto).toContain("La familia la vio el martes 15 de septiembre");
+  expect(texto).toContain("La familia todavía no la ha visto.");
+});
+
+it("la familia, al ver sus citaciones, deja constancia de que las vio", async () => {
+  estado.status = "Exhausted";
+  estado.citas = [
+    cita({ _id: "c1", estado: "SOLICITADA", origen: "CITACION_DOCENTE", motivo: "Hablar" }),
+    cita({ _id: "c2", estado: "CONFIRMADA" }),
+  ];
+  await act(async () => { vista = create(<CitasFamilia />); });
+  expect(estado.mutaciones["interaccion:marcarCitasVistas"]).toHaveBeenCalledWith({ citaIds: ["c1"] });
+});
+
+it("Ajustes muestra por qué no llegan los avisos, y deja reintentar", async () => {
+  avisos.estado = { resultado: "ERROR", detalle: "Al obtener el token de Expo: servicio no disponible" };
+  avisos.reintentos = 0;
+  await act(async () => { vista = create(<Ajustes />); });
+  const texto = JSON.stringify(vista.toJSON());
+  expect(texto).toContain("No se pudieron activar.");
+  expect(texto).toContain("Al obtener el token de Expo: servicio no disponible");
+  await act(async () => vista.root.findAllByType(Boton).find((b) => b.props.children === "Reintentar")!.props.onPress());
+  expect(avisos.reintentos).toBe(1);
+  avisos.estado = { resultado: "REGISTRADO" };
+});
+
+it("con los avisos activos, lo dice y no ofrece reintentar", async () => {
+  avisos.estado = { resultado: "REGISTRADO" };
+  await act(async () => { vista = create(<Ajustes />); });
+  expect(JSON.stringify(vista.toJSON())).toContain("Activos: este teléfono recibe los avisos de Cresco.");
+  expect(vista.root.findAllByType(Boton).some((b) => b.props.children === "Reintentar")).toBe(false);
+});
+

@@ -30,8 +30,12 @@ const AVISO: Record<Doc<"notificacion">["tipo"], string> = {
   NOTA_DOCENTE: "Tienes una novedad de tu representado",
   ESTUDIANTE_APROBADO: "Tienes una novedad de tu representado",
   COMUNICADO: "Tu docente publicó un comunicado",
-  CITACION: "Tienes una cita",
+  // No "Tienes una cita": por este tipo también llegan cancelaciones, una
+  // inasistencia registrada y los acuerdos de la reunión, y avisar una cita
+  // que se acaba de cancelar sería decir lo contrario de lo que pasó.
+  CITACION: "Hay novedades sobre una cita",
   RECORDATORIO_CITA: "Tienes una cita",
+  RESUMEN_SEMANAL: "Ya está el resumen de la semana",
   RESPUESTA_INCONFORMIDAD: "Hay novedades sobre tu reclamo",
   ALERTA_EMERGENCIA: "Alerta de emergencia — abre Cresco",
   SISTEMA: "Cresco",

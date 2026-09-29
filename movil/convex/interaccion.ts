@@ -27,6 +27,7 @@ import {
   type QueryCtx,
 } from "./_generated/server";
 import { verificarReautenticacion } from "./lib/reautenticacion";
+import { notificar } from "./lib/notificaciones";
 import {
   ALCANCE_ALERTA,
   MODALIDAD,
@@ -45,6 +46,7 @@ import {
 import {
   ErrorPermiso,
   auditar,
+  exigirAccesoDocenteAEstudiante,
   exigirDocente,
   exigirPerfil,
   exigirRepresentante,
@@ -98,42 +100,6 @@ function exigirFormatoHora(hora: string, campo: string): void {
   if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(hora)) {
     throw new ErrorDominio("VALIDACION", `${campo} debe tener el formato HH:MM.`);
   }
-}
-
-/**
- * Crea una notificación en bandeja y programa su entrega al teléfono.
- *
- * El push va con `scheduler.runAfter(0, ...)` y no con una llamada directa: si
- * el envío fallara dentro de esta transacción, se revertiría **la notificación
- * misma**. La bandeja tiene que sobrevivir aunque el push no salga; al revés
- * no sirve de nada.
- *
- * Se programa una acción por destinatario. Una alerta de curso son treinta
- * peticiones en vez de una, y se prefiere así: un teléfono con el token muerto
- * no arrastra a los otros veintinueve.
- *
- * Lo que viaja a Expo es un aviso genérico, nunca este `titulo` ni este
- * `cuerpo` — ver `push.ts`, que explica por qué.
- */
-async function notificar(
-  ctx: MutationCtx,
-  perfilUsuarioId: Id<"perfilUsuario">,
-  tipo: Doc<"notificacion">["tipo"],
-  titulo: string,
-  cuerpo: string,
-  entidadTipo?: string,
-  entidadId?: string,
-): Promise<Id<"notificacion">> {
-  const notificacionId = await ctx.db.insert("notificacion", {
-    perfilUsuarioId,
-    tipo,
-    titulo,
-    cuerpo,
-    entidadTipo,
-    entidadId,
-  });
-  await ctx.scheduler.runAfter(0, internal.push.enviar, { notificacionId });
-  return notificacionId;
 }
 
 /* ------------------------------------------------------------------ *
@@ -318,6 +284,50 @@ export const bloquesDisponibles = query({
   }),
 });
 
+/** ux_cita_bloque_vivo: un bloque no admite dos reservas vivas a la vez. */
+async function bloqueOcupado(
+  ctx: QueryCtx,
+  disponibilidadDocenteId: Id<"disponibilidadDocente">,
+): Promise<boolean> {
+  for (const estado of CITA_VIVA) {
+    const ocupado = await ctx.db
+      .query("cita")
+      .withIndex("por_bloque_estado", (q) =>
+        q.eq("disponibilidadDocenteId", disponibilidadDocenteId).eq("estado", estado),
+      )
+      .first();
+    if (ocupado !== null) return true;
+  }
+  return false;
+}
+
+const inicioDelBloque = (bloque: Doc<"disponibilidadDocente">) =>
+  new Date(`${bloque.fecha}T${bloque.horaInicio}:00-05:00`).getTime();
+
+/**
+ * Devuelve el bloque de una cita que se cae. `estado` lo decide quien llama:
+ * ver `cancelarCita` para por qué no siempre vuelve a quedar DISPONIBLE.
+ */
+async function liberarBloque(
+  ctx: MutationCtx,
+  cita: Doc<"cita">,
+  estado: "DISPONIBLE" | "CANCELADO",
+): Promise<void> {
+  if (cita.disponibilidadDocenteId === undefined) return;
+  const bloque = await ctx.db.get(cita.disponibilidadDocenteId);
+  if (bloque?.estado === "RESERVADO") {
+    await ctx.db.patch(bloque._id, { estado, actualizadoEn: Date.now() });
+  }
+}
+
+async function nombreDelEstudiante(
+  ctx: QueryCtx,
+  estudianteId: Id<"estudiante">,
+): Promise<string | null> {
+  const estudiante = await ctx.db.get(estudianteId);
+  return estudiante === null ? null : `${estudiante.nombres} ${estudiante.apellidos}`;
+}
+
 /**
  * El representante reserva un bloque. Nace `SOLICITADA`: **requiere
  * confirmación del docente** (F2), no queda cerrada por reservar.
@@ -338,20 +348,11 @@ export const solicitarCita = mutation({
       throw new ErrorDominio("CONFLICTO", "Ese horario ya no está disponible.");
     }
 
-    // ux_cita_bloque_vivo: un bloque no admite dos reservas vivas a la vez.
-    for (const estado of CITA_VIVA) {
-      const ocupado = await ctx.db
-        .query("cita")
-        .withIndex("por_bloque_estado", (q) =>
-          q.eq("disponibilidadDocenteId", args.disponibilidadDocenteId).eq("estado", estado),
-        )
-        .first();
-      if (ocupado !== null) {
-        throw new ErrorDominio("CONFLICTO", "Otro representante acaba de reservar ese horario.");
-      }
+    if (await bloqueOcupado(ctx, bloque._id)) {
+      throw new ErrorDominio("CONFLICTO", "Otro representante acaba de reservar ese horario.");
     }
 
-    const inicio = new Date(`${bloque.fecha}T${bloque.horaInicio}:00-05:00`).getTime();
+    const inicio = inicioDelBloque(bloque);
     const fin = inicio + REGLAS.CITA_MINUTOS * MINUTO;
     const ahora = Date.now();
 
@@ -378,7 +379,8 @@ export const solicitarCita = mutation({
         docente.perfilUsuarioId,
         "CITACION",
         "Nueva solicitud de cita",
-        `Un representante solicitó el bloque del ${bloque.fecha} a las ${bloque.horaInicio}.`,
+        `La familia de ${(await nombreDelEstudiante(ctx, args.estudianteId)) ?? "un estudiante"} ` +
+          `pidió una cita para el ${cuandoEnTexto(inicio)}.`,
         "cita",
         citaId,
       );
@@ -387,7 +389,7 @@ export const solicitarCita = mutation({
   }),
 });
 
-/** El docente confirma o rechaza. Rechazar libera el bloque. */
+/** El docente confirma o rechaza la cita que pidió una familia. Rechazar libera el bloque. */
 export const responderCita = mutation({
   args: {
     citaId: v.id("cita"),
@@ -401,11 +403,22 @@ export const responderCita = mutation({
     if (cita.docenteId !== docente._id) {
       throw new ErrorDominio("SIN_PERMISO", "Esa cita no es tuya.");
     }
+    // Una citación la confirma la familia, no quien la envió: sin esto el
+    // docente podría darla por aceptada en nombre de la familia.
+    if (cita.origen !== "SOLICITADA_POR_REPRESENTANTE") {
+      throw new ErrorDominio("CONFLICTO", "Esa citación la confirma la familia.");
+    }
     if (cita.estado !== "SOLICITADA") {
       throw new ErrorDominio("CONFLICTO", "Esa cita ya fue respondida.");
     }
 
     const ahora = Date.now();
+    if (args.aceptar && cita.fechaHoraInicio <= ahora) {
+      throw new ErrorDominio(
+        "CONFLICTO",
+        "Esa cita ya pasó. La familia puede reservar otro horario.",
+      );
+    }
     await ctx.db.patch(cita._id, {
       estado: args.aceptar ? "CONFIRMADA" : "RECHAZADA",
       notasDocente: args.notasDocente?.trim() || undefined,
@@ -418,6 +431,8 @@ export const responderCita = mutation({
         actualizadoEn: ahora,
       });
     }
+
+    if (args.aceptar) await programarRecordatorios(ctx, cita);
 
     const representante = await ctx.db.get(cita.representanteId);
     if (representante !== null) {
@@ -435,6 +450,614 @@ export const responderCita = mutation({
   }),
 });
 
+/**
+ * El docente cita a la familia de un estudiante (`origen: CITACION_DOCENTE`).
+ *
+ * De las entrevistas del 1 de septiembre: cuando un alumno pierde el año, el
+ * distrito le pide al docente "una carpeta de todas las citaciones". Hasta
+ * aquí solo la familia podía pedir una cita, y el docente no tenía cómo dejar
+ * constancia de que la llamó.
+ *
+ * Usa uno de **sus propios bloques de atención**, no una hora cualquiera: en
+ * un plantel fiscal la institución le asigna esas franjas (ver
+ * `publicarDisponibilidad`) y es ahí donde recibe a las familias. Así la
+ * citación reserva el bloque igual que una solicitud, y nadie más puede
+ * tomarlo mientras la familia responde.
+ *
+ * Nace SOLICITADA y la confirma **la familia** (`responderCitacion`). El
+ * motivo es obligatorio: una citación sin motivo no le dice a la familia a
+ * qué viene, y en una carpeta no prueba nada.
+ */
+export const citarFamilia = mutation({
+  args: {
+    disponibilidadDocenteId: v.id("disponibilidadDocente"),
+    estudianteId: v.id("estudiante"),
+    motivo: v.string(),
+  },
+  handler: (ctx, args) => conErroresPublicos(async () => {
+    const { docente } = await exigirAccesoDocenteAEstudiante(ctx, args.estudianteId);
+    const motivo = exigirTexto(args.motivo, "El motivo de la citación");
+
+    const bloque = await ctx.db.get(args.disponibilidadDocenteId);
+    if (bloque === null || bloque.docenteId !== docente._id) {
+      throw new ErrorDominio("NO_ENCONTRADO", "Ese horario no es uno de tus bloques de atención.");
+    }
+    if (bloque.estado !== "DISPONIBLE" || await bloqueOcupado(ctx, bloque._id)) {
+      throw new ErrorDominio("CONFLICTO", "Ese horario ya no está libre.");
+    }
+    const inicio = inicioDelBloque(bloque);
+    const ahora = Date.now();
+    if (inicio <= ahora) {
+      throw new ErrorDominio("FECHAS_INVALIDAS", "Ese horario ya pasó. Elige uno que todavía no empiece.");
+    }
+
+    // D2: un solo representante legal por estudiante en la v1.
+    const vinculo = await ctx.db
+      .query("vinculoRepresentacion")
+      .withIndex("por_estudiante_estado", (q) =>
+        q.eq("estudianteId", args.estudianteId).eq("estado", "ACTIVO"),
+      )
+      .unique();
+    const representante = vinculo === null ? null : await ctx.db.get(vinculo.representanteId);
+    if (representante === null) {
+      throw new ErrorDominio(
+        "SIN_REPRESENTANTE",
+        "Este estudiante todavía no tiene un representante en Cresco. Tendrás que citarlo por otra vía.",
+      );
+    }
+
+    const citaId = await ctx.db.insert("cita", {
+      disponibilidadDocenteId: bloque._id,
+      docenteId: docente._id,
+      representanteId: representante._id,
+      estudianteId: args.estudianteId,
+      origen: "CITACION_DOCENTE",
+      motivo,
+      fechaHoraInicio: inicio,
+      fechaHoraFin: inicio + REGLAS.CITA_MINUTOS * MINUTO,
+      modalidad: bloque.modalidad,
+      estado: "SOLICITADA",
+      actualizadoEn: ahora,
+    });
+    await ctx.db.patch(bloque._id, { estado: "RESERVADO", actualizadoEn: ahora });
+
+    const nombre = (await nombreDelEstudiante(ctx, args.estudianteId)) ?? "tu representado";
+    await notificar(
+      ctx,
+      representante.perfilUsuarioId,
+      "CITACION",
+      "El docente te citó",
+      `Por ${nombre}: ${cuandoEnTexto(inicio)}, ${MODALIDAD_EN_TEXTO[bloque.modalidad]}. ` +
+        `Motivo: ${motivo}. Confírmale en Cresco si puedes asistir.`,
+      "cita",
+      citaId,
+    );
+    const recordar = momentoRecordatorioCitacion(inicio, ahora);
+    if (recordar !== null) {
+      await ctx.scheduler.runAt(recordar, internal.interaccion.recordarCitacionSinRespuesta, {
+        citaId,
+        fechaHoraInicio: inicio,
+      });
+    }
+    return citaId;
+  }),
+});
+
+/**
+ * La familia responde a una citación del docente. Decir que no puede asistir
+ * libera el bloque y **exige un mensaje**: el docente necesita saber por qué
+ * para volver a citar, y una citación declinada sin explicación es justo lo
+ * que después no se puede sostener en ninguna carpeta.
+ */
+export const responderCitacion = mutation({
+  args: {
+    citaId: v.id("cita"),
+    asistira: v.boolean(),
+    mensaje: v.optional(v.string()),
+  },
+  handler: (ctx, args) => conErroresPublicos(async () => {
+    const representante = await exigirRepresentante(ctx);
+    const cita = await ctx.db.get(args.citaId);
+    if (cita === null) throw new ErrorDominio("NO_ENCONTRADO", "La cita no existe.");
+    if (cita.representanteId !== representante._id) {
+      throw new ErrorDominio("SIN_PERMISO", "Esa cita no es tuya.");
+    }
+    if (cita.origen !== "CITACION_DOCENTE") {
+      throw new ErrorDominio("CONFLICTO", "Esa cita la confirma el docente.");
+    }
+    if (cita.estado !== "SOLICITADA") {
+      throw new ErrorDominio("CONFLICTO", "Ya respondiste esta citación.");
+    }
+    const ahora = Date.now();
+    if (cita.fechaHoraInicio <= ahora) {
+      throw new ErrorDominio("CONFLICTO", "Esa citación ya pasó.");
+    }
+    const mensaje = args.asistira
+      ? args.mensaje?.trim() || undefined
+      : exigirTexto(args.mensaje ?? "", "El mensaje para el docente");
+
+    await ctx.db.patch(cita._id, {
+      estado: args.asistira ? "CONFIRMADA" : "RECHAZADA",
+      mensajeRepresentante: mensaje,
+      actualizadoEn: ahora,
+    });
+    if (args.asistira) await programarRecordatorios(ctx, cita);
+    else await liberarBloque(ctx, cita, "DISPONIBLE");
+
+    const docente = await ctx.db.get(cita.docenteId);
+    if (docente !== null) {
+      const nombre = (await nombreDelEstudiante(ctx, cita.estudianteId)) ?? "Un estudiante";
+      await notificar(
+        ctx,
+        docente.perfilUsuarioId,
+        "CITACION",
+        args.asistira ? "La familia confirmó la citación" : "La familia no puede asistir a la citación",
+        `${nombre}, ${cuandoEnTexto(cita.fechaHoraInicio)}.` +
+          (mensaje ? ` Escribió: "${mensaje}"` : ""),
+        "cita",
+        cita._id,
+      );
+    }
+    return cita._id;
+  }),
+});
+
+/**
+ * Cualquiera de las dos partes cancela una cita que todavía no empieza, con
+ * motivo: la otra parte lo recibe, y queda en el historial de las dos.
+ *
+ * `como` dice en nombre de quién se cancela. Hace falta porque una misma
+ * persona puede ser docente y representante a la vez, y sin él no habría
+ * cómo saber si la cancelación sale de su agenda de docente o de sus citas de
+ * familia.
+ *
+ * El bloque no corre la misma suerte en los dos casos. Si cancela la familia,
+ * el docente sigue libre a esa hora y el bloque vuelve a ofrecerse. Si cancela
+ * el docente, lo normal es que sea él quien no puede, y reabrirlo le mandaría
+ * otra familia a una hora en la que no va a estar: queda CANCELADO, que
+ * tampoco le impide volver a publicar esa franja (`publicarDisponibilidad`
+ * ignora los bloques cancelados al buscar cruces).
+ */
+export const cancelarCita = mutation({
+  args: {
+    citaId: v.id("cita"),
+    como: v.union(v.literal("DOCENTE"), v.literal("REPRESENTANTE")),
+    motivo: v.string(),
+  },
+  handler: (ctx, args) => conErroresPublicos(async () => {
+    const cita = await ctx.db.get(args.citaId);
+    if (cita === null) throw new ErrorDominio("NO_ENCONTRADO", "La cita no existe.");
+    const propia = args.como === "DOCENTE"
+      ? cita.docenteId === (await exigirDocente(ctx))._id
+      : cita.representanteId === (await exigirRepresentante(ctx))._id;
+    if (!propia) throw new ErrorDominio("SIN_PERMISO", "Esa cita no es tuya.");
+    if (cita.estado !== "SOLICITADA" && cita.estado !== "CONFIRMADA") {
+      throw new ErrorDominio("CONFLICTO", "Esa cita ya no se puede cancelar.");
+    }
+    const ahora = Date.now();
+    if (cita.fechaHoraInicio <= ahora) {
+      throw new ErrorDominio(
+        "CONFLICTO",
+        args.como === "DOCENTE"
+          ? "Esa cita ya empezó. Registra si la familia asistió."
+          : "Esa cita ya empezó y no se puede cancelar.",
+      );
+    }
+    const motivo = exigirTexto(args.motivo, "El motivo de la cancelación");
+
+    await ctx.db.patch(cita._id, {
+      estado: "CANCELADA",
+      canceladaPor: args.como,
+      motivoCancelacion: motivo,
+      actualizadoEn: ahora,
+    });
+    await liberarBloque(ctx, cita, args.como === "DOCENTE" ? "CANCELADO" : "DISPONIBLE");
+
+    const destinatario = args.como === "DOCENTE"
+      ? await ctx.db.get(cita.representanteId)
+      : await ctx.db.get(cita.docenteId);
+    if (destinatario !== null) {
+      const nombre = (await nombreDelEstudiante(ctx, cita.estudianteId)) ?? "Un estudiante";
+      await notificar(
+        ctx,
+        destinatario.perfilUsuarioId,
+        "CITACION",
+        args.como === "DOCENTE" ? "El docente canceló la cita" : "La familia canceló la cita",
+        `${nombre}, ${cuandoEnTexto(cita.fechaHoraInicio)}. Motivo: ${motivo}`,
+        "cita",
+        cita._id,
+      );
+    }
+    return cita._id;
+  }),
+});
+
+/**
+ * El docente registra, desde la hora de la cita, si la familia asistió.
+ *
+ * Antes de la hora no hay nada que registrar: un "no asistió" anotado por
+ * adelantado sería un dato falso sobre una familia.
+ *
+ * Un "no asistió" **se le avisa a la familia**. Es un registro sobre ella que
+ * puede terminar en una carpeta del distrito, y enterarse por otro lado iría
+ * contra lo mismo que pide `notasDocente`: nada que no se le pueda decir a la
+ * familia a la cara.
+ */
+export const registrarAsistenciaCita = mutation({
+  args: { citaId: v.id("cita"), asistio: v.boolean() },
+  handler: (ctx, args) => conErroresPublicos(async () => {
+    const docente = await exigirDocente(ctx);
+    const cita = await ctx.db.get(args.citaId);
+    if (cita === null) throw new ErrorDominio("NO_ENCONTRADO", "La cita no existe.");
+    if (cita.docenteId !== docente._id) {
+      throw new ErrorDominio("SIN_PERMISO", "Esa cita no es tuya.");
+    }
+    if (cita.estado === "ATENDIDA" || cita.estado === "NO_ASISTIO") {
+      throw new ErrorDominio("CONFLICTO", "Ya registraste esta cita.");
+    }
+    if (cita.estado !== "CONFIRMADA") {
+      throw new ErrorDominio("CONFLICTO", "Solo se registra la asistencia de una cita confirmada.");
+    }
+    const ahora = Date.now();
+    if (cita.fechaHoraInicio > ahora) {
+      throw new ErrorDominio("CONFLICTO", "Esa cita todavía no empieza.");
+    }
+
+    await ctx.db.patch(cita._id, {
+      estado: args.asistio ? "ATENDIDA" : "NO_ASISTIO",
+      actualizadoEn: ahora,
+    });
+
+    if (!args.asistio) {
+      const representante = await ctx.db.get(cita.representanteId);
+      if (representante !== null) {
+        const nombre = (await nombreDelEstudiante(ctx, cita.estudianteId)) ?? "tu representado";
+        await notificar(
+          ctx,
+          representante.perfilUsuarioId,
+          "CITACION",
+          "Quedó registrado que no asististe",
+          `A la cita por ${nombre} del ${cuandoEnTexto(cita.fechaHoraInicio)}. ` +
+            "Si hubo un error, conversa con el docente.",
+          "cita",
+          cita._id,
+        );
+      }
+    }
+    return cita._id;
+  }),
+});
+
+/** Una pantalla de citas no muestra más que esto de una vez. */
+const CITAS_VISTAS_POR_LLAMADA = 50;
+
+/**
+ * La familia tuvo en pantalla estas citaciones del docente. Lo llama la app al
+ * mostrarlas (una query no puede escribir), igual que los avisos del curso.
+ * Solo cuenta la primera vez, solo citaciones (una cita que pidió la familia
+ * no hace falta "verla") y solo las de quien llama.
+ */
+export const marcarCitasVistas = mutation({
+  args: { citaIds: v.array(v.id("cita")) },
+  handler: (ctx, args) => conErroresPublicos(async () => {
+    const representante = await exigirRepresentante(ctx);
+    if (args.citaIds.length > CITAS_VISTAS_POR_LLAMADA) {
+      throw new ErrorDominio("VALIDACION", "Son demasiadas citas de una sola vez.");
+    }
+    const ahora = Date.now();
+    let marcadas = 0;
+    for (const citaId of new Set(args.citaIds)) {
+      const cita = await ctx.db.get(citaId);
+      if (cita === null || cita.representanteId !== representante._id ||
+          cita.origen !== "CITACION_DOCENTE" || cita.vistaPorFamiliaEn !== undefined) continue;
+      await ctx.db.patch(cita._id, { vistaPorFamiliaEn: ahora });
+      marcadas++;
+    }
+    return marcadas;
+  }),
+});
+
+/** Unas líneas, no un informe: es lo que se acordó, no la reunión entera. */
+const ACUERDOS_MAX = 1000;
+
+/**
+ * El docente deja escrito lo que se acordó en una reunión a la que la familia
+ * asistió, y la familia lo recibe.
+ *
+ * De las entrevistas del 1 de septiembre: lo que pide el distrito es "una
+ * carpeta de todas las citaciones, informes... lo que más vale es el informe
+ * escrito". Una cita marcada como atendida prueba que hubo reunión; esto
+ * prueba **qué se habló**. Es también lo que un informe imprimible (DP-009)
+ * tendría que imprimir.
+ *
+ * Una sola vez: ver `acuerdos` en el esquema.
+ */
+export const anotarAcuerdos = mutation({
+  args: { citaId: v.id("cita"), acuerdos: v.string() },
+  handler: (ctx, args) => conErroresPublicos(async () => {
+    const docente = await exigirDocente(ctx);
+    const cita = await ctx.db.get(args.citaId);
+    if (cita === null) throw new ErrorDominio("NO_ENCONTRADO", "La cita no existe.");
+    if (cita.docenteId !== docente._id) {
+      throw new ErrorDominio("SIN_PERMISO", "Esa cita no es tuya.");
+    }
+    if (cita.estado !== "ATENDIDA") {
+      throw new ErrorDominio("CONFLICTO", "Solo se anotan acuerdos de una reunión a la que la familia asistió.");
+    }
+    if (cita.acuerdos !== undefined) {
+      throw new ErrorDominio("CONFLICTO", "Los acuerdos de esta reunión ya quedaron registrados.");
+    }
+    const acuerdos = exigirTexto(args.acuerdos, "Lo que acordaron");
+    if (acuerdos.length > ACUERDOS_MAX) {
+      throw new ErrorDominio("VALIDACION", `Los acuerdos no pueden pasar de ${ACUERDOS_MAX} caracteres.`);
+    }
+
+    await ctx.db.patch(cita._id, { acuerdos, actualizadoEn: Date.now() });
+
+    const representante = await ctx.db.get(cita.representanteId);
+    if (representante !== null) {
+      const nombre = (await nombreDelEstudiante(ctx, cita.estudianteId)) ?? "tu representado";
+      await notificar(
+        ctx,
+        representante.perfilUsuarioId,
+        "CITACION",
+        "Acuerdos de la reunión",
+        `Reunión por ${nombre} del ${cuandoEnTexto(cita.fechaHoraInicio)}: ${acuerdos}`,
+        "cita",
+        cita._id,
+      );
+    }
+    return cita._id;
+  }),
+});
+
+/**
+ * Los bloques libres del propio docente, para elegir uno al citar a una
+ * familia. `desde` lo manda la pantalla y no sale del reloj del servidor: una
+ * query no se vuelve a ejecutar solo porque pase el tiempo.
+ */
+export const misBloquesLibres = query({
+  args: { desde: v.string() },
+  handler: (ctx, args) => conErroresPublicos(async () => {
+    const docente = await exigirDocente(ctx);
+    const bloques = await ctx.db
+      .query("disponibilidadDocente")
+      .withIndex("por_docente_fecha", (q) =>
+        q.eq("docenteId", docente._id).gte("fecha", args.desde),
+      )
+      .collect();
+    return bloques
+      .filter((b) => b.estado === "DISPONIBLE")
+      .map((b) => ({
+        id: b._id,
+        fecha: b.fecha,
+        horaInicio: b.horaInicio,
+        horaFin: b.horaFin,
+        modalidad: b.modalidad,
+        lugarOEnlace: b.lugarOEnlace,
+      }));
+  }),
+});
+
+/* ------------------------------------------------------------------ *
+ *  RECORDATORIOS DE CITA
+ * ------------------------------------------------------------------ */
+
+/**
+ * Ecuador continental no tiene horario de verano desde 1993: el desfase es
+ * fijo, y por eso aquí se hace aritmética en vez de pedirle la zona a `Intl`.
+ * Es la misma suposición que ya hace `solicitarCita` al armar `-05:00`.
+ */
+const DESFASE_GUAYAQUIL = 5 * 60 * MINUTO;
+const HORA = 60 * MINUTO;
+/** La víspera se avisa a las 19:00, no 24 h antes: a las 12:30 nadie planifica mañana. */
+const HORA_VISPERA = 19;
+
+type MomentoRecordatorio = "VISPERA" | "UNA_HORA";
+const momentoRecordatorio = v.union(v.literal("VISPERA"), v.literal("UNA_HORA"));
+
+/**
+ * Cuándo avisar de una cita que empieza en `inicio`: la noche anterior y una
+ * hora antes. Los momentos que ya pasaron se omiten — una cita confirmada a
+ * las 21:00 para mañana temprano recibe solo el aviso de una hora antes, y la
+ * confirmación misma ya hizo de víspera.
+ */
+export function momentosDeRecordatorio(
+  inicio: number,
+  ahora: number,
+): { momento: MomentoRecordatorio; en: number }[] {
+  const candidatos = [
+    { momento: "VISPERA" as const, en: visperaDe(inicio) },
+    { momento: "UNA_HORA" as const, en: inicio - HORA },
+  ];
+  return candidatos.filter((c) => c.en > ahora);
+}
+
+/** Medianoche de Guayaquil del día en que cae `instante`. */
+const medianocheLocal = (instante: number) =>
+  Math.floor((instante - DESFASE_GUAYAQUIL) / DIA) * DIA + DESFASE_GUAYAQUIL;
+
+/** Las 19:00 del día anterior a `inicio`, en hora de Guayaquil. */
+const visperaDe = (inicio: number) => medianocheLocal(inicio) - DIA + HORA_VISPERA * HORA;
+
+/** Con menos margen que esto, recordar una citación ya no le sirve a nadie. */
+const MARGEN_CITACION = 2 * HORA;
+
+/**
+ * Cuándo recordar una citación que la familia no ha respondido: la víspera a
+ * las 19:00, igual que una cita confirmada. Si la citación salió después de
+ * esa hora, dos horas antes; con menos margen que eso, nunca.
+ */
+export function momentoRecordatorioCitacion(inicio: number, ahora: number): number | null {
+  const vispera = visperaDe(inicio);
+  if (vispera > ahora) return vispera;
+  const antes = inicio - MARGEN_CITACION;
+  return antes > ahora ? antes : null;
+}
+
+/** "hoy a las 12:30", "mañana a las 12:30" o "el jueves 10 de septiembre a las 12:30". */
+function cuandoDesde(instante: number, ahora: number): string {
+  const dias = Math.round((medianocheLocal(instante) - medianocheLocal(ahora)) / DIA);
+  if (dias === 0) return `hoy a las ${horaLocal(instante)}`;
+  if (dias === 1) return `mañana a las ${horaLocal(instante)}`;
+  return `el ${cuandoEnTexto(instante)}`;
+}
+
+/** Al quedar confirmada una cita, por cualquiera de las dos partes. */
+async function programarRecordatorios(ctx: MutationCtx, cita: Doc<"cita">): Promise<void> {
+  for (const { momento, en } of momentosDeRecordatorio(cita.fechaHoraInicio, Date.now())) {
+    await ctx.scheduler.runAt(en, internal.interaccion.recordarCita, {
+      citaId: cita._id,
+      fechaHoraInicio: cita.fechaHoraInicio,
+      momento,
+    });
+  }
+}
+
+/** "12:30" en hora de Guayaquil. */
+function horaLocal(instante: number): string {
+  return new Date(instante - DESFASE_GUAYAQUIL).toISOString().slice(11, 16);
+}
+
+const DIAS_SEMANA = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];
+const MESES = [
+  "enero", "febrero", "marzo", "abril", "mayo", "junio",
+  "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre",
+];
+
+/**
+ * "jueves 10 de septiembre a las 12:30", en hora de Guayaquil. El mismo
+ * formato que `fechaHoraLegible` en la aplicación: la notificación y la
+ * pantalla que abre tienen que nombrar la cita igual.
+ */
+function cuandoEnTexto(instante: number): string {
+  const local = new Date(instante - DESFASE_GUAYAQUIL);
+  const dia = `${DIAS_SEMANA[local.getUTCDay()]} ${local.getUTCDate()} de ${MESES[local.getUTCMonth()]}`;
+  return `${dia} a las ${horaLocal(instante)}`;
+}
+
+const MODALIDAD_EN_TEXTO: Record<Doc<"cita">["modalidad"], string> = {
+  PRESENCIAL: "presencial",
+  VIRTUAL: "virtual",
+  TELEFONICA: "por teléfono",
+};
+
+/**
+ * Tarea programada por `programarRecordatorios`. No guarda el id de la tarea
+ * ni hay que cancelarla: **relee la cita al dispararse** y solo avisa si sigue
+ * CONFIRMADA y a la misma hora. Una cita cancelada, marcada como atendida o
+ * reprogramada deja estas tareas sin efecto por sí sola — el mismo criterio
+ * que `vencerInconformidad`.
+ */
+export const recordarCita = internalMutation({
+  args: {
+    citaId: v.id("cita"),
+    fechaHoraInicio: v.number(),
+    momento: momentoRecordatorio,
+  },
+  returns: v.boolean(),
+  handler: async (ctx, args): Promise<boolean> => {
+    const cita = await ctx.db.get(args.citaId);
+    if (cita === null || cita.estado !== "CONFIRMADA" ||
+        cita.fechaHoraInicio !== args.fechaHoraInicio ||
+        cita.fechaHoraInicio <= Date.now()) {
+      return false;
+    }
+
+    const nombre = (await nombreDelEstudiante(ctx, cita.estudianteId)) ?? "tu representado";
+    const bloque = cita.disponibilidadDocenteId === undefined
+      ? null
+      : await ctx.db.get(cita.disponibilidadDocenteId);
+    const titulo = args.momento === "VISPERA" ? "Tu cita es mañana" : "Tu cita es en una hora";
+    const detalle =
+      `A las ${horaLocal(cita.fechaHoraInicio)}, ${MODALIDAD_EN_TEXTO[cita.modalidad]}` +
+      (bloque?.lugarOEnlace ? `. Lugar o enlace: ${bloque.lugarOEnlace}.` : ".");
+
+    const representante = await ctx.db.get(cita.representanteId);
+    if (representante !== null) {
+      await notificar(
+        ctx, representante.perfilUsuarioId, "RECORDATORIO_CITA", titulo,
+        `Con el docente de ${nombre}. ${detalle}`, "cita", cita._id,
+      );
+    }
+    const docente = await ctx.db.get(cita.docenteId);
+    if (docente !== null) {
+      await notificar(
+        ctx, docente.perfilUsuarioId, "RECORDATORIO_CITA", titulo,
+        `Con el representante de ${nombre}. ${detalle}`, "cita", cita._id,
+      );
+    }
+    return true;
+  },
+});
+
+/**
+ * Cada cita con el nombre del estudiante y el lugar o enlace de su bloque.
+ *
+ * Sin el nombre, la agenda del docente decía solo fecha y modalidad: con
+ * treinta familias no había forma de saber de quién era cada cita, y ahora
+ * que el docente cita él mismo a las familias hace falta todavía más. El
+ * lugar vive en el bloque, no en la cita; sin traerlo, una cita virtual no
+ * mostraba el enlace en ninguna pantalla.
+ */
+async function presentarCitas(ctx: QueryCtx, citas: Doc<"cita">[]) {
+  const presentadas = await Promise.all(citas.map(async (cita) => {
+    const bloque = cita.disponibilidadDocenteId === undefined
+      ? null
+      : await ctx.db.get(cita.disponibilidadDocenteId);
+    return {
+      ...cita,
+      estudianteNombre: await nombreDelEstudiante(ctx, cita.estudianteId),
+      lugarOEnlace: bloque?.lugarOEnlace ?? null,
+    };
+  }));
+  return presentadas.sort((a, b) => b.fechaHoraInicio - a.fechaHoraInicio);
+}
+
+/**
+ * La familia no respondió una citación y ya es la víspera (o faltan dos
+ * horas): se le recuerda a ella, y se le avisa al docente, que así sabe con
+ * tiempo que quizá nadie llegue y puede volver a citar.
+ *
+ * Programada por `citarFamilia`. Como `recordarCita`, relee la cita al
+ * dispararse: si la familia ya respondió, o la citación se retiró o cambió de
+ * hora, no hace nada.
+ */
+export const recordarCitacionSinRespuesta = internalMutation({
+  args: { citaId: v.id("cita"), fechaHoraInicio: v.number() },
+  returns: v.boolean(),
+  handler: async (ctx, args): Promise<boolean> => {
+    const cita = await ctx.db.get(args.citaId);
+    const ahora = Date.now();
+    if (cita === null || cita.origen !== "CITACION_DOCENTE" || cita.estado !== "SOLICITADA" ||
+        cita.fechaHoraInicio !== args.fechaHoraInicio || cita.fechaHoraInicio <= ahora) {
+      return false;
+    }
+
+    const nombre = (await nombreDelEstudiante(ctx, cita.estudianteId)) ?? "tu representado";
+    const cuando = cuandoDesde(cita.fechaHoraInicio, ahora);
+    const representante = await ctx.db.get(cita.representanteId);
+    if (representante !== null) {
+      await notificar(
+        ctx, representante.perfilUsuarioId, "RECORDATORIO_CITA",
+        "Tienes una citación sin responder",
+        `El docente de ${nombre} te citó para ${cuando}. Confírmale si puedes asistir.`,
+        "cita", cita._id,
+      );
+    }
+    const docente = await ctx.db.get(cita.docenteId);
+    if (docente !== null) {
+      await notificar(
+        ctx, docente.perfilUsuarioId, "CITACION",
+        "La familia todavía no responde",
+        `${nombre}: citación de ${cuando}, sin respuesta. Se lo recordamos a la familia.`,
+        "cita", cita._id,
+      );
+    }
+    return true;
+  },
+});
+
 /** Citas del representante autenticado (P8). */
 export const misCitasRepresentante = query({
   args: {},
@@ -444,7 +1067,7 @@ export const misCitasRepresentante = query({
       .query("cita")
       .withIndex("por_representante", (q) => q.eq("representanteId", representante._id))
       .collect();
-    return citas.sort((a, b) => b.fechaHoraInicio - a.fechaHoraInicio);
+    return await presentarCitas(ctx, citas);
   }),
 });
 
@@ -457,7 +1080,175 @@ export const misCitasDocente = query({
       .query("cita")
       .withIndex("por_docente", (q) => q.eq("docenteId", docente._id))
       .collect();
-    return citas.sort((a, b) => b.fechaHoraInicio - a.fechaHoraInicio);
+    return await presentarCitas(ctx, citas);
+  }),
+});
+
+/**
+ * ¿Le puede llegar un aviso al teléfono a esta persona? Solo si tiene al menos
+ * un dispositivo activo: `registrarDispositivo` lo da de alta al iniciar
+ * sesión, y `push.ts` lo desactiva solo cuando Expo responde que ya no existe.
+ */
+async function tieneTelefonoParaAvisos(ctx: QueryCtx, perfilUsuarioId: Id<"perfilUsuario">): Promise<boolean> {
+  const activo = await ctx.db
+    .query("dispositivo")
+    .withIndex("por_usuario", (q) => q.eq("perfilUsuarioId", perfilUsuarioId).eq("activo", true))
+    .first();
+  return activo !== null;
+}
+
+/**
+ * Las familias del curso a las que hoy no les puede llegar un aviso al
+ * teléfono, para que el docente se lo diga en persona.
+ *
+ * Todo lo que Cresco deja constancia —quién vio un aviso, quién abrió un
+ * reporte, los recordatorios de citas y citaciones— depende de que el aviso
+ * llegue. Sin esto, la familia sin teléfono registrado era un punto ciego:
+ * nadie se enteraba de que nada le llegaba. Solo el titular del curso.
+ */
+export const familiasSinAvisos = query({
+  args: { cursoId: v.id("curso") },
+  handler: (ctx, args) => conErroresPublicos(async () => {
+    await exigirTitularDelCurso(ctx, args.cursoId);
+    const matriculas = await ctx.db
+      .query("matricula")
+      .withIndex("por_curso_estado", (q) => q.eq("cursoId", args.cursoId).eq("estado", "CURSANDO"))
+      .collect();
+    let familias = 0;
+    const sinAvisos: { estudianteId: Id<"estudiante">; nombre: string }[] = [];
+    for (const matricula of matriculas) {
+      // D2: un solo representante legal por estudiante en la v1.
+      const vinculo = await ctx.db
+        .query("vinculoRepresentacion")
+        .withIndex("por_estudiante_estado", (q) =>
+          q.eq("estudianteId", matricula.estudianteId).eq("estado", "ACTIVO"),
+        )
+        .unique();
+      const representante = vinculo === null ? null : await ctx.db.get(vinculo.representanteId);
+      if (representante === null) continue;
+      familias++;
+      if (await tieneTelefonoParaAvisos(ctx, representante.perfilUsuarioId)) continue;
+      sinAvisos.push({
+        estudianteId: matricula.estudianteId,
+        nombre: (await nombreDelEstudiante(ctx, matricula.estudianteId)) ?? "Estudiante",
+      });
+    }
+    return {
+      familias,
+      sinAvisos: sinAvisos.sort((a, b) => a.nombre.localeCompare(b.nombre, "es")),
+    };
+  }),
+});
+
+/** Cuántos avisos y reportes recientes entran en el historial de una familia. */
+const HISTORIAL_AVISOS = 15;
+const HISTORIAL_REPORTES = 15;
+
+/**
+ * El historial de la relación con una familia, para el docente: sus citas y
+ * citaciones con él, qué avisos del curso vio, qué reportes abrió, y sus
+ * reclamos.
+ *
+ * De las entrevistas del 1 de septiembre: cuando un alumno pierde el año, el
+ * distrito le pide al docente "una carpeta de todas las citaciones, informes".
+ * Esto junta en una pantalla lo que Cresco ya sabe de esa carpeta. No la
+ * reemplaza (DP-009): es lo que la aplicación registró, no el expediente del
+ * plantel, y la pantalla lo dice.
+ *
+ * Solo las citas y los reclamos **de este docente**: los que la familia tenga
+ * con otro docente son de esa relación, no de esta.
+ */
+export const historialDeLaFamilia = query({
+  args: { estudianteId: v.id("estudiante") },
+  handler: (ctx, args) => conErroresPublicos(async () => {
+    const { docente, matricula } = await exigirAccesoDocenteAEstudiante(ctx, args.estudianteId);
+    const vinculo = await ctx.db
+      .query("vinculoRepresentacion")
+      .withIndex("por_estudiante_estado", (q) =>
+        q.eq("estudianteId", args.estudianteId).eq("estado", "ACTIVO"),
+      )
+      .unique();
+    const representante = vinculo === null ? null : await ctx.db.get(vinculo.representanteId);
+    const perfil = representante === null ? null : await ctx.db.get(representante.perfilUsuarioId);
+
+    const deEsteDocente = await ctx.db
+      .query("cita")
+      .withIndex("por_docente", (q) => q.eq("docenteId", docente._id))
+      .collect();
+    const citas = await presentarCitas(
+      ctx,
+      deEsteDocente.filter((c) => c.estudianteId === args.estudianteId),
+    );
+
+    // Los avisos que le llegaron: los del curso y los dirigidos a este hijo.
+    const comunicados = (await ctx.db
+      .query("comunicadoCurso")
+      .withIndex("por_curso_ventana", (q) => q.eq("cursoId", matricula.cursoId).eq("activo", true))
+      .collect())
+      .filter((c) => c.alcance === "CURSO" || c.estudianteId === args.estudianteId)
+      .sort((a, b) => b._creationTime - a._creationTime)
+      .slice(0, HISTORIAL_AVISOS);
+    const avisos = await Promise.all(comunicados.map(async (c) => ({
+      id: c._id,
+      titulo: c.titulo,
+      publicadoEn: c._creationTime,
+      visto: vinculo !== null && (await ctx.db
+        .query("vistaComunicado")
+        .withIndex("por_comunicado_representante", (q) =>
+          q.eq("comunicadoCursoId", c._id).eq("representanteId", vinculo.representanteId),
+        )
+        .first()) !== null,
+    })));
+
+    const reportes = await ctx.db
+      .query("reporteEstudiante")
+      .withIndex("por_matricula_fecha", (q) => q.eq("matriculaId", matricula._id))
+      .order("desc")
+      .take(HISTORIAL_REPORTES);
+    let entregados = 0;
+    let abiertos = 0;
+    for (const reporte of reportes) {
+      const entrega = vinculo === null ? null : await ctx.db
+        .query("entregaReporte")
+        .withIndex("por_reporte_representante", (q) =>
+          q.eq("reporteEstudianteId", reporte._id).eq("representanteId", vinculo.representanteId),
+        )
+        .unique();
+      if (entrega === null) continue;
+      entregados++;
+      if (entrega.leidoEn !== undefined) abiertos++;
+    }
+
+    const reclamosDelDocente = await ctx.db
+      .query("inconformidad")
+      .withIndex("por_docente_estado", (q) => q.eq("docenteId", docente._id))
+      .collect();
+    const reclamos: Doc<"inconformidad">[] = [];
+    for (const reclamo of reclamosDelDocente) {
+      const accion = await ctx.db.get(reclamo.accionRegistradaId);
+      const suya = accion === null ? null : await ctx.db.get(accion.matriculaId);
+      if (suya?.estudianteId === args.estudianteId) reclamos.push(reclamo);
+    }
+
+    return {
+      estudiante: (await nombreDelEstudiante(ctx, args.estudianteId)) ?? "Estudiante",
+      // `null`: sin representante vinculado. `nombre: null`: vinculado, pero
+      // su perfil es anterior a los nombres (#52).
+      representante: representante === null ? null : {
+        nombre: perfil && (perfil.nombres || perfil.apellidos)
+          ? `${perfil.nombres ?? ""} ${perfil.apellidos ?? ""}`.trim()
+          : null,
+        recibeAvisos: await tieneTelefonoParaAvisos(ctx, representante.perfilUsuarioId),
+      },
+      citas,
+      avisos,
+      reportes: { entregados, abiertos },
+      reclamos: {
+        total: reclamos.length,
+        sinResolver: reclamos.filter((r) =>
+          r.estado === "ABIERTA" || r.estado === "EN_REVISION" || r.estado === "VENCIDA").length,
+      },
+    };
   }),
 });
 
@@ -1147,13 +1938,40 @@ export const misNotificaciones = query({
     const perfil = await perfilActual(ctx);
     if (perfil === null) return [];
 
-    return await ctx.db
+    const notificaciones = await ctx.db
       .query("notificacion")
       .withIndex("por_usuario", (q) => q.eq("perfilUsuarioId", perfil._id))
       .order("desc")
       .take(NOTIFICACIONES_EN_BANDEJA);
+    return await Promise.all(notificaciones.map(async (n) => ({
+      ...n,
+      cursoId: n.entidadTipo === "cita" && n.entidadId ? await cursoDeLaCita(ctx, n.entidadId) : null,
+    })));
   }),
 });
+
+/**
+ * El curso de una cita, para que tocar su aviso lleve al docente a la agenda
+ * correcta: esa pantalla vive dentro de un curso (D16), y con varios no hay
+ * cómo adivinar cuál. Primero el curso para el que se publicó la franja; si
+ * no lo dice, el curso en el que está matriculado el estudiante.
+ */
+async function cursoDeLaCita(ctx: QueryCtx, entidadId: string): Promise<Id<"curso"> | null> {
+  const citaId = ctx.db.normalizeId("cita", entidadId);
+  const cita = citaId === null ? null : await ctx.db.get(citaId);
+  if (cita === null) return null;
+  const bloque = cita.disponibilidadDocenteId === undefined
+    ? null
+    : await ctx.db.get(cita.disponibilidadDocenteId);
+  if (bloque?.cursoId !== undefined) return bloque.cursoId;
+  const matricula = await ctx.db
+    .query("matricula")
+    .withIndex("por_estudiante_estado", (q) =>
+      q.eq("estudianteId", cita.estudianteId).eq("estado", "CURSANDO"),
+    )
+    .unique();
+  return matricula?.cursoId ?? null;
+}
 
 /** Marca una notificación como leída. Solo el dueño puede. */
 export const marcarNotificacionLeida = mutation({

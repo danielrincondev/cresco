@@ -4,7 +4,7 @@
 import { convexTest } from "convex-test";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { api } from "./_generated/api";
+import { api, internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import schema from "./schema";
 
@@ -408,3 +408,154 @@ describe("nucleo — periodos", () => {
     ).resolves.toHaveLength(2);
   });
 });
+
+describe("nucleo — el año lectivo: reglas y corrección", () => {
+  // Jueves 27 de agosto: el año del piloto (mayo a febrero) ya está en curso.
+  beforeEach(() => vi.useFakeTimers().setSystemTime(new Date("2026-08-27T15:00:00Z")));
+
+  it("un año que ya empezó se puede crear; uno que ya terminó, no", async () => {
+    const t = convexTest(schema, modules);
+    const { cliente } = await sembrarDocente(t);
+    await expect(cliente.mutation(api.nucleo.crearCurso, { ...datosCurso, anioInicio: "2025-05-05", anioFin: "2026-02-27" }))
+      .rejects.toThrow("El año lectivo ya terminó");
+    await expect(cliente.mutation(api.nucleo.crearCurso, datosCurso)).resolves.toBeDefined();
+  });
+
+  it("un año lectivo no dura más de 400 días", async () => {
+    const t = convexTest(schema, modules);
+    const { cliente } = await sembrarDocente(t);
+    await expect(cliente.mutation(api.nucleo.crearCurso, { ...datosCurso, anioInicio: "2026-05-04", anioFin: "2027-06-30" }))
+      .rejects.toThrow("no dura más de 400 días");
+  });
+
+  it("el titular corrige las fechas y el nombre del año se actualiza", async () => {
+    const t = convexTest(schema, modules);
+    const { cliente } = await sembrarDocente(t);
+    const { id: cursoId } = await cliente.mutation(api.nucleo.crearCurso, datosCurso);
+    await cliente.mutation(api.nucleo.corregirAnioLectivo, { cursoId, fechaInicio: "2026-04-27", fechaFin: "2027-03-05" });
+    const calendario = await cliente.query(api.nucleo.obtenerCalendarioCurso, { cursoId });
+    expect(calendario).toMatchObject({ fechaInicio: "2026-04-27", fechaFin: "2027-03-05" });
+    expect((await t.run((ctx) => ctx.db.query("anioLectivo").collect()))[0].nombre).toBe("2026–2027");
+  });
+
+  it("al corregir valen las mismas reglas que al crear", async () => {
+    const t = convexTest(schema, modules);
+    const { cliente } = await sembrarDocente(t);
+    const { id: cursoId } = await cliente.mutation(api.nucleo.crearCurso, datosCurso);
+    await expect(cliente.mutation(api.nucleo.corregirAnioLectivo, { cursoId, fechaInicio: "2025-09-01", fechaFin: "2026-08-20" }))
+      .rejects.toThrow("El año lectivo ya terminó");
+    await expect(cliente.mutation(api.nucleo.corregirAnioLectivo, { cursoId, fechaInicio: "2026-01-05", fechaFin: "2027-03-05" }))
+      .rejects.toThrow("no dura más de 400 días");
+  });
+
+  it("no deja fuera a un parcial ya definido", async () => {
+    const t = convexTest(schema, modules);
+    const { cliente } = await sembrarDocente(t);
+    const { id: cursoId } = await cliente.mutation(api.nucleo.crearCurso, datosCurso);
+    await cliente.mutation(api.nucleo.definirPeriodos, { cursoId, periodos: periodosValidos });
+    await expect(cliente.mutation(api.nucleo.corregirAnioLectivo, { cursoId, fechaInicio: "2026-06-01", fechaFin: "2027-02-26" }))
+      .rejects.toThrow("Primer parcial");
+  });
+
+  it("solo el titular corrige el año", async () => {
+    const t = convexTest(schema, modules);
+    const { cliente } = await sembrarDocente(t);
+    const { id: cursoId } = await cliente.mutation(api.nucleo.crearCurso, datosCurso);
+    const otro = await sembrarDocente(t, "docente_2");
+    await expect(otro.cliente.mutation(api.nucleo.corregirAnioLectivo, { cursoId, fechaInicio: "2026-05-04", fechaFin: "2027-02-26" }))
+      .rejects.toThrow("No eres el docente titular");
+  });
+});
+
+describe("nucleo — eliminar un curso y los cursos anteriores", () => {
+  beforeEach(() => vi.useFakeTimers().setSystemTime(new Date("2026-08-27T15:00:00Z")));
+
+  /** Un curso con un estudiante matriculado y una invitación pendiente. */
+  async function cursoConFamilias(t: ReturnType<typeof convexTest>) {
+    const docente = await sembrarDocente(t);
+    const curso = await docente.cliente.mutation(api.nucleo.crearCurso, datosCurso);
+    await docente.cliente.mutation(api.nucleo.crearInvitacion, { cursoId: curso.id });
+    const matriculaId = await t.run(async (ctx) => {
+      const c = (await ctx.db.get(curso.id))!;
+      const anio = (await ctx.db.get(c.anioLectivoId))!;
+      const estudianteId = await ctx.db.insert("estudiante", {
+        institucionId: anio.institucionId, nombres: "Ana", apellidos: "Pérez", tipoDocumento: "CEDULA",
+        numeroDocumento: "0911111111", origenRegistro: "REPRESENTANTE", estadoVerificacion: "APROBADO",
+        estado: "ACTIVO", actualizadoEn: Date.now(),
+      });
+      return await ctx.db.insert("matricula", {
+        estudianteId, cursoId: curso.id, fechaIngreso: "2026-05-04", estado: "CURSANDO", actualizadoEn: Date.now(),
+      });
+    });
+    return { ...docente, cursoId: curso.id, matriculaId };
+  }
+
+  it("eliminar oculta el curso, retira a sus estudiantes, revoca invitaciones, audita y libera el plan", async () => {
+    const t = convexTest(schema, modules);
+    const { cliente, cursoId, matriculaId } = await cursoConFamilias(t);
+    await cliente.mutation(internal.nucleo.eliminarCursoVerificado, { cursoId, reautenticadoEn: Date.now() });
+
+    const estado = await t.run(async (ctx) => ({
+      curso: await ctx.db.get(cursoId),
+      matricula: await ctx.db.get(matriculaId),
+      invitaciones: await ctx.db.query("invitacionCurso").collect(),
+      auditoria: (await ctx.db.query("auditoria").collect()).filter((a) => a.entidadTipo === "curso"),
+    }));
+    expect(estado.curso?.estado).toBe("ELIMINADO");
+    expect(estado.matricula).toMatchObject({ estado: "RETIRADA", fechaSalida: "2026-08-27" });
+    expect(estado.invitaciones.every((i) => i.estado === "REVOCADA")).toBe(true);
+    expect(estado.auditoria[0]).toMatchObject({ accion: "ANULAR", datosDespues: { estado: "ELIMINADO", matriculasRetiradas: 1 } });
+    // Nada se borró: el curso sigue en la base, solo que no aparece.
+    const lista = await cliente.query(api.nucleo.listarCursos);
+    expect(lista.cursos).toEqual([]);
+    expect(lista.anteriores).toEqual([]);
+    await expect(cliente.mutation(api.nucleo.crearCurso, { ...datosCurso, paralelo: "B" })).resolves.toBeDefined();
+  });
+
+  it("una confirmación de identidad de hace más de 5 minutos no sirve", async () => {
+    const t = convexTest(schema, modules);
+    const { cliente, cursoId } = await cursoConFamilias(t);
+    await expect(cliente.mutation(internal.nucleo.eliminarCursoVerificado, { cursoId, reautenticadoEn: Date.now() - 6 * 60_000 }))
+      .rejects.toThrow("Vuelve a confirmar tu identidad para eliminar el curso");
+  });
+
+  it("sin un token de Clerk válido, ni siquiera se intenta", async () => {
+    const t = convexTest(schema, modules);
+    const { cliente, cursoId } = await cursoConFamilias(t);
+    await expect(cliente.action(api.nucleo.eliminarCurso, { cursoId, tokenReautenticacion: "falso" }))
+      .rejects.toThrow("Vuelve a confirmar tu identidad para eliminar el curso");
+    expect((await t.run((ctx) => ctx.db.get(cursoId)))?.estado).toBe("ACTIVO");
+  });
+
+  it("solo el titular elimina su curso", async () => {
+    const t = convexTest(schema, modules);
+    const { cursoId } = await cursoConFamilias(t);
+    const otro = await sembrarDocente(t, "docente_2");
+    await expect(otro.cliente.mutation(internal.nucleo.eliminarCursoVerificado, { cursoId, reautenticadoEn: Date.now() }))
+      .rejects.toThrow("No eres el docente titular");
+  });
+
+  it("cuando termina el año lectivo pasa a anteriores el mismo día, y libera el plan", async () => {
+    const t = convexTest(schema, modules);
+    const { cliente, cursoId } = await cursoConFamilias(t);
+    vi.setSystemTime(new Date("2027-03-01T15:00:00Z"));
+    const lista = await cliente.query(api.nucleo.listarCursos);
+    expect(lista.cursos).toEqual([]);
+    expect(lista.anteriores.map((c) => c.id)).toEqual([cursoId]);
+    await expect(cliente.mutation(api.nucleo.crearCurso, {
+      ...datosCurso, anioInicio: "2027-04-26", anioFin: "2028-02-25",
+    })).resolves.toBeDefined();
+  });
+
+  it("la tarea nocturna lo marca Finalizado y termina las matrículas", async () => {
+    const t = convexTest(schema, modules);
+    const { cursoId, matriculaId } = await cursoConFamilias(t);
+    vi.setSystemTime(new Date("2027-03-01T15:00:00Z"));
+    expect(await t.mutation(internal.nucleo.finalizarCursosVencidos, {})).toBe(1);
+    const estado = await t.run(async (ctx) => ({ curso: await ctx.db.get(cursoId), matricula: await ctx.db.get(matriculaId) }));
+    expect(estado.curso?.estado).toBe("ARCHIVADO");
+    expect(estado.matricula).toMatchObject({ estado: "FINALIZADA", fechaSalida: "2027-02-26" });
+    expect(await t.mutation(internal.nucleo.finalizarCursosVencidos, {})).toBe(0);
+  });
+});
+

@@ -13,7 +13,8 @@ import { autenticarPeticion, leerEvento, sanearParaConvex } from "./lib/revenuec
 /**
  * POST /webhooks/revenuecat
  *
- * Contrato original (`api/openapi.yaml`, archivado en docs/99-archivo/):
+ * Contrato original (`api/openapi.yaml` del stack anterior; sigue en el
+ * historial: `git show c5ce997:docs/99-archivo/openapi-v1.1.0-archivado.yaml`):
  *   200 → procesado (o ya procesado antes)
  *   401 → firma inválida
  *

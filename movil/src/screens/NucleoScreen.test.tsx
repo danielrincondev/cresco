@@ -18,12 +18,22 @@ const estado = vi.hoisted(() => ({
   fallosRegistro: 0,
   fallosAuditoria: 0,
   consentimientoDesactualizado: false,
-  novedades: [] as { leidaEn?: number }[],
+  novedades: [] as Record<string, unknown>[],
+  cursos: { cursos: [] as Record<string, unknown>[], limitePlan: 1 },
   funciones: new Map<string, (args: unknown) => Promise<unknown>>(),
   barraInferior: true,
   barraInferiorGuardada: [] as boolean[],
   hijos: [] as { estudianteId: string; nombres: string; apellidos: string; estadoVerificacion: string }[],
   estadoHijos: "Exhausted" as "Exhausted" | "LoadingFirstPage",
+  argsReporteDeHoy: [] as unknown[],
+  sinAvisos: { familias: 0, sinAvisos: [] as { estudianteId: string; nombre: string }[] },
+  alTocarAviso: undefined as ((id: string) => void) | undefined,
+}));
+// El módulo nativo no existe en pruebas: se guarda a quién avisar al tocar.
+vi.mock("../lib/avisosDelTelefono", () => ({
+  useAvisosDelTelefono: (_perfil: unknown, alTocar: (id: string) => void) => { estado.alTocarAviso = alTocar; },
+  useEstadoAvisos: () => ({ resultado: "REGISTRADO" }),
+  registrarTelefono: async () => "REGISTRADO",
 }));
 vi.mock("react-native", async () => ({
   ...(await import("../test/mockReactNative")).reactNative(),
@@ -64,11 +74,33 @@ vi.mock("convex/react", () => ({
   // El mock tiene que distinguir que se le pregunta: la pantalla consulta el
   // perfil **y** las novedades, y devolver el perfil para las dos hacia que
   // `sinLeer` operara sobre algo que no es una lista.
-  useQuery: (ref: Parameters<typeof getFunctionName>[0]) =>
-    getFunctionName(ref) === "interaccion:misNotificaciones"
-      ? estado.novedades
-      : estado.perfil,
-  usePaginatedQuery: () => ({ results: estado.hijos, status: estado.estadoHijos, loadMore: vi.fn() }),
+  useQuery: (ref: Parameters<typeof getFunctionName>[0], args?: unknown) => {
+    const nombre = getFunctionName(ref);
+    if (nombre === "interaccion:misNotificaciones") return estado.novedades;
+    if (nombre === "conducta:reporteDeHoy") estado.argsReporteDeHoy.push(args);
+    // El reporte del día trae también las novedades del curso (QA del 26 de
+    // septiembre); sin esta rama, el mock genérico de abajo (`estado.perfil`,
+    // un objeto) revienta el `.map` de `NovedadesDelCurso`.
+    if (nombre === "conducta:comunicadosVigentes") return [];
+    // Las pantallas del docente: sin estas ramas recibían el perfil, que no
+    // es una lista, y `<Cursos>` o la agenda reventaban dentro de la prueba.
+    if (nombre === "nucleo:listarCursos") return estado.cursos;
+    if (nombre === "interaccion:misCitasDocente") return [];
+    if (nombre === "interaccion:misBloquesLibres") return [];
+    if (nombre === "nucleo:obtenerCalendarioCurso") return { periodos: [] };
+    if (nombre === "interaccion:familiasSinAvisos") return estado.sinAvisos;
+    if (nombre === "interaccion:historialDeLaFamilia") return {
+      estudiante: "Ana Pérez", representante: null, citas: [], avisos: [],
+      reportes: { entregados: 0, abiertos: 0 }, reclamos: { total: 0, sinResolver: 0 },
+    };
+    return estado.perfil;
+  },
+  // Como Convex: una consulta en "skip" no trae nada. Sin esto, al docente le
+  // llegaban como "hijos" los estudiantes de prueba y la app lo mandaba al
+  // reporte de un hijo que no tiene.
+  usePaginatedQuery: (_ref: unknown, args: unknown) => args === "skip"
+    ? { results: [], status: "LoadingFirstPage", loadMore: vi.fn() }
+    : { results: estado.hijos, status: estado.estadoHijos, loadMore: vi.fn() },
   useMutation: (ref: Parameters<typeof getFunctionName>[0]) => {
     const nombre = getFunctionName(ref);
     if (!estado.funciones.has(nombre)) estado.funciones.set(nombre, async (args: unknown) => {
@@ -121,6 +153,9 @@ beforeEach(() => {
   estado.fallosAuditoria = 0;
   estado.consentimientoDesactualizado = false;
   estado.novedades = [];
+  estado.cursos = { cursos: [], limitePlan: 1 };
+  estado.argsReporteDeHoy = [];
+  estado.sinAvisos = { familias: 0, sinAvisos: [] };
   estado.barraInferior = true;
   estado.barraInferiorGuardada = [];
   estado.hijos = [];
@@ -328,13 +363,6 @@ it("la barra inferior existe para el representante y no para el docente", async 
     vista!.root.findAll((n) => n.props.accessibilityLabel === "Inicio"),
   ).not.toHaveLength(0);
 
-  // El mock de useQuery de este archivo solo conoce "obtenerPerfil" y
-  // "misNotificaciones": para cualquier otra consulta -incluida
-  // listarCursos, que usa la pantalla del docente- devuelve el perfil tal
-  // cual, y `<Cursos>` revienta leyendo un campo que no existe ahi. Es un
-  // hueco del mock compartido, no del producto: por eso el volcado de error
-  // en stderr es ruido esperado, y la asercion que importa (sin barra
-  // inferior para el docente) sigue siendo válida pese a él.
   estado.perfil = { ...perfil, representanteId: null, docenteId: "docente" as never };
   await actualizar();
   expect(tablist()).toBeUndefined();
@@ -457,3 +485,161 @@ it("tocar Inicio después del arranque sí lleva a Mis hijos, y se queda ahí", 
   await actualizar();
   expect(JSON.stringify(vista!.toJSON())).toContain("Acompaña a tus hijos");
 });
+
+/* ---------- Del aviso de una cita a la agenda del docente ---------- */
+
+const cursoDePrueba = (id: string, nombre: string) => ({
+  id, nombre, nivel: "5", paralelo: nombre.slice(-1), jornada: "MATUTINA",
+  institucion: "Escuela de prueba", totalEstudiantes: 20, periodoVigente: null,
+});
+const avisoDeCita = (cursoId: string | null) => ({
+  _id: "n1", _creationTime: Date.now(), tipo: "CITACION", titulo: "La familia confirmó la citación",
+  cuerpo: "Ana Pérez, jueves 10 de septiembre a las 12:30.", entidadTipo: "cita", entidadId: "c1", cursoId,
+});
+async function abrirAviso(titulo: string) {
+  await act(async () => vista!.root.findByProps({ accessibilityLabel: "Novedades, 1 sin leer" }).props.onPress());
+  await act(async () => vista!.root.findByProps({ accessibilityLabel: `${titulo}, sin leer` }).props.onPress());
+}
+
+/**
+ * Antes, tocar un aviso de cita dejaba al docente en la campana: la agenda
+ * vive dentro de un curso y la app no sabía de cuál era la cita. Ahora el
+ * aviso trae su curso, y con varios cursos se elige ese, no el primero.
+ */
+it("el docente que toca un aviso de cita llega a la agenda del curso de esa cita", async () => {
+  estado.perfil = { ...perfil, representanteId: null, docenteId: "docente" as never };
+  estado.cursos = { cursos: [cursoDePrueba("curso-a", "Quinto A"), cursoDePrueba("curso-b", "Sexto B")], limitePlan: 5 };
+  estado.novedades = [avisoDeCita("curso-b")];
+  await montar();
+  await abrirAviso("La familia confirmó la citación");
+  expect(JSON.stringify(vista!.toJSON())).toContain("Atención a familias");
+  // La agenda abierta es la de Sexto B: se nota al citar desde ella.
+  await pulsar("Citar a una familia");
+  expect(JSON.stringify(vista!.toJSON())).toContain("Sexto B. Elige al estudiante.");
+});
+
+it("sin curso en el aviso, sirve el único curso del docente", async () => {
+  estado.perfil = { ...perfil, representanteId: null, docenteId: "docente" as never };
+  estado.cursos = { cursos: [cursoDePrueba("curso-a", "Quinto A")], limitePlan: 1 };
+  estado.novedades = [avisoDeCita(null)];
+  await montar();
+  await abrirAviso("La familia confirmó la citación");
+  expect(JSON.stringify(vista!.toJSON())).toContain("Atención a familias");
+});
+
+it("con varios cursos y ninguno identificado, no adivina: se queda en la campana", async () => {
+  estado.perfil = { ...perfil, representanteId: null, docenteId: "docente" as never };
+  estado.cursos = { cursos: [cursoDePrueba("curso-a", "Quinto A"), cursoDePrueba("curso-b", "Sexto B")], limitePlan: 5 };
+  estado.novedades = [avisoDeCita(null)];
+  await montar();
+  await abrirAviso("La familia confirmó la citación");
+  expect(JSON.stringify(vista!.toJSON())).not.toContain("Atención a familias");
+});
+
+it("desde la lista de estudiantes del curso se abre el historial de su familia, y atrás vuelve al curso", async () => {
+  estado.perfil = { ...perfil, representanteId: null, docenteId: "docente" as never };
+  estado.cursos = { cursos: [cursoDePrueba("curso-a", "Quinto A")], limitePlan: 1 };
+  estado.hijos = [{ estudianteId: "e1", nombres: "Ana", apellidos: "Pérez", estadoVerificacion: "APROBADO" }];
+  await montar();
+  await act(async () => vista!.root.findByProps({ accessibilityLabel: "Abrir Quinto A" }).props.onPress());
+  await pulsar("Historial de la familia");
+  let texto = JSON.stringify(vista!.toJSON());
+  expect(texto).toContain("Historial de la familia");
+  expect(texto).toContain("Sin representante vinculado en Cresco.");
+  await pulsar("Volver al curso");
+  texto = JSON.stringify(vista!.toJSON());
+  expect(texto).not.toContain("Sin representante vinculado en Cresco.");
+  expect(texto).toContain("Historial de la familia"); // otra vez el botón, en la lista del curso
+});
+
+/* ---------- El aviso de un día abre ese día ---------- */
+
+// 22:00 del martes 15 en Guayaquil: son las 03:00 del 16 en UTC.
+const NOCHE_DEL_15 = Date.UTC(2026, 8, 16, 3, 0);
+const avisoDeLaFamilia = (tipo: string, titulo: string) => ({
+  _id: "n1", _creationTime: NOCHE_DEL_15, tipo, titulo, cuerpo: "",
+  entidadTipo: "estudiante", entidadId: "e1", cursoId: null,
+});
+
+/**
+ * El reporte de las 22:00 casi siempre se toca a la mañana siguiente. Antes
+ * abría "hoy", un día todavía sin reporte, y el de anoche quedaba escondido.
+ */
+it("tocar a la mañana el aviso del reporte de anoche abre el reporte de anoche", async () => {
+  estado.novedades = [avisoDeLaFamilia("REPORTE_DIARIO", "Reporte de hoy publicado")];
+  await montar();
+  await abrirAviso("Reporte de hoy publicado");
+  expect(estado.argsReporteDeHoy.at(-1)).toEqual({ estudianteId: "e1", fecha: "2026-09-15" });
+});
+
+it("un aviso del curso no lleva a un día: abre el reporte de hoy", async () => {
+  estado.novedades = [avisoDeLaFamilia("NOTA_DOCENTE", "Traer materiales")];
+  await montar();
+  await abrirAviso("Traer materiales");
+  expect(estado.argsReporteDeHoy.at(-1)).toEqual({ estudianteId: "e1" });
+});
+
+/* ---------- A quién no le llegan los avisos ---------- */
+
+it("en el curso, el docente ve a qué familias no les llegan los avisos al teléfono", async () => {
+  estado.perfil = { ...perfil, representanteId: null, docenteId: "docente" as never };
+  estado.cursos = { cursos: [cursoDePrueba("curso-a", "Quinto A")], limitePlan: 1 };
+  estado.sinAvisos = {
+    familias: 3,
+    sinAvisos: [{ estudianteId: "e1", nombre: "Ana Pérez" }, { estudianteId: "e2", nombre: "Bruno Zambrano" }],
+  };
+  await montar();
+  await act(async () => vista!.root.findByProps({ accessibilityLabel: "Abrir Quinto A" }).props.onPress());
+  expect(JSON.stringify(vista!.toJSON())).toContain("2 de 3 familias no reciben avisos en el teléfono");
+  expect(JSON.stringify(vista!.toJSON())).not.toContain("Bruno Zambrano");
+  await pulsar("Ver quiénes (2)");
+  expect(JSON.stringify(vista!.toJSON())).toContain("Ana Pérez, Bruno Zambrano.");
+});
+
+it("si a todas les llegan los avisos, no hay nada que señalar", async () => {
+  estado.perfil = { ...perfil, representanteId: null, docenteId: "docente" as never };
+  estado.cursos = { cursos: [cursoDePrueba("curso-a", "Quinto A")], limitePlan: 1 };
+  estado.sinAvisos = { familias: 3, sinAvisos: [] };
+  await montar();
+  await act(async () => vista!.root.findByProps({ accessibilityLabel: "Abrir Quinto A" }).props.onPress());
+  expect(JSON.stringify(vista!.toJSON())).not.toContain("avisos en el teléfono");
+});
+
+/* ---------- Tocar un aviso del sistema, fuera de la app ---------- */
+
+it("tocar un aviso del teléfono abre su pantalla y lo marca leído, como en la campana", async () => {
+  estado.novedades = [avisoDeLaFamilia("REPORTE_DIARIO", "Reporte de hoy publicado")];
+  await montar();
+  await act(async () => estado.alTocarAviso!("n1"));
+  expect(estado.argsReporteDeHoy.at(-1)).toEqual({ estudianteId: "e1", fecha: "2026-09-15" });
+  expect(llamadas("interaccion:marcarNotificacionLeida")).toEqual([
+    { nombre: "interaccion:marcarNotificacionLeida", args: { notificacionId: "n1" } },
+  ]);
+});
+
+it("los cursos de un año terminado van plegados en 'Cursos anteriores', marcados Finalizado", async () => {
+  estado.perfil = { ...perfil, representanteId: null, docenteId: "docente" as never };
+  estado.cursos = {
+    cursos: [cursoDePrueba("curso-a", "Quinto A")],
+    anteriores: [cursoDePrueba("curso-v", "Cuarto A")],
+    limitePlan: 1,
+  } as never;
+  await montar();
+  expect(JSON.stringify(vista!.toJSON())).not.toContain("Cuarto A");
+  await pulsar("Cursos anteriores (1)");
+  const texto = JSON.stringify(vista!.toJSON());
+  expect(texto).toContain("Cuarto A");
+  expect(texto).toContain("Finalizado");
+});
+
+it("la campana está en cualquier pantalla, no solo en el inicio, y no en la propia bandeja", async () => {
+  estado.perfil = { ...perfil, representanteId: null, docenteId: "docente" as never };
+  estado.cursos = { cursos: [cursoDePrueba("curso-a", "Quinto A")], limitePlan: 1 };
+  estado.novedades = [avisoDeCita("curso-a")];
+  await montar();
+  await act(async () => vista!.root.findByProps({ accessibilityLabel: "Abrir Quinto A" }).props.onPress());
+  expect(vista!.root.findAllByProps({ accessibilityLabel: "Novedades, 1 sin leer" }).length).toBeGreaterThan(0);
+  await act(async () => vista!.root.findByProps({ accessibilityLabel: "Novedades, 1 sin leer" }).props.onPress());
+  expect(vista!.root.findAllByProps({ accessibilityLabel: "Novedades, 1 sin leer" })).toHaveLength(0);
+});
+

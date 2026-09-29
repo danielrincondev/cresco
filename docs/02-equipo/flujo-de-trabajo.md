@@ -1,6 +1,6 @@
 # Flujo de trabajo del equipo — Cresco
 
-> **Estado:** Vigente · **Dueño:** Todos · **Última revisión:** 2026-08-22
+> **Estado:** Vigente · **Dueño:** Todos · **Última revisión:** 2026-09-28
 
 Este documento reemplaza la idea de "manual que se reescribe cada vez que algo
 cambia". Explica el problema que resolvimos, qué se construyó, y cómo trabaja
@@ -23,14 +23,16 @@ en prosa se mantenga sincronizado a mano.
 
 | Antes | Ahora |
 |---|---|
-| `NEXT_STEPS.md` reescrito a mano cada vez | GitHub Issues + Project board *(pendiente de crear, ver abajo)* |
-| Decisiones editadas encima en `registro-decisiones.md` | `docs/00-producto/decisiones/` — un archivo por decisión (DP-001 a DP-008), nunca se edita, se reemplaza |
+| `NEXT_STEPS.md` reescrito a mano cada vez | GitHub Issues |
+| Decisiones editadas encima en `registro-decisiones.md` | `docs/00-producto/decisiones/` — un archivo por decisión (DP-001 a DP-013), nunca se edita, se reemplaza |
 | Reglas de negocio descritas en prosa | Viven en el código: `convex/lib/enums.ts`, `guardas.ts` — el código no puede desincronizarse de sí mismo |
 | "Cada quien es dueño de su módulo" como frase del manual | `.github/CODEOWNERS` — GitHub pide la revisión correcta solo, sin depender de que alguien se acuerde |
 
 `registro-decisiones.md`, `decisiones-pendientes.md` y
 `cuestionario-direccion-visual.md` quedaron marcados `Reemplazado` y movidos a
-`docs/99-archivo/` — se conservan completos como historial, no se borró nada.
+`docs/99-archivo/`. El 28 de septiembre esa carpeta se retiró del árbol, junto
+con `Contexto/NEXT_STEPS.md`: su contenido sigue completo en el historial de
+git (`git show c5ce997:docs/99-archivo/`).
 
 ## El ciclo de trabajo, individual
 
@@ -52,7 +54,7 @@ Ejemplo con tu propio módulo (`convex/nucleo.ts`):
    `permisos.ts`), pide la aprobación de **los tres**.
 7. El CI corre solo (typecheck + tests). El botón de fusionar queda
    deshabilitado hasta que esté en verde y llegue la aprobación.
-8. Fusionas. Tu rama se borra sola (configuración pendiente, ver abajo).
+8. Fusionas. Tu rama se borra sola en GitHub.
 9. B y Kenny hacen `git pull origin main` cuando les toque tocar algo cerca.
 
 ## El ciclo en equipo
@@ -76,9 +78,8 @@ de que alguien la organice aparte.
 ## Cuando algo no llega a tiempo
 
 No se deja en una rama vieja divergiendo de `main`. Se fusiona igual, pero
-detrás de una bandera de activación (`convex/lib/flags.ts`, pendiente de
-crear) — código real, compilado y probado, simplemente apagado hasta que esté
-listo. Ya lo decidimos así para el diferenciador de IA (`DP-008`); la idea es
+detrás de una bandera de activación (`convex/lib/flags.ts`) — código real,
+compilado y probado, simplemente apagado hasta que esté listo. Ya lo decidimos así para el diferenciador de IA (`DP-008`); la idea es
 usarlo como práctica general.
 
 ## La interfaz (actualizado el 10 de septiembre — DP-012)
@@ -121,22 +122,13 @@ Persona D (@krriveram) no escribe código. Su lane son tres cosas con fecha:
 Cada una vive en su propio issue con fecha de entrega. Un lane sin código
 necesita entregables con fecha, o deja de poder seguirse.
 
-## Qué falta configurar, y qué te toca a ti (Daniel)
+## Configuración de GitHub
 
-Esto requiere permisos de **Admin** sobre el repo, que hoy solo tienes tú:
+La hizo Daniel, que es quien tiene permisos de **Admin** sobre el repo:
 
-1. **Settings → Branches → Add branch protection rule**, patrón `main`:
-   - ☑ Require a pull request before merging
-   - ☑ Require approvals (mínimo 1)
-   - ☑ Require review from Code Owners
-   - ☑ Require status checks to pass before merging → seleccionar el check
-     de `.github/workflows/ci.yml`
-2. **Settings → General → Pull Requests** → activar "Automatically delete
-   head branches" (para que las ramas cortas no se acumulen).
-3. Revisar que tu usuario de GitHub en `.github/CODEOWNERS` sea correcto
-   (`@danielrincondev`) — si no, dímelo y lo corrijo.
-4. `git pull` en tu copia local para traer todo esto una vez que se haga
-   push.
+- `main` está protegida: todo cambio entra por Pull Request, con la revisión de
+  los dueños que pide `CODEOWNERS` y el check del CI (`Tipos y pruebas`) en
+  verde.
+- La rama de un PR se borra sola al fusionarlo.
 
-Lo que ya tenías pendiente (núcleo + componentes) sigue igual, ver
-`Contexto/NEXT_STEPS.md`.
+Cambiar algo de esto solo lo puede hacer un Admin: se le pide a Daniel.

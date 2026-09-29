@@ -99,6 +99,21 @@ const CITA: Record<EstadoCita, Etiqueta> = {
 
 export const etiquetaCita = (estado: EstadoCita): Etiqueta => CITA[estado];
 
+/**
+ * La etiqueta de una cita **a una hora dada**. Una solicitud cuya hora pasó
+ * sin que nadie respondiera ya no está "esperando" nada: seguir diciéndolo
+ * invita a presentarse a una cita que nunca se confirmó, justo lo que la
+ * tabla de arriba intenta evitar.
+ */
+export const etiquetaCitaAl = (
+  estado: EstadoCita,
+  fechaHoraInicio: number,
+  ahora: number,
+): Etiqueta =>
+  estado === "SOLICITADA" && fechaHoraInicio <= ahora
+    ? { tono: "neutro", texto: "Sin respuesta" }
+    : CITA[estado];
+
 /* --------------------------------------------------------------------------
  * Reclamos (inconformidades)
  * ----------------------------------------------------------------------- */

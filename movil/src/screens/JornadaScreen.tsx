@@ -24,13 +24,15 @@ import type { FunctionReturnType } from "convex/server";
 
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
-import { Chip, EstadoVacio } from "../components/Estado";
+import { CampoFecha } from "../components/CampoFecha";
+import { Chip, Chips, EstadoVacio } from "../components/Estado";
 import { EsqueletoPagina } from "../components/Movimiento";
 import {
   Aviso,
   Boton,
   Campo,
   Cargando,
+  Casilla,
   Cuerpo,
   ErrorMensaje,
   Opciones,
@@ -39,7 +41,7 @@ import {
   Tarjeta,
   useOperacion,
 } from "../components/NucleoUI";
-import { fechaLegible, hoyISO } from "../lib/fechas";
+import { fechaISO, fechaLegible, hoyISO } from "../lib/fechas";
 
 type EstadoAsistencia = "PRESENTE" | "AUSENTE" | "ATRASO" | "JUSTIFICADA" | "PERMISO";
 
@@ -249,7 +251,56 @@ export function ReporteGeneral({
       >
         Publicar a las familias
       </Boton>
+
+      <LecturasDeReportes cursoId={cursoId} />
     </Pagina>
+  );
+}
+
+/**
+ * Quién abrió el reporte de cada uno de los últimos días, y quién falta.
+ *
+ * El reporte es lo que más se usa, y hasta ahora el docente lo publicaba sin
+ * saber si alguien lo abría. Dice "abrió", no "leyó", por lo mismo que los
+ * avisos dicen "vio": es lo que la aplicación sabe de verdad.
+ */
+function LecturasDeReportes({ cursoId }: { cursoId: Id<"curso"> }) {
+  const dias = useQuery(api.conducta.lecturasDeReportes, { cursoId });
+  const [abierto, setAbierto] = useState<string>();
+
+  if (dias === undefined || dias.length === 0) return null;
+
+  return (
+    <>
+      <Subtitulo>Quién abrió los reportes</Subtitulo>
+      <Cuerpo>
+        Cuenta cuando la familia ve el reporte en la aplicación: el mismo día,
+        o después en "Reportes anteriores".
+      </Cuerpo>
+      {dias.map((dia) => (
+        <Tarjeta key={dia.fecha}>
+          <Subtitulo>{fechaLegible(dia.fecha)}</Subtitulo>
+          <Cuerpo>
+            {dia.abiertos === dia.familias
+              ? `Lo abrieron todas las familias (${dia.familias}).`
+              : `Lo abrieron ${dia.abiertos} de ${dia.familias} familias.`}
+          </Cuerpo>
+          {dia.faltan.length > 0 &&
+            (abierto === dia.fecha ? (
+              <>
+                <Cuerpo>{`Faltan: ${dia.faltan.join(", ")}.`}</Cuerpo>
+                <Boton secundario onPress={() => setAbierto(undefined)}>
+                  Ocultar
+                </Boton>
+              </>
+            ) : (
+              <Boton secundario onPress={() => setAbierto(dia.fecha)}>
+                {`Ver quiénes faltan (${dia.faltan.length})`}
+              </Boton>
+            ))}
+        </Tarjeta>
+      ))}
+    </>
   );
 }
 
@@ -274,8 +325,15 @@ export function PublicarComunicado({
   const [titulo, setTitulo] = useState("");
   const [contenido, setContenido] = useState("");
   const [fechaEvento, setFechaEvento] = useState("");
+  // Un evento puede ser de un solo día o de un plazo (QA del 26 de
+  // septiembre): las dos formas están disponibles, y "es un plazo" solo
+  // pide la segunda fecha cuando hace falta.
+  const [esPlazo, setEsPlazo] = useState(false);
+  const [fechaEventoFin, setFechaEventoFin] = useState("");
   const [publicado, setPublicado] = useState(false);
   const op = useOperacion();
+
+  const faltaFechaEvento = tipo === "EVENTO" && !fechaEvento.trim();
 
   async function enviar() {
     const r = await op.ejecutar(() =>
@@ -286,8 +344,9 @@ export function PublicarComunicado({
         titulo: titulo.trim(),
         contenido: contenido.trim(),
         // La fecha solo viaja en un evento: una nota no ocurre un día.
-        ...(tipo === "EVENTO" && fechaEvento.trim()
-          ? { fechaEvento: fechaEvento.trim() }
+        ...(tipo === "EVENTO" ? { fechaEvento: fechaEvento.trim() } : {}),
+        ...(tipo === "EVENTO" && esPlazo && fechaEventoFin.trim()
+          ? { fechaEventoFin: fechaEventoFin.trim() }
           : {}),
       }),
     );
@@ -301,6 +360,7 @@ export function PublicarComunicado({
           <Cuerpo>Las familias del curso ya pueden verlo en sus novedades.</Cuerpo>
         </Tarjeta>
         <Boton onPress={onVolver}>Volver al curso</Boton>
+        <ComunicadosPublicados cursoId={cursoId} />
       </Pagina>
     );
   }
@@ -340,15 +400,30 @@ export function PublicarComunicado({
           editable={!op.pendiente}
         />
         {tipo === "EVENTO" && (
-          <Campo
-            etiqueta="Fecha del evento"
-            value={fechaEvento}
-            onChangeText={setFechaEvento}
-            placeholder="2026-09-30"
-            maxLength={10}
-            ayuda="Año-mes-día. Se puede dejar vacío si todavía no hay fecha."
-            editable={!op.pendiente}
-          />
+          <>
+            <CampoFecha
+              etiqueta="Fecha del evento"
+              valor={fechaEvento}
+              onChange={setFechaEvento}
+              ayuda="Cuándo empieza. Un evento siempre necesita esta fecha."
+              editable={!op.pendiente}
+            />
+            <Casilla
+              texto="Dura varios días (un plazo)"
+              marcada={esPlazo}
+              onChange={() => setEsPlazo(!esPlazo)}
+              disabled={op.pendiente}
+            />
+            {esPlazo && (
+              <CampoFecha
+                etiqueta="Hasta"
+                valor={fechaEventoFin}
+                onChange={setFechaEventoFin}
+                ayuda="Último día en que se sigue viendo en el reporte diario."
+                editable={!op.pendiente}
+              />
+            )}
+          </>
         )}
       </Tarjeta>
 
@@ -361,10 +436,71 @@ export function PublicarComunicado({
       <Boton
         onPress={() => void enviar()}
         pendiente={op.pendiente}
-        disabled={!titulo.trim() || !contenido.trim()}
+        disabled={!titulo.trim() || !contenido.trim() || faltaFechaEvento}
       >
         Publicar al curso
       </Boton>
+
+      <ComunicadosPublicados cursoId={cursoId} />
     </Pagina>
+  );
+}
+
+/**
+ * Lo que el docente ya publicó en el curso, con cuántas familias lo vieron y
+ * quiénes faltan.
+ *
+ * De las entrevistas del 1 de septiembre: "ya no vale que yo le avisé por
+ * WhatsApp". Esto es lo que el docente puede mostrar en su lugar, así que
+ * dice exactamente lo que la aplicación sabe — que la familia **vio** el
+ * aviso al abrir el reporte donde aparece —, sin prometer que lo leyó.
+ */
+function ComunicadosPublicados({ cursoId }: { cursoId: Id<"curso"> }) {
+  const publicados = useQuery(api.conducta.comunicadosPublicados, { cursoId });
+  const [abierto, setAbierto] = useState<string>();
+
+  if (publicados === undefined || publicados.length === 0) return null;
+  const hoy = hoyISO();
+
+  return (
+    <>
+      <Subtitulo>Lo que ya publicaste</Subtitulo>
+      <Cuerpo>
+        Cuenta como visto cuando la familia abre el reporte de su hijo donde
+        aparece el aviso.
+      </Cuerpo>
+      {publicados.map((c) => (
+        <Tarjeta key={c.id}>
+          <Chips>
+            <Chip etiqueta={{ tono: "neutro", texto: c.tipo === "EVENTO" ? "Evento" : "Nota" }} />
+            {c.visibleHasta < hoy && (
+              <Chip etiqueta={{ tono: "neutro", texto: "Ya no se muestra" }} />
+            )}
+          </Chips>
+          <Subtitulo>{c.titulo}</Subtitulo>
+          <Cuerpo>{`Publicado el ${fechaLegible(fechaISO(c.publicadoEn))}`}</Cuerpo>
+          <Cuerpo>
+            {c.familias === 0
+              ? "Todavía no hay familias vinculadas que puedan verlo."
+              : c.vistos === c.familias
+                ? `Lo vieron todas las familias (${c.familias}).`
+                : `Lo vieron ${c.vistos} de ${c.familias} familias.`}
+          </Cuerpo>
+          {c.faltan.length > 0 &&
+            (abierto === c.id ? (
+              <>
+                <Cuerpo>{`Faltan: ${c.faltan.join(", ")}.`}</Cuerpo>
+                <Boton secundario onPress={() => setAbierto(undefined)}>
+                  Ocultar
+                </Boton>
+              </>
+            ) : (
+              <Boton secundario onPress={() => setAbierto(c.id)}>
+                {`Ver quiénes faltan (${c.faltan.length})`}
+              </Boton>
+            ))}
+        </Tarjeta>
+      ))}
+    </>
   );
 }
