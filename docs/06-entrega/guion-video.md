@@ -1,0 +1,310 @@
+# Guion del video (Shipaton 2026)
+
+> **Estado:** Borrador para revisar · **Dueño:** Persona C · **Última revisión:** 2026-09-28
+>
+> El video de demostración para Devpost (#55): menos de 2 minutos, la app en
+> teléfonos Android reales, narración en español y subtítulos en inglés
+> (DP-015). Usa los datos de demostración de `movil/convex/demo.ts`: la docente
+> Andrea Salazar, la representante Rosa Mendoza y su hijo Mateo, en una escuela
+> ficticia. Si una pantalla de la app cambia, se corrige aquí primero.
+
+**La idea que tiene que quedar:** Cresco es el puente seguro entre la escuela y la familia: todo queda por escrito, nadie es anónimo y el docente nunca tiene que dar su número.
+
+| Duración | Límite | Voz | Subtítulos | Edición | Formato |
+|---|---|---|---|---|---|
+| 1:50 | menos de 2:00 | español, otra persona | inglés, pegados al video | CapCut | 16:9 · 1080p · 30 fps |
+
+## Cinta de tiempo
+
+| Segmento | Tiempo | Dura | Escenas |
+|---|---|---|---|
+| El problema | 0:00–0:19 | 19 s | 1 a 3 |
+| Cresco | 0:19–0:24 | 5 s | 4 |
+| El ciclo en acción | 0:24–1:15 | 51 s | 5 a 10 |
+| RevenueCat, con propósito | 1:15–1:41 | 26 s | 11 a 14 |
+| Cierre | 1:41–1:50 | 9 s | 15 |
+
+Termina en 1:50. Quedan 10 segundos de margen hasta el límite de 2:00.
+
+## Guion segundo a segundo
+
+En las escenas del ciclo se ven los dos teléfonos lado a lado: la docente a la
+izquierda y la familia a la derecha. Los botones que se tocan van en `código`,
+lo que se escribe en *«cursiva»* y los avisos del teléfono como «Cresco · texto».
+
+### El problema · 0:00–0:19
+
+#### 1 · Un papelito en la mochila · 0:00–0:06
+
+| | |
+|---|---|
+| **Pantalla completa** | Plano cerrado de una mochila escolar con un papel doblado que asoma. Se graba en casa, con el teléfono en horizontal, de 8 a 10 segundos. Sin caras, sin nombres reales y sin marcas visibles en la mochila. |
+| **Voz** | En la escuela pública de Ecuador, las noticias de un niño viajan en un papelito. |
+| **Subtítulos** | `0:00–0:06` In Ecuador's public schools, news about a child travels on a scrap of paper. |
+| **Edición** | Si no hay toma, fondo azul oscuro con el texto «Un papelito en la mochila». |
+
+#### 2 · Lo que oímos en las entrevistas · 0:06–0:14
+
+| | |
+|---|---|
+| **Pantalla completa** | Fondo azul oscuro de Cresco (#002A5C). La cita en letras grandes: «Estaban tomando los números de los profesores.» Debajo, pequeño: «Docente de un plantel fiscal · entrevista del 1 de septiembre de 2026». |
+| **Voz** | ¿Grupos de WhatsApp? Un plantel los prohibió: «estaban tomando los números de los profesores». |
+| **Subtítulos** | `0:06–0:08` WhatsApp groups?<br>`0:08–0:14` One school banned them: “they were taking the teachers' numbers.” |
+| **Ojo** | El logo de WhatsApp no sale: se nombra, no se muestra. |
+
+#### 3 · El costo · 0:14–0:19
+
+| | |
+|---|---|
+| **Pantalla completa** | El mismo fondo. Dos líneas que aparecen al ritmo de la voz: «El docente, expuesto.» y «La familia, tarde.» |
+| **Voz** | El docente queda expuesto, y la familia se entera tarde. |
+| **Subtítulos** | `0:14–0:19` Teachers are left exposed, and families find out too late. |
+
+### Cresco · 0:19–0:24
+
+#### 4 · El puente · 0:19–0:24
+
+| | |
+|---|---|
+| **Pantalla completa** | Fondo claro (#EBF4FA), el de la app. El ícono de Cresco, la palabra «Cresco» y debajo «El puente seguro entre la escuela y la familia». Al final entran los dos teléfonos: docente a la izquierda, familia a la derecha. |
+| **Voz** | Cresco es un puente seguro entre la escuela y la familia. |
+| **Subtítulos** | `0:19–0:24` Cresco is a safe bridge between school and family. |
+
+### El ciclo en acción · 0:24–1:15
+
+#### 5 · La docente anota · 0:24–0:33 · General o Beta
+
+| | |
+|---|---|
+| **Docente · Andrea (izquierda)** | abre «Quinto de Básica A» → `Anotar conducta`, sin detenerse en la portada → Mateo Andrade Mendoza, el primero de la lista: `Anotar` → escribe *«Conversó durante la evaluación.»* → `Indisciplina` → deja −1, que ya viene elegido → `Registrar la anotación` → «Anotación registrada» |
+| **Familia · Rosa (derecha)** | Pantalla de inicio del teléfono, quieta. |
+| **Voz** | La docente anota lo que pasó, con sus palabras. El puntaje se calcula solo. |
+| **Subtítulos** | `0:24–0:29` The teacher writes down what happened, in her own words.<br>`0:29–0:33` The behaviour score updates on its own. |
+| **Texto en pantalla** | Los primeros 3 segundos, abajo: «Demo data · fictional school, students and families». |
+| **Edición** | La escritura, acelerada ×3. |
+| **Ojo** | Solo un instante en la portada del curso: ahí dice que 19 de 20 familias no reciben avisos, porque las familias ficticias no tienen teléfono. Es cierto, pero en el video confunde. |
+
+#### 6 · La familia lo recibe · 0:33–0:39 · General o Beta
+
+| | |
+|---|---|
+| **Docente · Andrea (izquierda)** | En pausa: congelado en su último cuadro. |
+| **Familia · Rosa (derecha)** | baja el aviso «Cresco · Tienes una novedad de tu representado» → lo toca → se abre «Lo de hoy, contado por su docente», con INDISCIPLINA · −1 y el texto de la docente |
+| **Voz** | La familia lo recibe al instante. El aviso nunca dice el nombre del niño. |
+| **Subtítulos** | `0:33–0:39` The family gets it instantly. The notification never names the child. |
+| **Edición** | Si el aviso tarda en llegar, corta la espera. |
+
+#### 7 · La familia reclama · 0:39–0:50 · General o Beta
+
+| | |
+|---|---|
+| **Docente · Andrea (izquierda)** | En pausa: congelado en su último cuadro. |
+| **Familia · Rosa (derecha)** | `Ver el acumulado del parcial` → la anotación de hoy está arriba: `Ver y reclamar` → `Reclamar esta anotación` → `Falta contexto` → escribe *«Me dijo que le estaba preguntando algo a la profesora.»* → `Enviar el reclamo` → «Reclamo enviado» |
+| **Voz** | ¿No está de acuerdo? Reclama por escrito y con su nombre: en Cresco no hay mensajes anónimos. |
+| **Subtítulos** | `0:39–0:44` Disagree? She disputes it in writing, under her own name.<br>`0:44–0:50` There are no anonymous messages in Cresco. |
+| **Edición** | La navegación ×2 y la escritura ×3. Que se alcance a leer «El docente tiene 30 días para responderte por escrito». |
+
+#### 8 · La docente responde · 0:50–1:00 · General o Beta
+
+| | |
+|---|---|
+| **Docente · Andrea (izquierda)** | baja el aviso «Cresco · Hay novedades sobre tu reclamo» y lo toca → «Reclamos»: la tarjeta dice «Lo abrió Rosa Mendoza» → `Responder` → `Se anula` → escribe *«Tiene razón: me estaba preguntando por una instrucción del examen. La anulo.»* → `Enviar respuesta` |
+| **Familia · Rosa (derecha)** | En pausa: congelado en su último cuadro. |
+| **Voz** | La docente tiene treinta días para responder por escrito: mantenerla, modificarla o anularla. |
+| **Subtítulos** | `0:50–0:55` The teacher has 30 days to answer in writing:<br>`0:55–1:00` keep the entry, change it, or annul it. |
+| **Texto en pantalla** | Un recuadro sobre «Lo abrió Rosa Mendoza» durante un segundo. |
+| **Edición** | La escritura, acelerada ×3. |
+
+#### 9 · La respuesta llega · 1:00–1:05 · General o Beta
+
+| | |
+|---|---|
+| **Docente · Andrea (izquierda)** | En pausa: congelado en su último cuadro. |
+| **Familia · Rosa (derecha)** | llega el aviso «Cresco · Hay novedades sobre tu reclamo» → la campana de arriba: «El docente respondió tu reclamo», con lo que escribió la docente → menú, `Reporte acumulado`: la anotación dice «Anulada» y el puntaje vuelve a «Buen desempeño · 63» |
+| **Voz** | Si la anula, el puntaje se recalcula, y todo queda registrado. |
+| **Subtítulos** | `1:00–1:05` If she annuls it, the score is recalculated, and it all stays on record. |
+
+#### 10 · Una cita, sin números de por medio · 1:05–1:15 · General o Beta
+
+| | |
+|---|---|
+| **Docente · Andrea (izquierda)** | baja el aviso «Cresco · Hay novedades sobre una cita» y lo toca → «Atención a familias», en «Por confirmar»: la de Mateo Andrade Mendoza → `Confirmar` |
+| **Familia · Rosa (derecha)** | `Inicio` → `Ver al docente a cargo`: nombre, título y horario, y ningún teléfono (2 segundos) → `Pedir una cita` → `Ver horarios del docente` → el primer horario libre: `Reservar este horario` |
+| **Voz** | Para conversar, la familia pide una cita en el horario de la docente. Ella confirma, sin dar nunca su número. |
+| **Subtítulos** | `1:05–1:10` To talk, the family books a slot in the teacher's office hours.<br>`1:10–1:15` She confirms, and never has to give out her number. |
+| **Ojo** | En «Por confirmar» también está la cita de Santiago. Confirmen la de Mateo. |
+
+### RevenueCat, con propósito · 1:15–1:41
+
+#### 11 · El límite del plan gratuito · 1:15–1:22 · Solo Beta
+
+| | |
+|---|---|
+| **Docente · Andrea (izquierda)** | En pausa, o fuera de cuadro. |
+| **Familia · Rosa (derecha)** | `Reporte diario`, con el anuncio de prueba abajo → `Ver reportes anteriores` → 2 reportes y el aviso «Tu plan muestra los últimos 2 reportes» → `Ver los planes` → «Tu plan»: Premium mensual y Premium bimestral, con su precio |
+| **Voz** | Lo esencial es gratis. Cuando una familia quiere más, aparece el plan Premium. |
+| **Subtítulos** | `1:15–1:22` The essentials are free. Premium appears only when a family wants more. |
+| **Ojo** | Desde aquí, solo en Beta. En General los planes salen sin precio y con un aviso de que esa build no cobra. |
+
+#### 12 · La compra · 1:22–1:30 · Solo Beta
+
+| | |
+|---|---|
+| **Docente · Andrea (izquierda)** | En pausa, o fuera de cuadro. |
+| **Familia · Rosa (derecha)** | toca el precio de Premium mensual → la ventana de compra de prueba de RevenueCat: la opción de compra exitosa → «Compra registrada. Tu plan se activa en unos segundos.» → «Tu plan hoy: Representante — Premium mensual» |
+| **Voz** | La compra pasa por RevenueCat, y nuestro servidor activa el plan con su webhook. |
+| **Subtítulos** | `1:22–1:26` The purchase goes through RevenueCat,<br>`1:26–1:30` and its webhook tells our server to unlock the plan. |
+| **Texto en pantalla** | Opcional, arriba: «RevenueCat Test Store». |
+| **Edición** | Corta la espera entre la compra y el plan activado. |
+
+#### 13 · Lo que se desbloquea · 1:30–1:35 · Solo Beta
+
+| | |
+|---|---|
+| **Docente · Andrea (izquierda)** | En pausa, o fuera de cuadro. |
+| **Familia · Rosa (derecha)** | `Reporte diario`, ya sin anuncio → `Ver reportes anteriores`: sin el aviso del límite y con todos los reportes → opcional: el acumulado y `Descargar el PDF` |
+| **Voz** | Más historial, el informe en PDF, y cero anuncios. |
+| **Subtítulos** | `1:30–1:35` More history, a PDF report, and no ads. |
+
+#### 14 · El plan del docente · 1:35–1:41 · Solo Beta
+
+| | |
+|---|---|
+| **Docente · Andrea (izquierda)** | «Cursos»: el aviso «Tu plan incluye un curso y ya lo estás usando» → `Ver el plan PRO` → «Tu plan como docente»: Docente — PRO, con su precio |
+| **Familia · Rosa (derecha)** | En pausa, con su plan Premium ya activo. |
+| **Voz** | Y el docente con varios cursos tiene su propio plan PRO. |
+| **Subtítulos** | `1:35–1:41` Teachers with several classes get their own PRO plan. |
+| **Ojo** | En Beta, con la cuenta de Andrea: se cierra la sesión de Rosa y se entra con la de Andrea. |
+
+### Cierre · 1:41–1:50
+
+#### 15 · Que ninguna señal llegue tarde · 1:41–1:50
+
+| | |
+|---|---|
+| **Pantalla completa** | Fondo azul oscuro. El ícono de Cresco y, en grande, «Que ninguna señal llegue tarde.» Debajo, pequeño: «Código abierto (AGPL-3.0) · github.com/danielrincondev/cresco» y «Equipo Neofix · Ecuador». |
+| **Voz** | Todo por escrito, nadie anónimo, y el docente nunca da su número. Cresco: que ninguna señal llegue tarde. |
+| **Subtítulos** | `1:41–1:46` Everything in writing. No one anonymous. Teachers never give out their number.<br>`1:46–1:50` Cresco: so no warning sign arrives too late. |
+
+## Locución
+
+La hoja para quien narra: solo lo que se lee, en orden. Cada frase tiene su
+tiempo, con margen.
+
+| # | Frase | Tiempo |
+|---|---|---|
+| 1 | En la escuela pública de Ecuador, las noticias de un niño viajan en un papelito. | 0:00–0:06 (6 s) |
+| 2 | ¿Grupos de WhatsApp? Un plantel los prohibió: «estaban tomando los números de los profesores». | 0:06–0:14 (8 s) |
+| 3 | El docente queda expuesto, y la familia se entera tarde. | 0:14–0:19 (5 s) |
+| 4 | Cresco es un puente seguro entre la escuela y la familia. | 0:19–0:24 (5 s) |
+| 5 | La docente anota lo que pasó, con sus palabras. El puntaje se calcula solo. | 0:24–0:33 (9 s) |
+| 6 | La familia lo recibe al instante. El aviso nunca dice el nombre del niño. | 0:33–0:39 (6 s) |
+| 7 | ¿No está de acuerdo? Reclama por escrito y con su nombre: en Cresco no hay mensajes anónimos. | 0:39–0:50 (11 s) |
+| 8 | La docente tiene treinta días para responder por escrito: mantenerla, modificarla o anularla. | 0:50–1:00 (10 s) |
+| 9 | Si la anula, el puntaje se recalcula, y todo queda registrado. | 1:00–1:05 (5 s) |
+| 10 | Para conversar, la familia pide una cita en el horario de la docente. Ella confirma, sin dar nunca su número. | 1:05–1:15 (10 s) |
+| 11 | Lo esencial es gratis. Cuando una familia quiere más, aparece el plan Premium. | 1:15–1:22 (7 s) |
+| 12 | La compra pasa por RevenueCat, y nuestro servidor activa el plan con su webhook. | 1:22–1:30 (8 s) |
+| 13 | Más historial, el informe en PDF, y cero anuncios. | 1:30–1:35 (5 s) |
+| 14 | Y el docente con varios cursos tiene su propio plan PRO. | 1:35–1:41 (6 s) |
+| 15 | Todo por escrito, nadie anónimo, y el docente nunca da su número. Cresco: que ninguna señal llegue tarde. | 1:41–1:50 (9 s) |
+
+**Cómo grabarla**
+
+- Un cuarto silencioso y con cosas blandas (cortinas, ropa, una cama): quitan el eco.
+- La grabadora de voz del teléfono, a un palmo de la boca y un poco de lado, para que no se oiga el aire.
+- Tono tranquilo y cercano, como si se lo contaras a alguien. Sin prisa: cada frase tiene margen.
+- Cada frase dos veces, con un segundo de silencio entre una y otra. Si te equivocas, repite la frase entera.
+- Manda el archivo original por Drive o por correo. Como nota de voz de WhatsApp llega comprimido y se oye peor.
+
+**Cómo se dicen**
+
+- Cresco: CRES-co
+- RevenueCat: RÉ-ve-niu-cat, como en inglés
+- webhook: güeb-juk
+- PDF: pe-de-efe
+- Premium: PRI-mium
+
+## Subtítulos
+
+| Opción | ¿Se ven siempre? | ¿Se corrigen después de subir? | Trabajo |
+|---|---|---|---|
+| **Pegados al video** (recomendada) | Sí, en cualquier reproductor y también sin sonido. | No: hay que exportar y subir el video otra vez. | Importar el `.srt` en CapCut, o escribir las 22 frases a mano. |
+| Subtítulos de YouTube | Solo si quien mira los enciende. | Sí, desde YouTube Studio. | Subir el `.srt` en YouTube Studio. |
+| Los dos | Sí: los pegados, en inglés. | Solo los de YouTube. | Los dos pasos. Los de YouTube irían en español, para quien no oye bien. |
+
+**Por qué pegados:** En Devpost el video se ve en el reproductor de YouTube, que deja los subtítulos apagados si nadie los enciende. Un juez que no hable español vería una app en español y oiría español. Sin subtítulos pegados, no entendería nada.
+
+**Cómo se hacen en CapCut**
+
+1. Cuando la voz esté grabada, les preparo el archivo `.srt` con las 22 frases en inglés y los tiempos de este guion.
+2. CapCut de computadora deja importar ese archivo como subtítulos. Después se mueve cada uno hasta que coincida con la voz.
+3. Si su versión de CapCut no lo deja, se copian a mano como texto: son 22 frases.
+4. Los subtítulos automáticos de CapCut no hacen falta. Escriben el español que oyen, y habría que traducirlo y corregirlo igual.
+
+**Formato**
+
+- Letra blanca sobre una franja oscura semitransparente, abajo y al centro.
+- Máximo dos líneas, de unos 42 caracteres cada una.
+- Grandes: que se lean sin esfuerzo en la pantalla de un teléfono.
+- En la franja libre debajo de los teléfonos, sin tapar las pantallas.
+- Cada una aparece con su frase y se va cuando la frase termina.
+
+## Antes de grabar
+
+**Cuándo**
+
+- **Hoy, lunes 28:** revisar este guion y mandarle la locución a quien narra.
+- **Martes 29, día de clases:** grabar la voz y las tomas 2 a 5. El servidor no deja anotar en fin de semana.
+- **Miércoles 30:** editar, subtitular, subir a YouTube y enviar a Devpost de día. El cierre es el miércoles 30 a las 23:45 de California, que en Ecuador es la 01:45 del jueves 1 de octubre.
+
+**Teléfonos**
+
+1. Dos teléfonos Android: A con la cuenta de **Andrea Salazar** (docente) y B con la de **Rosa Mendoza** (familia). Ya tienen los datos de demostración. No creen nada más en esas cuentas antes de grabar.
+2. En los dos: Ajustes, Apariencia, **Claro**. Así se ven iguales lado a lado.
+3. En los dos: Ajustes, Avisos en este teléfono, **Activos**. Sin esto no llega el aviso de la escena 6.
+4. Silencien las notificaciones de las otras apps (WhatsApp, correo, redes). «No molestar» no sirve: también calla a Cresco.
+5. Graben con el grabador de pantalla de Android (en el panel rápido, «Grabar pantalla»), sin audio. Si el teléfono lo ofrece, activen «Mostrar toques».
+
+**Builds**
+
+6. Escenas 5 a 10: la **General 1.1.0** sirve en los dos teléfonos.
+7. Escenas 11 a 14: solo **Beta**, con la laptop corriendo `npm run dev` y el teléfono en la misma Wi-Fi. En General los planes salen sin precio.
+8. Prueben la compra antes con **otra cuenta de familia**, nunca con Rosa. Si Rosa compra antes de grabar, ya no vuelve a ver el muro de pago.
+9. Si en Beta aparece abajo un aviso amarillo o rojo de desarrollo, ciérrenlo antes de grabar.
+
+**Datos**
+
+10. Andrea publica una franja para el **jueves 1 de octubre, de 10:00 a 11:00, en «Aula 12»** (menú del curso, Atención a familias, Publicar una franja). Así Rosa tiene horarios libres graben el día que graben, y coincide con su horario de martes y jueves.
+11. La anotación y el reclamo se hacen una sola vez, con los dos teléfonos grabando. Si hay que repetir, cada intento deja otra anotación anulada en el historial de Mateo. No rompe nada, pero se ve.
+
+**Lo que no debe salir**
+
+12. La portada del curso de Andrea más de un segundo (el aviso de las 19 familias sin avisos).
+13. Nada personal de ustedes: notificaciones, contactos, fotos o números.
+14. Caras de niños reales, la escuela real, logos de otras marcas (WhatsApp incluido) o casos reales de violencia o extorsión.
+15. Música con derechos de autor.
+
+## Tomas
+
+La voz se graba cuando quien narra pueda. Lo demás, en este orden.
+
+| # | Toma | Dónde y cómo | Dura | Escenas |
+|---|---|---|---|---|
+| 1 | La voz | Quien narra, con la hoja de locución | 10 min | 1 a 15 |
+| 2 | La mochila | Cámara del teléfono, en horizontal | 10 s | 1 |
+| 3 | El ciclo | Los dos teléfonos grabando la pantalla a la vez, de corrido | 4 min | 5 a 10 |
+| 4 | La compra | Beta, con la cuenta de Rosa | 2 min | 11 a 13 |
+| 5 | El plan PRO | Beta, con la cuenta de Andrea | 20 s | 14 |
+| 6 | Las tarjetas de texto | Se hacen en CapCut | — | 2, 3, 4 y 15 |
+
+## Edición en CapCut
+
+1. Proyecto de 16:9, 1920 × 1080, 30 fps.
+2. Primero la voz: pongan la narración completa en la línea de tiempo y acomoden todo lo demás a ella.
+3. Los dos teléfonos lado a lado sobre el fondo #EBF4FA, a un 85 % del alto: docente a la izquierda, familia a la derecha. Arriba de cada uno, «TEACHER · Andrea» y «FAMILY · Rosa».
+4. El teléfono que no actúa, congelado en su último cuadro y un poco más tenue. En las escenas 11 a 14 puede salir de cuadro.
+5. Aceleren la escritura (×2 a ×4) y corten las esperas: pantallas cargando, avisos que tardan.
+6. Música opcional. Si la usan, de la Biblioteca de audio de YouTube y muy baja bajo la voz. La de CapCut puede recibir un reclamo de derechos en YouTube.
+7. Exporten en 1080p y 30 fps. En YouTube, confirmen que dura menos de 2:00.
+8. Súbanlo a YouTube como público o «No listado» y pongan el enlace en Devpost, y en `devpost.md` donde dice «[YouTube or Vimeo link]».

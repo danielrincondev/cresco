@@ -84,6 +84,7 @@ documentación del producto.
 | Documento | Estado | Dueño |
 |---|---|---|
 | `devpost.md` | ✅ texto final en inglés, campo por campo, para pegar en Devpost (#55) | Persona C |
+| `guion-video.md` | 🚧 borrador para revisar: el video segundo a segundo, la locución, los subtítulos y las tomas (#55) | Persona C |
 
 ---
 
