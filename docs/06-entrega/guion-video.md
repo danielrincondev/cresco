@@ -237,7 +237,7 @@ tiempo, con margen.
 
 **Cómo se hacen en CapCut**
 
-1. Cuando la voz esté grabada, les preparo el archivo `.srt` con las 22 frases en inglés y los tiempos de este guion.
+1. El archivo `.srt` con las 22 frases en inglés ya está listo, con los tiempos de este guion: `docs/06-entrega/subtitulos-video-en.srt`.
 2. CapCut de computadora deja importar ese archivo como subtítulos. Después se mueve cada uno hasta que coincida con la voz.
 3. Si su versión de CapCut no lo deja, se copian a mano como texto: son 22 frases.
 4. Los subtítulos automáticos de CapCut no hacen falta. Escriben el español que oyen, y habría que traducirlo y corregirlo igual.
@@ -255,7 +255,7 @@ tiempo, con margen.
 **Cuándo**
 
 - **Hoy, martes 29:** quien narra graba la voz y la manda (el archivo original). Si les alcanza después de la prueba con tu tía, graben también las sesiones A, B y C: el martes es día de clases hasta la medianoche.
-- **Miércoles 30 en la mañana:** lo que falte por grabar. Apenas tengas la voz, te preparo el `.srt`.
+- **Miércoles 30 en la mañana:** lo que falte por grabar.
 - **Miércoles 30 en la tarde:** editar, subtitular, subir a YouTube y enviar a Devpost **antes de las 20:00**. El cierre es a la 01:45 del jueves 1 de octubre en Ecuador (23:45 del miércoles en California): mejor no apurar el margen.
 
 **Teléfonos**

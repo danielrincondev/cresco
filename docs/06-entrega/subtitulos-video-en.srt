@@ -1,0 +1,103 @@
+1
+00:00:00,000 --> 00:00:06,000
+In Ecuador's public schools, news about
+a child travels on a scrap of paper.
+
+2
+00:00:06,000 --> 00:00:08,000
+WhatsApp groups?
+
+3
+00:00:08,000 --> 00:00:14,000
+One school banned them: “they were
+taking the teachers' numbers.”
+
+4
+00:00:14,000 --> 00:00:19,000
+Teachers are left exposed, and
+families find out too late.
+
+5
+00:00:19,000 --> 00:00:24,000
+Cresco is a safe bridge
+between school and family.
+
+6
+00:00:24,000 --> 00:00:29,000
+The teacher writes down what
+happened, in her own words.
+
+7
+00:00:29,000 --> 00:00:33,000
+The behaviour score updates on its own.
+
+8
+00:00:33,000 --> 00:00:39,000
+The family gets it instantly. The
+notification never names the child.
+
+9
+00:00:39,000 --> 00:00:44,000
+Disagree? She disputes it in
+writing, under her own name.
+
+10
+00:00:44,000 --> 00:00:50,000
+There are no anonymous messages in Cresco.
+
+11
+00:00:50,000 --> 00:00:55,000
+The teacher has 30 days
+to answer in writing:
+
+12
+00:00:55,000 --> 00:01:00,000
+keep the entry, change it, or annul it.
+
+13
+00:01:00,000 --> 00:01:05,000
+If she annuls it, the score is
+recalculated, and it all stays on record.
+
+14
+00:01:05,000 --> 00:01:10,000
+To talk, the family books a slot
+in the teacher's office hours.
+
+15
+00:01:10,000 --> 00:01:15,000
+She confirms, and never
+has to give out her number.
+
+16
+00:01:15,000 --> 00:01:22,000
+The essentials are free. Premium
+appears only when a family wants more.
+
+17
+00:01:22,000 --> 00:01:26,000
+The purchase goes through RevenueCat,
+
+18
+00:01:26,000 --> 00:01:30,000
+and its webhook tells our
+server to unlock the plan.
+
+19
+00:01:30,000 --> 00:01:35,000
+More history, a PDF report, and no ads.
+
+20
+00:01:35,000 --> 00:01:41,000
+Teachers with several classes
+get their own PRO plan.
+
+21
+00:01:41,000 --> 00:01:46,000
+Everything in writing. No one anonymous.
+Teachers never give out their number.
+
+22
+00:01:46,000 --> 00:01:50,000
+Cresco: so no warning
+sign arrives too late.
