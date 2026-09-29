@@ -116,3 +116,57 @@ it("el destino activo se anuncia como seleccionado", async () => {
     .at(0);
   expect(pulsable).toBeTruthy();
 });
+
+/* ---------- Gestos (issue #101) ---------- */
+
+/** Un `gestureState` inventado: solo lo que miran los gestos. */
+const gesto = (g: { x0?: number; dx: number; dy?: number; vx?: number }) =>
+  ({ x0: 0, dy: 0, vx: 0, ...g }) as never;
+
+it("deslizar hacia la izquierda sobre el menú lo cierra; un toque o un desliz vertical no", async () => {
+  const onCerrar = vi.fn();
+  const v = await pintar(
+    <MenuLateral abierto onCerrar={onCerrar}>
+      <ItemMenu icono="school" texto="Cursos" onPress={() => {}} />
+    </MenuLateral>,
+  );
+  const capa = v.root.findAll((n) => typeof n.props.onPanResponderRelease === "function")[0];
+  expect(capa.props.onMoveShouldSetPanResponderCapture(null, gesto({ dx: -30, dy: 4 }))).toBe(true);
+  expect(capa.props.onMoveShouldSetPanResponderCapture(null, gesto({ dx: -6 }))).toBe(false);
+  expect(capa.props.onMoveShouldSetPanResponderCapture(null, gesto({ dx: -20, dy: 60 }))).toBe(false);
+  expect(capa.props.onMoveShouldSetPanResponderCapture(null, gesto({ dx: 40 }))).toBe(false);
+
+  capa.props.onPanResponderRelease(null, gesto({ dx: -20, vx: -0.1 }));
+  expect(onCerrar).not.toHaveBeenCalled();
+  capa.props.onPanResponderRelease(null, gesto({ dx: -80 }));
+  expect(onCerrar).toHaveBeenCalledTimes(1);
+  capa.props.onPanResponderRelease(null, gesto({ dx: -25, vx: -0.9 }));
+  expect(onCerrar).toHaveBeenCalledTimes(2);
+});
+
+it("desde el borde izquierdo, deslizar a la derecha abre el menú; desde el medio o sin menú, no", async () => {
+  const { useGestoParaAbrirMenu, BORDE_DEL_GESTO } = await import("./MenuLateral");
+  const onAbrir = vi.fn();
+  let manejadores: Record<string, (e: unknown, g: unknown) => unknown> = {};
+  function Pantalla({ activo }: { activo: boolean }) {
+    manejadores = useGestoParaAbrirMenu(onAbrir, activo) as never;
+    return null;
+  }
+  const v = await pintar(<Pantalla activo />);
+  const captura = (g: Parameters<typeof gesto>[0]) =>
+    manejadores.onMoveShouldSetPanResponderCapture(null, gesto(g));
+
+  expect(captura({ x0: 10, dx: 30, dy: 3 })).toBe(true);
+  expect(captura({ x0: BORDE_DEL_GESTO + 20, dx: 30 })).toBe(false);
+  expect(captura({ x0: 10, dx: 30, dy: 70 })).toBe(false);
+  expect(captura({ x0: 10, dx: -30 })).toBe(false);
+  expect(captura({ x0: 10, dx: 6 })).toBe(false);
+
+  manejadores.onPanResponderRelease(null, gesto({ x0: 10, dx: 30 }));
+  expect(onAbrir).not.toHaveBeenCalled();
+  manejadores.onPanResponderRelease(null, gesto({ x0: 10, dx: 90 }));
+  expect(onAbrir).toHaveBeenCalledTimes(1);
+
+  await act(async () => v.update(<Pantalla activo={false} />));
+  expect(captura({ x0: 10, dx: 30 })).toBe(false);
+});

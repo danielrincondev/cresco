@@ -14,7 +14,10 @@ categoría Next Gen.
 > interviews teachers told us that a WhatsApp message is not evidence ("what
 > counts is the written report"), so Cresco keeps a record of which families
 > saw each notice, who opened each daily report, and what was agreed at each
-> meeting. Monetisation runs on **RevenueCat**: a Premium entitlement for
+> meeting. Teachers never expose a personal phone number or email: families
+> reach them only inside the app, always under their own name (one school we
+> interviewed had banned parent WhatsApp groups because teachers' numbers were
+> being taken). Monetisation runs on **RevenueCat**: a Premium entitlement for
 > families (seven past reports instead of two, a printable PDF report, no ads)
 > and a PRO entitlement for teachers (up to five courses), confirmed
 > server-side by a RevenueCat webhook in Convex, with Test Store purchases
@@ -86,6 +89,9 @@ request.
   viendo un anuncio con premio en el plan gratuito.
 - Reclama una anotación con la que no está de acuerdo.
 - Pide citas, responde las citaciones del docente y recibe los acuerdos.
+- Ve quién es el docente de su hijo y su horario de atención, pero nunca su
+  teléfono ni su correo personal: a él se llega pidiendo una cita, siempre a
+  nombre propio ([DP-016](docs/00-producto/decisiones/016-sin-contacto-personal-del-docente.md)).
 - Recibe avisos en el teléfono: el reporte publicado, anotaciones, avisos del
   curso, citas y alertas.
 
@@ -99,6 +105,11 @@ request.
 - Cada madrugada, los cursos cuyo año lectivo terminó quedan finalizados y
   cierran sus matrículas. Desde el día siguiente al fin del año ya aparecen en
   «Cursos anteriores» y no ocupan cupo del plan.
+
+**En toda la aplicación:** tema claro, oscuro o como el teléfono, desde
+Ajustes; claro por defecto ([DP-014](docs/00-producto/decisiones/014-modo-oscuro-opcional.md)).
+La aplicación está en español; el inglés está diseñado para la v2
+([DP-015](docs/00-producto/decisiones/015-ingles-se-difiere-a-v2.md)).
 
 ## Monetización con RevenueCat
 
@@ -143,7 +154,7 @@ y backend de Convex:
 | `convex/auditoria.ts` | Los cuatro eventos de DP-006 (`LOGIN`, `LEER_SENSIBLE`, `CREAR`/`ANULAR` acción, `APROBAR`), además de `ACTUALIZAR`, `ALERTA` y `EXPORTAR` (el informe en PDF) |
 | Reautenticación antes de una alerta o de eliminar un curso (`convex/lib/reautenticacion.ts`) | Implementado: verifica la firma de Clerk contra el JWKS y exige verificación reciente |
 | Datos semilla (`convex/semillas.ts`) | Catálogos: franjas, categorías de conducta, planes y plantilla del reporte |
-| Sistema de diseño (`movil/src/theme/Theme.ts`) | Implementado: color, tipografía, espaciado, iconografía |
+| Sistema de diseño (`movil/src/theme/Theme.ts`) | Implementado: color (paleta clara y oscura, las dos con contraste AA comprobado por prueba), tipografía, espaciado, iconografía |
 | Integración continua (`.github/workflows/ci.yml`) | Tipos, más de 700 pruebas y empaquetado de Android en cada PR |
 | Propiedad por módulo (`.github/CODEOWNERS`) | Implementado: protección de `main` activa; exige CI y revisión |
 | Banderas de activación (`convex/lib/flags.ts`) | Implementado |

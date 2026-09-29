@@ -67,23 +67,33 @@ async function presentarPerfil(ctx: QueryCtx, perfil: Doc<"perfilUsuario">) {
 }
 
 /**
- * D18: los datos profesionales que el docente edita y el representante ve.
+ * D18: los datos profesionales que el docente edita y el representante ve:
+ * su título y su horario de atención.
  *
- * La tabla `docente` tenia estos cuatro campos desde el primer esquema y
- * **ninguna mutation los escribia** (#52): estaban siempre vacios, asi que P9
- * no tenia nada que mostrar.
+ * La tabla `docente` tenia estos campos desde el primer esquema y **ninguna
+ * mutation los escribia** (#52): estaban siempre vacios, asi que P9 no tenia
+ * nada que mostrar. Todo es opcional y todo se puede borrar: cadena vacía lo
+ * quita.
  *
- * Todo es opcional y todo se puede borrar: un docente que no quiere publicar
- * su telefono personal manda cadena vacia y el campo desaparece. Obligarlo a
- * dar un telefono para poder usar la aplicacion seria pedirle un dato que el
- * servicio no necesita.
+ * **Sin medios de contacto personales (DP-016).** Hasta el 28 de septiembre
+ * aquí también iban un correo y un teléfono "de contacto", que P9 mostraba con
+ * botones para escribir y llamar. Se quitaron: un teléfono publicado a las
+ * familias lo puede sacar cualquiera que tome el celular de un padre, incluido
+ * el propio estudiante, y es la puerta a las amenazas anónimas que la
+ * aplicación existe para cerrar. En Cresco la familia llega al docente pidiendo
+ * una cita, y todo queda a su nombre.
+ *
+ * `correoContacto` y `telefonoContacto` se siguen aceptando **solo** para que
+ * una build 1.0.0, que todavía los manda, pueda guardar el título y el
+ * horario. Se descartan sin mirarlos, y cada guardado borra los que hubiera.
  */
 export const actualizarDatosDocente = mutation({
   args: {
     tituloProfesional: v.optional(v.string()),
+    horarioAtencion: v.optional(v.string()),
+    // Descartados (DP-016): solo para que una build 1.0.0 no falle al guardar.
     correoContacto: v.optional(v.string()),
     telefonoContacto: v.optional(v.string()),
-    horarioAtencion: v.optional(v.string()),
   },
   handler: (ctx, args) => conErroresPublicos(async () => {
     const docente = await exigirDocente(ctx);
@@ -92,22 +102,16 @@ export const actualizarDatosDocente = mutation({
     const limpiar = (valor: string | undefined) =>
       valor === undefined ? undefined : valor.trim() === "" ? null : valor.trim();
 
-    const correo = limpiar(args.correoContacto);
-    if (typeof correo === "string" && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(correo)) {
-      throw new ErrorDominio("VALIDACION", "Revisa el correo de contacto.");
-    }
-    const telefono = limpiar(args.telefonoContacto);
-    if (typeof telefono === "string" && !/^\+?[0-9 ()-]{7,25}$/.test(telefono)) {
-      throw new ErrorDominio("VALIDACION", "Revisa el teléfono de contacto.");
-    }
-
     const campos = {
       tituloProfesional: limpiar(args.tituloProfesional),
-      correoContacto: correo,
-      telefonoContacto: telefono,
       horarioAtencion: limpiar(args.horarioAtencion),
     };
-    const parche: Record<string, string | undefined> = { actualizadoEn: Date.now() } as never;
+    // Un correo o un teléfono guardados antes de DP-016 se borran aquí.
+    const parche: Record<string, string | undefined> = {
+      actualizadoEn: Date.now(),
+      correoContacto: undefined,
+      telefonoContacto: undefined,
+    } as never;
     for (const [clave, valor] of Object.entries(campos)) {
       if (valor === undefined) continue;
       parche[clave] = valor === null ? undefined : valor;
@@ -154,11 +158,20 @@ export const completarPerfil = mutation({
       throw new ErrorDominio("VALIDACION", "Escribe tu nombre y tu apellido.");
     }
     const numeroDocumento = normalizarDocumento(args.tipoDocumento, args.numeroDocumento);
-    const telefono = args.telefono?.trim();
+    let perfil = await perfilActual(ctx);
+    // El teléfono es solo de quien es representante (DP-016): puede servir en
+    // una emergencia con su hijo. Un docente no da datos personales, así que a
+    // un perfil que queda solo como docente no se le guarda, aunque lo mande
+    // una build 1.0.0, que muestra el campo a todos.
+    const perfilPrevio = perfil;
+    const yaEsRepresentante = perfilPrevio !== null && (await ctx.db.query("representante")
+      .withIndex("por_perfil", (q) => q.eq("perfilUsuarioId", perfilPrevio._id)).unique()) !== null;
+    const telefono = args.roles.includes("REPRESENTANTE") || yaEsRepresentante
+      ? args.telefono?.trim()
+      : undefined;
     if (telefono !== undefined && !/^\+?[0-9 ()-]{7,25}$/.test(telefono)) {
       throw new ErrorDominio("VALIDACION", "Revisa el número de teléfono.");
     }
-    let perfil = await perfilActual(ctx);
     const duplicado = await ctx.db.query("perfilUsuario")
       .withIndex("por_documento", (q) => q.eq("tipoDocumento", args.tipoDocumento).eq("numeroDocumento", numeroDocumento))
       .unique();

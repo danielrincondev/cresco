@@ -11,6 +11,7 @@
 import type * as auditoria from "../auditoria.js";
 import type * as conducta from "../conducta.js";
 import type * as crons from "../crons.js";
+import type * as demo from "../demo.js";
 import type * as http from "../http.js";
 import type * as interaccion from "../interaccion.js";
 import type * as lib_enums from "../lib/enums.js";
@@ -39,6 +40,7 @@ declare const fullApi: ApiFromModules<{
   auditoria: typeof auditoria;
   conducta: typeof conducta;
   crons: typeof crons;
+  demo: typeof demo;
   http: typeof http;
   interaccion: typeof interaccion;
   "lib/enums": typeof lib_enums;

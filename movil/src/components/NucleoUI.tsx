@@ -23,7 +23,7 @@ import {
 import { ConvexError } from "convex/values";
 import { Aparece, useEntrada, useReduceMotion } from "./Movimiento";
 import { Icono } from "../theme/Icono";
-import { Curva } from "../theme/Movimiento";
+import { Curva, Duracion } from "../theme/Movimiento";
 import {
   AREA_TACTIL_MINIMA,
   Espacio,
@@ -286,6 +286,16 @@ export function Cargando({ mensaje = "Cargando..." }: { mensaje?: string }) {
   );
 }
 /**
+ * El `Pressable` del botón, animable. La escala va en el estilo y no en una
+ * función de `pressed`: así el driver nativo la mueve sin pasar por
+ * JavaScript. Es lo que el issue #101 creía que exigía `reanimated`; con el
+ * `Animated` del núcleo alcanza, y no hace falta ninguna librería nativa.
+ */
+const PressableAnimado = Animated.createAnimatedComponent(Pressable);
+/** Cuánto se hunde un botón bajo el dedo: se nota sin mover nada alrededor. */
+const ESCALA_PULSADO = 0.97;
+
+/**
  * Botón, con un tono opcional para lo que tiene signo.
  *
  * `tono` pinta el texto del color del signo y, al seleccionarlo, rellena con
@@ -294,6 +304,13 @@ export function Cargando({ mensaje = "Cargando..." }: { mensaje?: string }) {
  * fondo claro —por debajo de AA— y que no se use como texto suelto. Los de
  * `TonoEstado` están medidos a 8.0:1 y 8.6:1 sobre su propio fondo, que es
  * justo la combinación que hace falta aquí.
+ *
+ * Un botón con tono que **no** es secundario va siempre relleno de su tono:
+ * sobre el azul de marca, el texto del tono no se lee (1.5:1 el rojo oscuro
+ * sobre el azul). Era el "Eliminar curso" de la confirmación.
+ *
+ * Al pulsarlo se hunde un poco (`ESCALA_PULSADO`), en `Duracion.instantanea`,
+ * sin rebote. Con "reducir movimiento" no se mueve: solo cambia de opacidad.
  */
 export function Boton({
   children,
@@ -317,23 +334,47 @@ export function Boton({
       : tono === "NEGATIVA"
         ? TonoEstado.negativo
         : null;
+  const reducir = useReduceMotion();
+  const escala = useRef(new Animated.Value(1)).current;
+  const [pulsado, setPulsado] = useState(false);
+  const inactivo = disabled || pendiente;
+  const hundir = (hasta: number) => {
+    if (reducir) return;
+    Animated.timing(escala, {
+      toValue: hasta,
+      duration: Duracion.instantanea,
+      easing: Curva.entrada,
+      useNativeDriver: true,
+    }).start();
+  };
   return (
-    <Pressable
+    <PressableAnimado
       accessibilityRole="button"
-      accessibilityState={{ disabled: disabled || pendiente, busy: pendiente }}
-      disabled={disabled || pendiente}
+      accessibilityState={{ disabled: inactivo, busy: pendiente }}
+      disabled={inactivo}
       onPress={onPress}
-      style={({ pressed }) => [
+      onPressIn={() => {
+        setPulsado(true);
+        hundir(ESCALA_PULSADO);
+      }}
+      onPressOut={() => {
+        setPulsado(false);
+        hundir(1);
+      }}
+      style={[
         s.boton,
         secundario && s.botonSecundario,
         paleta && { borderColor: paleta.borde },
-        paleta && seleccionado && { backgroundColor: paleta.fondo },
-        pressed && s.presionado,
-        (disabled || pendiente) && s.deshabilitado,
+        paleta && (seleccionado || !secundario) && { backgroundColor: paleta.fondo },
+        pulsado && s.presionado,
+        inactivo && s.deshabilitado,
+        { transform: [{ scale: escala }] },
       ]}
     >
       {pendiente ? (
-        <ActivityIndicator color={secundario ? Marca.base : Texto.sobreColor} />
+        <ActivityIndicator
+          color={paleta ? paleta.texto : secundario ? Marca.base : Texto.sobreColor}
+        />
       ) : (
         <Text
           style={[
@@ -345,7 +386,7 @@ export function Boton({
           {children}
         </Text>
       )}
-    </Pressable>
+    </PressableAnimado>
   );
 }
 /**

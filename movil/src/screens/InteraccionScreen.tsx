@@ -60,6 +60,8 @@ import { parrafosLegibles } from "../lib/texto";
 import { useRegistrarVistos } from "../lib/useRegistrarVistos";
 import { tokenDeReautenticacion } from "../lib/reautenticar";
 import { registrarTelefono, useEstadoAvisos, type EstadoAvisos } from "../lib/avisosDelTelefono";
+import { cambiarTema } from "../lib/apariencia";
+import { preferenciaTema, type PreferenciaTema } from "../theme/modo";
 import {
   fechaHoraLegible,
   fechaISO,
@@ -1396,23 +1398,24 @@ export function AlertasFamilia() {
  * ======================================================================= */
 
 /**
- * Lo que el docente publica sobre si mismo, y que el representante ve en P9.
+ * Lo que el docente publica sobre si mismo, y que el representante ve en P9:
+ * su título y su horario de atención. Los dos son opcionales y se pueden
+ * borrar: dejar uno en blanco lo quita.
  *
- * Los cuatro campos son opcionales y **todos se pueden borrar**: dejar uno en
- * blanco lo quita. Un docente que publico su telefono personal y se arrepiente
- * tiene que poder deshacerlo sin pedirle permiso a nadie, y obligarlo a
- * publicarlo para usar la aplicacion seria pedirle un dato que el servicio no
- * necesita.
+ * **No hay correo ni teléfono (DP-016).** Hasta el 28 de septiembre este
+ * formulario los pedía y P9 los mostraba con botones para escribir y llamar.
+ * Un teléfono publicado a las familias lo puede sacar cualquiera que tome el
+ * celular de un padre, incluido el propio estudiante: es la puerta a las
+ * amenazas anónimas que Cresco existe para cerrar. Aquí la familia llega al
+ * docente pidiendo una cita, y todo queda a su nombre.
  *
  * El nombre no se edita aqui: vive en el perfil de la cuenta, junto al
- * documento, porque es la identidad y no un dato de contacto.
+ * documento, porque es la identidad.
  */
 export function PerfilDocente() {
   const guardar = useMutation(api.nucleo.actualizarDatosDocente);
   const perfil = useQuery(api.nucleo.obtenerPerfil);
   const [titulo, setTitulo] = useState("");
-  const [correo, setCorreo] = useState("");
-  const [telefono, setTelefono] = useState("");
   const [horario, setHorario] = useState("");
   const [guardado, setGuardado] = useState(false);
   const op = useOperacion();
@@ -1420,12 +1423,7 @@ export function PerfilDocente() {
   async function enviar() {
     setGuardado(false);
     const r = await op.ejecutar(() =>
-      guardar({
-        tituloProfesional: titulo,
-        correoContacto: correo,
-        telefonoContacto: telefono,
-        horarioAtencion: horario,
-      }),
+      guardar({ tituloProfesional: titulo, horarioAtencion: horario }),
     );
     if (r.ok) setGuardado(true);
   }
@@ -1460,28 +1458,10 @@ export function PerfilDocente() {
           editable={!op.pendiente}
         />
         <Campo
-          etiqueta="Correo de contacto"
-          value={correo}
-          onChangeText={setCorreo}
-          autoCapitalize="none"
-          keyboardType="email-address"
-          maxLength={120}
-          editable={!op.pendiente}
-        />
-        <Campo
-          etiqueta="Teléfono de contacto"
-          value={telefono}
-          onChangeText={setTelefono}
-          keyboardType="phone-pad"
-          ayuda="Solo si quieres que te escriban. Puedes dejarlo vacío."
-          maxLength={25}
-          editable={!op.pendiente}
-        />
-        <Campo
           etiqueta="Horario de atención"
           value={horario}
           onChangeText={setHorario}
-          ayuda="Por ejemplo: martes de 10:00 a 11:00."
+          ayuda="Por ejemplo: martes de 10:00 a 11:00. No escribas aquí tu teléfono ni tu correo."
           maxLength={120}
           editable={!op.pendiente}
         />
@@ -1489,6 +1469,16 @@ export function PerfilDocente() {
           Deja un campo vacío para quitarlo. Lo que borres deja de verse en la
           ficha que consultan los representantes.
         </Aviso>
+      </Tarjeta>
+
+      <Tarjeta>
+        <Subtitulo>Tu número y tu correo no se publican</Subtitulo>
+        <Cuerpo>
+          Las familias te contactan dentro de Cresco, pidiéndote una cita. Así
+          tu vida personal queda aparte, y todo lo que te llega queda registrado
+          con el nombre de la familia que lo envió: en Cresco no hay mensajes
+          anónimos.
+        </Cuerpo>
       </Tarjeta>
 
       <ErrorMensaje mensaje={op.error} />
@@ -1531,17 +1521,12 @@ export function ProfesorACargo({
       <Pagina titulo="Docente a cargo">
         <EstadoVacio icono="account-question" titulo="Todavía no hay docente asignado">
           Cuando la institución asigne al titular de {nombre}, vas a verlo aquí
-          con sus datos de contacto.
+          con su horario de atención.
         </EstadoVacio>
       </Pagina>
     );
   }
 
-  const sinDatos =
-    ficha.tituloProfesional === null &&
-    ficha.correoContacto === null &&
-    ficha.telefonoContacto === null &&
-    ficha.horarioAtencion === null;
 
   return (
     <Pagina
@@ -1559,35 +1544,20 @@ export function ProfesorACargo({
         )}
       </Tarjeta>
 
-      {sinDatos ? (
-        <Tarjeta>
-          <Cuerpo>
-            El docente todavía no publicó cómo prefiere que lo contacten. Puedes
-            pedirle una cita desde la sección Citas.
-          </Cuerpo>
-        </Tarjeta>
-      ) : (
-        <Tarjeta>
-          <Subtitulo>Cómo contactarlo</Subtitulo>
-          {ficha.horarioAtencion && <Cuerpo>Atiende: {ficha.horarioAtencion}</Cuerpo>}
-          {ficha.correoContacto && (
-            <Boton
-              secundario
-              onPress={() => void Linking.openURL(`mailto:${ficha.correoContacto}`)}
-            >
-              Escribirle al correo
-            </Boton>
-          )}
-          {ficha.telefonoContacto && (
-            <Boton
-              secundario
-              onPress={() => void Linking.openURL(`tel:${ficha.telefonoContacto}`)}
-            >
-              Llamar a {ficha.telefonoContacto}
-            </Boton>
-          )}
-        </Tarjeta>
-      )}
+      {/* Sin correo ni teléfono del docente (DP-016): la manera de hablar con
+          él es una cita, que queda registrada a nombre de la familia. */}
+      <Tarjeta>
+        <Subtitulo>Cómo hablar con el docente</Subtitulo>
+        {ficha.horarioAtencion ? (
+          <Cuerpo>Atiende: {ficha.horarioAtencion}</Cuerpo>
+        ) : (
+          <Cuerpo>El docente todavía no publicó su horario de atención.</Cuerpo>
+        )}
+        <Cuerpo>
+          Pídele una cita desde la sección Citas. Queda registrada a tu nombre,
+          igual que todo lo que envías por Cresco.
+        </Cuerpo>
+      </Tarjeta>
 
       <Aviso>
         Para algo urgente fuera del horario, usa los canales de la institución.
@@ -1651,6 +1621,49 @@ function AvisosDelTelefono() {
   );
 }
 
+const OPCIONES_TEMA = [
+  { valor: "claro", texto: "Claro" },
+  { valor: "oscuro", texto: "Oscuro" },
+  { valor: "sistema", texto: "Como el teléfono" },
+] as const satisfies readonly { valor: PreferenciaTema; texto: string }[];
+
+/**
+ * El tema (DP-014). Las opciones muestran lo que la persona pidió, no la
+ * paleta de esta sesión: si el reinicio no llega a ocurrir, tiene que verse
+ * que el cambio quedó guardado y qué falta para verlo.
+ */
+function Apariencia() {
+  const [pedido, setPedido] = useState<PreferenciaTema>(preferenciaTema);
+  const [aviso, setAviso] = useState<string | null>(null);
+
+  async function cambiar(tema: PreferenciaTema) {
+    if (tema === pedido) return;
+    const anterior = pedido;
+    setPedido(tema);
+    setAviso(null);
+    const resultado = await cambiarTema(tema);
+    if (resultado === "SIN_GUARDAR") {
+      setPedido(anterior);
+      setAviso("No pudimos guardar el cambio en este teléfono.");
+    } else if (resultado === "CIERRA_Y_ABRE") {
+      setAviso("Listo. Cierra la aplicación y vuelve a abrirla para verlo.");
+    }
+  }
+
+  return (
+    <Tarjeta>
+      <Subtitulo>Apariencia</Subtitulo>
+      <Opciones valor={pedido} opciones={OPCIONES_TEMA} onChange={(tema) => void cambiar(tema)} />
+      <Cuerpo>
+        El modo oscuro es más cómodo de noche, por ejemplo para leer el reporte
+        que llega a las 22:00. «Como el teléfono» sigue el modo oscuro del
+        sistema. La aplicación se reinicia para aplicar el cambio.
+      </Cuerpo>
+      {aviso && <Aviso>{aviso}</Aviso>}
+    </Tarjeta>
+  );
+}
+
 export function Ajustes({
   esRepresentante = false,
   barraInferiorActiva = true,
@@ -1668,6 +1681,8 @@ export function Ajustes({
 
   return (
     <Pagina titulo="Ajustes">
+      <Apariencia />
+
       {esRepresentante && (
         <Tarjeta>
           <Subtitulo>Menú de abajo</Subtitulo>
@@ -1703,13 +1718,21 @@ export function Ajustes({
       </Tarjeta>
 
       <Tarjeta>
-        <Subtitulo>Exportar un informe</Subtitulo>
-        <Cuerpo>
-          El informe imprimible no entra en esta versión. Está decidido y
-          escrito (DP-009): es la primera función de la siguiente, porque de las
-          entrevistas salió que para un docente fiscal lo que vale ante el
-          distrito es el papel.
-        </Cuerpo>
+        <Subtitulo>Informe en PDF</Subtitulo>
+        {esRepresentante ? (
+          <Cuerpo>
+            El acumulado del parcial de tu hijo se descarga en PDF desde su
+            reporte acumulado, para guardarlo o compartirlo. Con Premium sale
+            directo; con el plan gratuito, viendo un anuncio.
+          </Cuerpo>
+        ) : (
+          <Cuerpo>
+            El informe del docente para el distrito no entra en esta versión.
+            Está decidido y escrito (DP-009): es la primera función de la
+            siguiente, porque de las entrevistas salió que para un docente
+            fiscal lo que vale ante el distrito es el papel.
+          </Cuerpo>
+        )}
         <Cuerpo>
           Cresco no reemplaza el expediente en papel de la institución.
         </Cuerpo>

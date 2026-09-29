@@ -120,40 +120,52 @@ informe debe dar a entender que reemplaza el expediente en papel del plantel.
 
 ---
 
-## 2. Lo que marca `expo-doctor` — después del Shipaton
+## 2. La build 1.1.0 del 28 de septiembre — por comprobar en el teléfono
 
-**Estado:** anotado el 28 de septiembre, en la revisión general del repo.
-`npx expo-doctor` pasa 19 de 21 comprobaciones. Las dos que fallan no rompen
-nada hoy (la build del 27 de septiembre funciona), pero las dos exigen build
-nueva y reinstalar en cada teléfono de prueba, así que **no se tocan antes de
-enviar**: una build a última hora es el riesgo, no el arreglo.
+**Estado:** construido el 28 de septiembre; va en las builds "General" y
+"Beta" de la **versión 1.1.0**. Cada punto se borra de aquí cuando
+pasa su comprobación en el teléfono.
 
-- **`splash` en `app.json`.** El esquema de configuración de Expo SDK 57 ya no
-  acepta la clave `splash` en la raíz; la pantalla de arranque se configura con
-  el plugin `expo-splash-screen`. Moverla ahí, con la misma imagen y el mismo
-  fondo (`#EBF4FA`).
-- **Nueve paquetes con un parche por detrás** de lo que pide el SDK 57: `expo`
-  57.0.13 → ~57.0.25, `react-native` 0.86.2 → 0.86.3, y `expo-auth-session`,
-  `expo-crypto`, `expo-dev-client`, `expo-font`, `expo-secure-store`,
-  `expo-updates` y `expo-web-browser`. Se actualizan todos juntos con
-  `npx expo install --check`, **sin** tocar `react-native-google-mobile-ads`,
-  que sigue fijado en 17.0.0 por el issue #903 de ese paquete.
+**Por qué 1.1.0 y no 1.0.0.** Esta build trae módulos nativos que la anterior
+no tiene. `runtimeVersion` sigue a la versión de la app, así que las
+actualizaciones por el aire que se publiquen desde este código solo llegan a
+la 1.1.0: una instalación vieja no recibe un JavaScript que pida módulos que no
+tiene (y que la cerraría al abrir). La 1.0.0 se queda con la última que
+recibió, la del modo oscuro. **Hay que instalar la 1.1.0 en cada teléfono de
+prueba.**
 
-**Cuándo está terminado:** `npx expo-doctor` pasa las 21, la build nueva
-arranca con el splash de siempre, y las pruebas de siempre en el teléfono
-(sesión, reporte del día, compra en "Beta", avisos) siguen pasando.
+| Qué | Cómo quedó | Cómo se comprueba |
+|---|---|---|
+| Avisos de `expo-doctor` | `npx expo-doctor` pasa 21 de 21: los nueve paquetes al parche que pide el SDK 57 (`react-native-google-mobile-ads` sigue en 17.0.0) y el splash configurado con `expo-splash-screen`, que ni estaba instalado | Abrir la app desde cerrada: el logo sobre fondo celeste, y después la app como siempre |
+| Lo nativo sigue al tema (DP-014) | `expo-system-ui` pinta el fondo nativo con el de la paleta, y `userInterfaceStyle: "automatic"` más `Appearance.setColorScheme` hacen que la barra del sistema siga **el tema de la app**, no el del teléfono | Ajustes → Apariencia → Oscuro: la app se reinicia oscura y la barra de navegación de Android también. Con el teléfono en modo oscuro y la app en Claro, todo queda claro |
+| «Como el teléfono» | Tercera opción en Ajustes → Apariencia. Se decide al abrir la app: un cambio del sistema con la app abierta se aplica la próxima vez | Elegirla con el teléfono en oscuro: la app queda oscura. Pasar el teléfono a claro, cerrar y abrir la app: queda clara |
+| Abrir el menú deslizando (issue #101) | `PanResponder` del núcleo, sin librería nueva: desde el borde izquierdo hacia la derecha abre; sobre el menú, hacia la izquierda cierra. Solo gestos horizontales: tocar y desplazar la lista funcionan igual | Deslizar desde el borde izquierdo hacia la derecha donde está la hamburguesa. Con navegación por gestos, empezar un dedo más adentro (el borde es el "atrás" de Android) |
+| El botón responde al dedo (issue #101) | Se hunde un 3 % en 120 ms al pulsarlo, con el `Animated` del núcleo y el driver nativo. Con "quitar animaciones" de Android no se mueve | Mantener pulsado cualquier botón: se hunde un poco y vuelve al soltar |
+| Fuente de iconos recortada (#84) | `scripts/generar-iconos.py` deja solo los 42 glifos que usa la app: de 1.277 KB a 6 KB. El paquete de la app baja de 6,64 a 5,24 MB. Un icono fuera del recorte no compila | Recorrer las pantallas: todos los iconos iguales que antes (barra de abajo, menú, campana, calendarios) |
+
+**Apareció en el camino y quedó resuelto:** el botón "Eliminar curso" de la
+confirmación tenía el texto rojo oscuro sobre el azul de marca (1,5:1, casi no
+se leía). Un botón con tono que no es secundario ahora va relleno de su tono.
+
+**Lo que sigue claro a propósito:** la pantalla de arranque. Android la pinta
+antes de que corra la app, así que no puede saber el tema elegido en Ajustes;
+una versión oscura del splash seguiría al *teléfono* y chocaría con quien
+tiene el teléfono oscuro y la app clara.
 
 ---
 
 ## Al hacer la tanda
 
 1. Instalar las dependencias nativas de todos los puntos de arriba de una vez.
-2. Reconstruir **"Beta"** (perfil `development`). Decidir en ese momento si
-   también se reconstruye **"General"** (perfil `preview`). Esa build no puede
-   mostrar la compra real ni el anuncio con la clave `test_` de RevenueCat (ver
-   `docs/04-guias/integracion-revenuecat.md`), así que solo vale la pena si
-   algo de la tanda se usa fuera de "Beta".
-3. Borrar de este documento cada punto que quede hecho.
+2. Reconstruir **"Beta"** (perfil `development`) y **"General"** (perfil
+   `preview`). Las dos llevan los mismos módulos nativos: una "Beta" vieja
+   con el JavaScript nuevo de Metro se cierra al abrir. "General" no puede
+   mostrar la compra real ni el anuncio con la clave `test_` de RevenueCat
+   (ver `docs/04-guias/integracion-revenuecat.md`).
+3. Si la tanda agrega o actualiza un módulo nativo, subir la versión de la app
+   (`app.json`), para que las actualizaciones por el aire no lleguen a las
+   builds anteriores.
+4. Borrar de este documento cada punto que quede hecho.
 
 ---
 

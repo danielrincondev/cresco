@@ -31,7 +31,7 @@ documentación del producto.
 
 | Documento | Estado | Dueño |
 |---|---|---|
-| `decisiones/` (13 decisiones de producto, DP-001 a DP-013) | ✅ una decisión por archivo, misma disciplina que los ADR | Persona C |
+| `decisiones/` (16 decisiones de producto, DP-001 a DP-016) | ✅ una decisión por archivo, misma disciplina que los ADR | Persona C |
 
 ## 01-arquitectura — ¿Cómo está construido?
 
@@ -83,7 +83,8 @@ documentación del producto.
 
 | Documento | Estado | Dueño |
 |---|---|---|
-| `borrador-devpost.md` | 🚧 material para el texto de Devpost (#55) | Persona D |
+| `devpost.md` | ✅ texto final en inglés, campo por campo, para pegar en Devpost (#55) | Persona C |
+| `guion-video.md` | 🚧 borrador para revisar: el video segundo a segundo, la locución, los subtítulos y las tomas (#55) | Persona C |
 
 ---
 

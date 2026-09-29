@@ -20,7 +20,7 @@ import {
 } from "convex/react";
 import { ConvexProviderWithClerk } from "convex/react-clerk";
 
-import { Marca, Semantico, Superficie, Texto } from "./theme/Theme";
+import { Marca, Semantico, Superficie, Texto, modoOscuro } from "./theme/Theme";
 // Se importa peso por peso, no desde `@expo-google-fonts/inter`. El paquete
 // barril arrastra sus 18 archivos .ttf al bundle -- 6 MB para usar dos de
 // ellos, mas que el codigo entero de la aplicacion. En un colegio fiscal
@@ -30,6 +30,8 @@ import { Inter_400Regular } from "@expo-google-fonts/inter/400Regular";
 import { Inter_600SemiBold } from "@expo-google-fonts/inter/600SemiBold";
 import { NucleoScreen } from "./screens/NucleoScreen";
 import { LimiteError } from "./components/NucleoUI";
+import { aplicarTemaNativo } from "./lib/apariencia";
+import { FAMILIA_ICONOS, FUENTE_ICONOS } from "./theme/Icono";
 
 const clerkPublishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY;
 const convexUrl = process.env.EXPO_PUBLIC_CONVEX_URL;
@@ -50,10 +52,18 @@ const convex = new ConvexReactClient(convexUrl, {
   unsavedChangesWarning: false,
 });
 
+// El tema también en lo que Android pinta por su cuenta (DP-014): la barra de
+// navegación del sistema y el fondo nativo. Antes del primer render, para que
+// ya salgan con el tema elegido.
+aplicarTemaNativo();
+
 export function App() {
   const [fontsLoaded, fontError] = useFonts({
     Inter: Inter_400Regular,
     "Inter-Semibold": Inter_600SemiBold,
+    // La fuente de iconos recortada (#84): 6 KB. Precargada aquí, los iconos
+    // salen con la primera pantalla en vez de aparecer un instante después.
+    [FAMILIA_ICONOS]: FUENTE_ICONOS,
   });
   if (!fontsLoaded && !fontError)
     return (
@@ -68,7 +78,7 @@ export function App() {
         tokenCache={tokenCache}
       >
         <ConvexProviderWithClerk client={convex} useAuth={useAuth}>
-          <StatusBar barStyle="dark-content" />
+          <StatusBar barStyle={modoOscuro ? "light-content" : "dark-content"} />
           <AuthLoading>
             <LoadingScreen message="Preparando tu sesión..." />
           </AuthLoading>
@@ -360,6 +370,7 @@ function WelcomeScreen() {
                     keyboardType="email-address"
                     onChangeText={setEmailAddress}
                     placeholder="nombre@ejemplo.com"
+                    placeholderTextColor={modoOscuro ? Texto.secundario : undefined}
                     style={styles.input}
                     value={emailAddress}
                   />
@@ -376,6 +387,7 @@ function WelcomeScreen() {
                     onSubmitEditing={() => void submitCredentials()}
                     placeholder="Mínimo 15 caracteres"
                     secureTextEntry
+                    placeholderTextColor={modoOscuro ? Texto.secundario : undefined}
                     style={styles.input}
                     value={password}
                   />
@@ -395,6 +407,7 @@ function WelcomeScreen() {
                     onChangeText={setCode}
                     onSubmitEditing={() => void verifyCode()}
                     placeholder="123456"
+                    placeholderTextColor={modoOscuro ? Texto.secundario : undefined}
                     style={styles.input}
                     value={code}
                   />

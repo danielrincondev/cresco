@@ -643,3 +643,59 @@ it("la campana está en cualquier pantalla, no solo en el inicio, y no en la pro
   expect(vista!.root.findAllByProps({ accessibilityLabel: "Novedades, 1 sin leer" })).toHaveLength(0);
 });
 
+it("deslizar desde el borde izquierdo abre el mismo menú que la hamburguesa", async () => {
+  await montar();
+  expect(vista!.root.findAll((n) => n.props.accessibilityLabel === "Cerrar el menú")).toHaveLength(0);
+  const pantalla = vista!.root.findAll(
+    (n) => (n.type as unknown) === "SafeAreaView" && typeof n.props.onPanResponderRelease === "function",
+  )[0];
+  expect(pantalla.props.onMoveShouldSetPanResponderCapture(null, { x0: 8, dx: 40, dy: 2, vx: 0 })).toBe(true);
+  await act(async () => pantalla.props.onPanResponderRelease(null, { x0: 8, dx: 120, dy: 2, vx: 0 }));
+  expect(vista!.root.findAll((n) => n.props.accessibilityLabel === "Cerrar el menú")).not.toHaveLength(0);
+});
+
+/**
+ * El muro de pago del docente aparece en el momento exacto en que el plan
+ * gratuito se queda corto: al querer un segundo curso. Antes decía que ampliar
+ * el plan estaría "disponible próximamente", cuando la compra ya existía.
+ */
+it("el docente con su único curso gratuito ve cómo pasar a PRO, y el botón lo lleva al plan", async () => {
+  estado.perfil = { ...perfil, representanteId: null, docenteId: "docente" as never };
+  estado.cursos = { cursos: [cursoDePrueba("curso-a", "Quinto A")], limitePlan: 1 };
+  await montar();
+  const texto = () => JSON.stringify(vista!.toJSON());
+  expect(texto()).toContain("Con el plan PRO puedes tener más cursos");
+  expect(texto()).not.toContain("disponible próximamente");
+  await pulsar("Ver el plan PRO");
+  expect(texto()).not.toContain("Tu plan incluye un curso y ya lo estás usando");
+});
+
+it("un docente PRO en su límite no recibe una oferta de PRO", async () => {
+  estado.perfil = { ...perfil, representanteId: null, docenteId: "docente" as never };
+  estado.cursos = {
+    cursos: ["a", "b", "c", "d", "e"].map((id) => cursoDePrueba(`curso-${id}`, `Curso ${id}`)),
+    limitePlan: 5,
+  };
+  await montar();
+  expect(JSON.stringify(vista!.toJSON())).toContain("Has alcanzado los 5 cursos de tu plan");
+  expect(vista!.root.findAllByType(Boton).some((b) => b.props.children === "Ver el plan PRO")).toBe(false);
+});
+
+/**
+ * DP-016: al docente no se le pide ningún dato personal. El teléfono es solo
+ * de quien marca que es representante, porque puede servir en una emergencia
+ * con su hijo.
+ */
+it("el formulario de registro pide el teléfono solo a quien marca que es representante", async () => {
+  estado.perfil = null;
+  await montar();
+  const etiquetas = () => vista!.root.findAllByType(Campo).map((c) => c.props.etiqueta);
+  const casilla = (texto: string) =>
+    vista!.root.findAllByType(Casilla).find((c) => c.props.texto === texto)!;
+  expect(etiquetas()).toContain("Número de documento");
+  expect(etiquetas()).not.toContain("Teléfono (opcional)");
+  await act(async () => casilla("Soy docente").props.onChange());
+  expect(etiquetas()).not.toContain("Teléfono (opcional)");
+  await act(async () => casilla("Soy representante legal").props.onChange());
+  expect(etiquetas()).toContain("Teléfono (opcional)");
+});

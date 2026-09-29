@@ -33,6 +33,7 @@ import {
   PieMenu,
   SeccionMenu,
   SeparadorMenu,
+  useGestoParaAbrirMenu,
 } from "../components/MenuLateral";
 import {
   Espacio,
@@ -751,8 +752,11 @@ export function NucleoScreen() {
       setRuta({ tipo: "curso", curso: ruta.curso });
     else volver();
   };
+  /** Donde está la hamburguesa, el menú también se abre deslizando desde el borde. */
+  const hayMenu = !!perfil && (rol === "DOCENTE" ? esRaizDocente : true);
+  const gestoMenu = useGestoParaAbrirMenu(() => setMenu(true), hayMenu && !menu);
   return (
-    <SafeAreaView style={styles.pantalla}>
+    <SafeAreaView style={styles.pantalla} {...gestoMenu}>
       <View style={styles.barra}>
         {/* **Un solo icono a la izquierda.** Para el docente: hamburguesa en
             las dos raíces —la lista de cursos y el curso abierto—, flecha en
@@ -766,10 +770,10 @@ export function NucleoScreen() {
             hace desde el menú (eligiendo "Mis hijos" u otra opción) o con el
             gesto/botón de atrás del sistema, que sigue funcionando igual.
 
-            No hay gesto desde el borde para abrir el menú: eso necesita
-            `gesture-handler`, que es nativo. La hamburguesa es la afordancia
-            que descubre todo el mundo de todas formas. */}
-        {perfil && (rol === "DOCENTE" ? esRaizDocente : true) ? (
+            Donde hay hamburguesa, el menú también se abre deslizando desde
+            el borde izquierdo (`useGestoParaAbrirMenu`). La hamburguesa sigue
+            siendo la afordancia que descubre todo el mundo. */}
+        {hayMenu ? (
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Abrir el menú"
@@ -1114,7 +1118,8 @@ function PerfilForm({
         apellidos,
         tipoDocumento: documento,
         numeroDocumento: numero,
-        telefono: telefono.trim() || undefined,
+        // Solo el representante da un teléfono (DP-016).
+        telefono: representante ? telefono.trim() || undefined : undefined,
         roles,
       }),
     );
@@ -1188,14 +1193,20 @@ function PerfilForm({
           maxLength={documento === "CEDULA" ? 10 : 30}
           editable={!op.pendiente && !identidadFijada}
         />
-        <Campo
-          etiqueta="Teléfono (opcional)"
-          value={telefono}
-          onChangeText={setTelefono}
-          keyboardType="phone-pad"
-          maxLength={25}
-          editable={!op.pendiente}
-        />
+        {/* Solo para quien es representante (DP-016): su número puede servir en
+            una emergencia con su hijo. Al docente no se le pide ningún dato
+            personal: se comunica con las familias dentro de Cresco. */}
+        {representante && (
+          <Campo
+            etiqueta="Teléfono (opcional)"
+            ayuda="Queda en tu cuenta por si hace falta en una emergencia con tu hijo. Las otras familias no lo ven."
+            value={telefono}
+            onChangeText={setTelefono}
+            keyboardType="phone-pad"
+            maxLength={25}
+            editable={!op.pendiente}
+          />
+        )}
       </Tarjeta>
       <ErrorMensaje mensaje={op.error} />
       <Boton
@@ -1303,17 +1314,20 @@ function Cursos({
           <Boton onPress={() => navegar({ tipo: "crearCurso" })}>
             Crear curso
           </Boton>
+        ) : datos.limitePlan === 1 ? (
+          // El momento exacto en que el plan gratuito se queda corto: aquí se
+          // ofrece PRO, no en la portada. Decía "disponible próximamente" desde
+          // antes de que existiera la compra, y ya existe.
+          <>
+            <Aviso>
+              Tu plan incluye un curso y ya lo estás usando. Con el plan PRO
+              puedes tener más cursos, y más estudiantes en cada uno.
+            </Aviso>
+            <Boton onPress={() => navegar({ tipo: "plan" })}>Ver el plan PRO</Boton>
+          </>
         ) : (
           <Aviso>
-            {/*
-              El plan gratuito permite 1 curso, y "los 1 cursos de tu plan" es
-              justo lo que se lee en un telefono real. El singular se trata
-              aparte en vez de dejar una plantilla que solo funciona en plural.
-            */}
-            {datos.limitePlan === 1
-              ? "Tu plan incluye un curso y ya lo estás usando."
-              : `Has alcanzado los ${datos.limitePlan} cursos de tu plan.`}{" "}
-            La opción para ampliar el plan estará disponible próximamente.
+            {`Has alcanzado los ${datos.limitePlan} cursos de tu plan. Cuando termina el año lectivo de un curso, deja de contar para el límite.`}
           </Aviso>
         ))}
     </Pagina>

@@ -27,13 +27,28 @@
  * que hacen falta para la navegación sí: `home`, `bell`, `account`,
  * `calendar`, `alert`, `account-group`, `file-document`. Si alguno no lo
  * tiene, este componente cae al relleno en vez de romperse.
+ *
+ * ## Solo los glifos que usa la app (#84)
+ *
+ * La fuente completa pesaba 1,28 MB —un tercio del paquete— para unas
+ * decenas de iconos. `scripts/generar-iconos.py` la recorta a los que aparecen
+ * en el código, con sus contornos, y escribe `glifos.ts`. El nombre de un
+ * icono se tipa con las claves de ese mapa: usar uno que no esté en el recorte
+ * **no compila**, así que no puede llegar a verse un cuadrado vacío.
  */
 
-import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
+import createIconSet from "@expo/vector-icons/createIconSet";
 
+import { GLIFOS } from "./glifos";
 import { AREA_TACTIL_MINIMA, Tamano, Texto } from "./Theme";
 
-type NombreIcono = keyof typeof MaterialCommunityIcons.glyphMap;
+/** El nombre con que se registra la fuente; `App.tsx` la precarga con el mismo. */
+export const FAMILIA_ICONOS = "IconosCresco";
+export const FUENTE_ICONOS = require("../../assets/fonts/IconosCresco.ttf");
+
+const Glifo = createIconSet(GLIFOS, FAMILIA_ICONOS, FUENTE_ICONOS);
+
+type NombreIcono = keyof typeof GLIFOS;
 
 export type PropsIcono = {
   /** Nombre base del icono, sin el sufijo `-outline`. Ej: `"home"`. */
@@ -52,7 +67,7 @@ export type PropsIcono = {
 
 /** ¿Existe la versión de contorno de este icono? */
 export function tieneContorno(nombre: string): boolean {
-  return `${nombre}-outline` in MaterialCommunityIcons.glyphMap;
+  return `${nombre}-outline` in GLIFOS;
 }
 
 export function Icono({
@@ -69,7 +84,7 @@ export function Icono({
   const nombreFinal = (usaContorno ? `${nombre}-outline` : nombre) as NombreIcono;
 
   return (
-    <MaterialCommunityIcons
+    <Glifo
       name={nombreFinal}
       size={tamano}
       color={color}

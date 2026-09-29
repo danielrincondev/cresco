@@ -52,6 +52,13 @@ vi.mock("../lib/avisosDelTelefono", () => ({
   useEstadoAvisos: () => avisos.estado,
   registrarTelefono: async () => { avisos.reintentos++; return "REGISTRADO"; },
 }));
+const apariencia = vi.hoisted(() => ({ resultado: "REINICIANDO" as string, pedidos: [] as string[] }));
+vi.mock("../lib/apariencia", () => ({
+  cambiarTema: async (tema: string) => {
+    apariencia.pedidos.push(tema);
+    return apariencia.resultado;
+  },
+}));
 import { AgendaDocente, AlertaDocente, Ajustes, CitasFamilia, HistorialFamilia, Notificaciones, resumenDelHistorial } from "./InteraccionScreen";
 import { Boton, Campo, Casilla, Opciones } from "../components/NucleoUI";
 
@@ -626,3 +633,51 @@ it("con los avisos activos, lo dice y no ofrece reintentar", async () => {
   expect(vista.root.findAllByType(Boton).some((b) => b.props.children === "Reintentar")).toBe(false);
 });
 
+/* ---------- Ajustes: el tema (DP-014) ---------- */
+
+/** La opción de tema con ese texto: un radio cuyo único hijo es el texto. */
+const opcionTema = (texto: string) =>
+  vista.root.findAllByProps({ accessibilityRole: "radio" }).find((opcion) =>
+    opcion.findAllByType("Text" as never).some((t) => t.props.children === texto))!;
+const elegido = () =>
+  ["Claro", "Oscuro", "Como el teléfono"].filter((t) => opcionTema(t).props.accessibilityState.checked);
+
+it("Ajustes ofrece claro, oscuro y como el teléfono; de entrada, claro, y elegir otro lo pide", async () => {
+  apariencia.pedidos = [];
+  apariencia.resultado = "REINICIANDO";
+  await act(async () => { vista = create(<Ajustes />); });
+  expect(elegido()).toEqual(["Claro"]);
+  await act(async () => opcionTema("Oscuro").props.onPress());
+  expect(apariencia.pedidos).toEqual(["oscuro"]);
+  expect(elegido()).toEqual(["Oscuro"]);
+  await act(async () => opcionTema("Oscuro").props.onPress());
+  expect(apariencia.pedidos).toEqual(["oscuro"]);
+  await act(async () => opcionTema("Como el teléfono").props.onPress());
+  expect(apariencia.pedidos).toEqual(["oscuro", "sistema"]);
+});
+
+it("si la app no pudo reiniciarse lo dice, y si no se pudo guardar vuelve a la opción anterior", async () => {
+  apariencia.pedidos = [];
+  apariencia.resultado = "CIERRA_Y_ABRE";
+  await act(async () => { vista = create(<Ajustes />); });
+  await act(async () => opcionTema("Oscuro").props.onPress());
+  expect(JSON.stringify(vista.toJSON())).toContain("Cierra la aplicación y vuelve a abrirla para verlo.");
+
+  apariencia.resultado = "SIN_GUARDAR";
+  await act(async () => opcionTema("Como el teléfono").props.onPress());
+  expect(apariencia.pedidos).toEqual(["oscuro", "sistema"]);
+  expect(elegido()).toEqual(["Oscuro"]);
+  expect(JSON.stringify(vista.toJSON())).toContain("No pudimos guardar el cambio en este teléfono.");
+  apariencia.resultado = "REINICIANDO";
+});
+
+it("Ajustes le dice a la familia dónde está su informe en PDF, y al docente que el suyo es de la siguiente versión", async () => {
+  await act(async () => { vista = create(<Ajustes esRepresentante />); });
+  let texto = JSON.stringify(vista.toJSON());
+  expect(texto).toContain("se descarga en PDF desde su reporte acumulado");
+  expect(texto).not.toContain("no entra en esta versión");
+
+  await act(async () => { vista = create(<Ajustes esRepresentante={false} />); });
+  texto = JSON.stringify(vista.toJSON());
+  expect(texto).toContain("El informe del docente para el distrito no entra en esta versión.");
+});
