@@ -158,11 +158,20 @@ export const completarPerfil = mutation({
       throw new ErrorDominio("VALIDACION", "Escribe tu nombre y tu apellido.");
     }
     const numeroDocumento = normalizarDocumento(args.tipoDocumento, args.numeroDocumento);
-    const telefono = args.telefono?.trim();
+    let perfil = await perfilActual(ctx);
+    // El teléfono es solo de quien es representante (DP-016): puede servir en
+    // una emergencia con su hijo. Un docente no da datos personales, así que a
+    // un perfil que queda solo como docente no se le guarda, aunque lo mande
+    // una build 1.0.0, que muestra el campo a todos.
+    const perfilPrevio = perfil;
+    const yaEsRepresentante = perfilPrevio !== null && (await ctx.db.query("representante")
+      .withIndex("por_perfil", (q) => q.eq("perfilUsuarioId", perfilPrevio._id)).unique()) !== null;
+    const telefono = args.roles.includes("REPRESENTANTE") || yaEsRepresentante
+      ? args.telefono?.trim()
+      : undefined;
     if (telefono !== undefined && !/^\+?[0-9 ()-]{7,25}$/.test(telefono)) {
       throw new ErrorDominio("VALIDACION", "Revisa el número de teléfono.");
     }
-    let perfil = await perfilActual(ctx);
     const duplicado = await ctx.db.query("perfilUsuario")
       .withIndex("por_documento", (q) => q.eq("tipoDocumento", args.tipoDocumento).eq("numeroDocumento", numeroDocumento))
       .unique();

@@ -4,6 +4,7 @@
 import { convexTest } from "convex-test";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { api } from "./_generated/api";
+import type { Id } from "./_generated/dataModel";
 import schema from "./schema";
 
 const modules = import.meta.glob(["./nucleo.ts", "./_generated/*.js"]);
@@ -62,14 +63,27 @@ describe("núcleo — perfiles", () => {
     expect(estado.docentes).toHaveLength(1);
   });
 
-  it("añade representante sin borrar docente ni el teléfono anterior", async () => {
+  it("añade representante sin borrar el docente, y el teléfono llega con el rol de representante", async () => {
     const t = convexTest(schema, modules);
     const cliente = t.withIdentity({ subject: "a" });
+    const telefonoGuardado = async (id: Id<"perfilUsuario">) =>
+      (await t.run((ctx) => ctx.db.get("perfilUsuario", id)))?.telefono;
+    // DP-016: un perfil solo docente no guarda teléfono, aunque lo mande una build 1.0.0.
     const primero = await cliente.mutation(api.nucleo.completarPerfil, { ...datos, telefono: "0990000000" });
-    const ambos = await cliente.mutation(api.nucleo.completarPerfil, { ...datos, roles: ["REPRESENTANTE"] });
+    expect(await telefonoGuardado(primero.perfilUsuarioId)).toBeUndefined();
+    const ambos = await cliente.mutation(api.nucleo.completarPerfil, { ...datos, roles: ["REPRESENTANTE"], telefono: "0990000000" });
     expect(ambos).toMatchObject(primero.docenteId ? { perfilUsuarioId: primero.perfilUsuarioId, docenteId: primero.docenteId } : {});
     expect(ambos.representanteId).not.toBeNull();
-    expect((await t.run((ctx) => ctx.db.get("perfilUsuario", ambos.perfilUsuarioId)))?.telefono).toBe("0990000000");
+    expect(await telefonoGuardado(ambos.perfilUsuarioId)).toBe("0990000000");
+    // Guardar otra vez sin teléfono no lo borra.
+    await cliente.mutation(api.nucleo.completarPerfil, { ...datos, roles: ["REPRESENTANTE"] });
+    expect(await telefonoGuardado(ambos.perfilUsuarioId)).toBe("0990000000");
+  });
+
+  it("a un docente no se le guarda el teléfono ni se le valida: se descarta (DP-016)", async () => {
+    const t = convexTest(schema, modules);
+    const perfil = await t.withIdentity({ subject: "a" }).mutation(api.nucleo.completarPerfil, { ...datos, telefono: "abc" });
+    expect((await t.run((ctx) => ctx.db.get("perfilUsuario", perfil.perfilUsuarioId)))?.telefono).toBeUndefined();
   });
 
   it("rechaza documento de otra cuenta incluso con solicitudes simultáneas", async () => {
@@ -115,7 +129,7 @@ describe("núcleo — perfiles", () => {
     { ...datos, roles: [] },
     { ...datos, roles: ["DOCENTE" as const, "DOCENTE" as const] },
     { ...datos, numeroDocumento: "incorrecto" },
-    { ...datos, telefono: "" },
+    { ...datos, roles: ["REPRESENTANTE" as const], telefono: "" },
     { ...datos, nombres: " " },
     { ...datos, apellidos: " " },
   ])("rechaza datos inválidos sin crear registros (%j)", async (args) => {

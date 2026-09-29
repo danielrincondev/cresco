@@ -1118,7 +1118,8 @@ function PerfilForm({
         apellidos,
         tipoDocumento: documento,
         numeroDocumento: numero,
-        telefono: telefono.trim() || undefined,
+        // Solo el representante da un teléfono (DP-016).
+        telefono: representante ? telefono.trim() || undefined : undefined,
         roles,
       }),
     );
@@ -1192,14 +1193,20 @@ function PerfilForm({
           maxLength={documento === "CEDULA" ? 10 : 30}
           editable={!op.pendiente && !identidadFijada}
         />
-        <Campo
-          etiqueta="Teléfono (opcional)"
-          value={telefono}
-          onChangeText={setTelefono}
-          keyboardType="phone-pad"
-          maxLength={25}
-          editable={!op.pendiente}
-        />
+        {/* Solo para quien es representante (DP-016): su número puede servir en
+            una emergencia con su hijo. Al docente no se le pide ningún dato
+            personal: se comunica con las familias dentro de Cresco. */}
+        {representante && (
+          <Campo
+            etiqueta="Teléfono (opcional)"
+            ayuda="Queda en tu cuenta por si hace falta en una emergencia con tu hijo. Las otras familias no lo ven."
+            value={telefono}
+            onChangeText={setTelefono}
+            keyboardType="phone-pad"
+            maxLength={25}
+            editable={!op.pendiente}
+          />
+        )}
       </Tarjeta>
       <ErrorMensaje mensaje={op.error} />
       <Boton

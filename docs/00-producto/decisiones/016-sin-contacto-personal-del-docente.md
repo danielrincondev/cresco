@@ -33,6 +33,11 @@ seguridad, porque *"estaban tomando los números de los profesores"*.
   mensajes anónimos.**
 - La ficha P9 muestra el nombre, el curso, el título profesional y el horario
   de atención.
+- **El teléfono de la cuenta es solo de las familias.** El formulario de
+  registro lo ofrece, opcional, únicamente a quien marca que es representante:
+  su número puede servir en una emergencia con su hijo. A un perfil que queda
+  solo como docente no se le pide, y el servidor no lo guarda aunque lo mande
+  una build 1.0.0. Hoy ese número no se muestra en ninguna pantalla.
 
 ## Consecuencias
 

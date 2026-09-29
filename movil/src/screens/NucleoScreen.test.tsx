@@ -680,3 +680,22 @@ it("un docente PRO en su límite no recibe una oferta de PRO", async () => {
   expect(JSON.stringify(vista!.toJSON())).toContain("Has alcanzado los 5 cursos de tu plan");
   expect(vista!.root.findAllByType(Boton).some((b) => b.props.children === "Ver el plan PRO")).toBe(false);
 });
+
+/**
+ * DP-016: al docente no se le pide ningún dato personal. El teléfono es solo
+ * de quien marca que es representante, porque puede servir en una emergencia
+ * con su hijo.
+ */
+it("el formulario de registro pide el teléfono solo a quien marca que es representante", async () => {
+  estado.perfil = null;
+  await montar();
+  const etiquetas = () => vista!.root.findAllByType(Campo).map((c) => c.props.etiqueta);
+  const casilla = (texto: string) =>
+    vista!.root.findAllByType(Casilla).find((c) => c.props.texto === texto)!;
+  expect(etiquetas()).toContain("Número de documento");
+  expect(etiquetas()).not.toContain("Teléfono (opcional)");
+  await act(async () => casilla("Soy docente").props.onChange());
+  expect(etiquetas()).not.toContain("Teléfono (opcional)");
+  await act(async () => casilla("Soy representante legal").props.onChange());
+  expect(etiquetas()).toContain("Teléfono (opcional)");
+});
