@@ -1,6 +1,6 @@
 # Guion del video (Shipaton 2026)
 
-> **Estado:** Borrador para revisar · **Dueño:** Persona C · **Última revisión:** 2026-09-28
+> **Estado:** Versión para grabar · **Dueño:** Persona C · **Última revisión:** 2026-09-29
 >
 > El video de demostración para Devpost (#55): menos de 2 minutos, la app en
 > teléfonos Android reales, narración en español y subtítulos en inglés
@@ -254,9 +254,9 @@ tiempo, con margen.
 
 **Cuándo**
 
-- **Hoy, lunes 28:** revisar este guion y mandarle la locución a quien narra.
-- **Martes 29, día de clases:** grabar la voz y las tomas 2 a 5. El servidor no deja anotar en fin de semana.
-- **Miércoles 30:** editar, subtitular, subir a YouTube y enviar a Devpost de día. El cierre es el miércoles 30 a las 23:45 de California, que en Ecuador es la 01:45 del jueves 1 de octubre.
+- **Hoy, martes 29:** quien narra graba la voz y la manda (el archivo original). Si les alcanza después de la prueba con tu tía, graben también las sesiones A, B y C: el martes es día de clases hasta la medianoche.
+- **Miércoles 30 en la mañana:** lo que falte por grabar. Apenas tengas la voz, te preparo el `.srt`.
+- **Miércoles 30 en la tarde:** editar, subtitular, subir a YouTube y enviar a Devpost **antes de las 20:00**. El cierre es a la 01:45 del jueves 1 de octubre en Ecuador (23:45 del miércoles en California): mejor no apurar el margen.
 
 **Teléfonos**
 
@@ -285,26 +285,116 @@ tiempo, con margen.
 14. Caras de niños reales, la escuela real, logos de otras marcas (WhatsApp incluido) o casos reales de violencia o extorsión.
 15. Música con derechos de autor.
 
-## Tomas
+## Qué grabar de la app
 
-La voz se graba cuando quien narra pueda. Lo demás, en este orden.
+Los clips que tienen que quedar grabados de la app. Cada uno dice en qué pantalla empieza, qué se toca y en qué pantalla hay que quedarse quieto dos segundos, que es lo que necesita el subtítulo para leerse. Las tarjetas de texto de las escenas 2, 3, 4 y 15 no se
+graban: se hacen en la edición.
 
-| # | Toma | Dónde y cómo | Dura | Escenas |
-|---|---|---|---|---|
-| 1 | La voz | Quien narra, con la hoja de locución | 10 min | 1 a 15 |
-| 2 | La mochila | Cámara del teléfono, en horizontal | 10 s | 1 |
-| 3 | El ciclo | Los dos teléfonos grabando la pantalla a la vez, de corrido | 4 min | 5 a 10 |
-| 4 | La compra | Beta, con la cuenta de Rosa | 2 min | 11 a 13 |
-| 5 | El plan PRO | Beta, con la cuenta de Andrea | 20 s | 14 |
-| 6 | Las tarjetas de texto | Se hacen en CapCut | — | 2, 3, 4 y 15 |
+### Sesión A · El ciclo
 
-## Edición en CapCut
+*Los dos teléfonos a la vez · General o Beta · escenas 5 a 10 · unos 4 minutos.* Empiecen a grabar en los dos teléfonos y no corten hasta el final: se recorta después. Rosa empieza con la app cerrada, en la pantalla de inicio del teléfono.
+
+| Clip | Escena | Teléfono | Empieza en | Qué se hace | Quieto 2 s en |
+|---|---|---|---|---|---|
+| A1 | 5 | Docente · Andrea | «Quinto de Básica A» | `Anotar conducta` → Mateo: `Anotar` → escribe *«Conversó durante la evaluación.»* → `Indisciplina` → `Registrar la anotación` | «Anotación registrada» |
+| A2 | 6 | Familia · Rosa | la pantalla de inicio del teléfono | llega «Cresco · Tienes una novedad de tu representado» → lo toca | el reporte de hoy, con la anotación a la vista |
+| A3 | 7 | Familia · Rosa | el reporte de hoy | `Ver el acumulado del parcial` → `Ver y reclamar` → `Reclamar esta anotación` → `Falta contexto` → escribe *«Me dijo que le estaba preguntando algo a la profesora.»* → `Enviar el reclamo` | «Reclamo enviado» |
+| A4 | 8 | Docente · Andrea | donde quedó | llega «Cresco · Hay novedades sobre tu reclamo» → lo toca → 2 segundos en «Lo abrió Rosa Mendoza» → `Responder` → `Se anula` → escribe *«Tiene razón: me estaba preguntando por una instrucción del examen. La anulo.»* → `Enviar respuesta` | la lista de reclamos, ya respondido |
+| A5 | 9 | Familia · Rosa | donde quedó | llega «Cresco · Hay novedades sobre tu reclamo» → la campana de arriba → 2 segundos en «El docente respondió tu reclamo» → menú, `Reporte acumulado` | «Anulada» y «Buen desempeño · 63» |
+| A6 | 10 | Familia · Rosa | donde quedó | `Inicio` → `Ver al docente a cargo` → 2 segundos en el horario, sin ningún teléfono → `Pedir una cita` → `Ver horarios del docente` → `Reservar este horario` | su cita pedida, por confirmar |
+| A7 | 10 | Docente · Andrea | donde quedó | llega «Cresco · Hay novedades sobre una cita» → lo toca → en «Por confirmar», la de Mateo: `Confirmar` | la cita confirmada |
+
+### Sesión B · La compra
+
+*El teléfono de Rosa · Solo Beta · escenas 11 a 13 · unos 2 minutos.* La laptop con `npm run dev` y el teléfono en la misma Wi-Fi. Rosa sigue en el plan gratuito.
+
+| Clip | Escena | Teléfono | Empieza en | Qué se hace | Quieto 2 s en |
+|---|---|---|---|---|---|
+| B1 | 11 | Familia · Rosa | `Reporte diario`, con el anuncio de prueba abajo | `Ver reportes anteriores` → 2 segundos en «Tu plan muestra los últimos 2 reportes» → `Ver los planes` | los dos planes Premium, con su precio |
+| B2 | 12 | Familia · Rosa | «Tu plan» | toca el precio de Premium mensual → en la ventana de RevenueCat, la compra exitosa → espera sin tocar nada | «Tu plan hoy: Representante — Premium mensual» |
+| B3 | 13 | Familia · Rosa | «Tu plan» | `Reporte diario`, ya sin anuncio → `Ver reportes anteriores`, sin el aviso del límite → opcional: el acumulado y `Descargar el PDF` | los reportes anteriores, o la vista del PDF |
+
+### Sesión C · El plan PRO
+
+*La cuenta de Andrea · Solo Beta · escena 14 · 20 segundos.* En la Beta, se cierra la sesión de Rosa y se entra con la de Andrea.
+
+| Clip | Escena | Teléfono | Empieza en | Qué se hace | Quieto 2 s en |
+|---|---|---|---|---|---|
+| C1 | 14 | Docente · Andrea | «Cursos» | 2 segundos en «Tu plan incluye un curso y ya lo estás usando» → `Ver el plan PRO` | «Docente — PRO», con su precio |
+
+### Sesión D · Con la cámara
+
+*La cámara de un teléfono, en horizontal · escena 1 · 10 segundos.* Con luz de día, sin caras, sin nombres reales y sin marcas a la vista.
+
+| Clip | Escena | Teléfono | Empieza en | Qué se hace | Quieto 2 s en |
+|---|---|---|---|---|---|
+| D1 | 1 | Cámara | la mochila, de cerca | el papel doblado que asoma → sin mover la cámara, o acercándose muy despacio | el papel, hasta completar 10 segundos |
+
+**Para que los clips sirvan**
+
+- Empiecen a grabar 2 segundos antes del primer toque y paren 2 segundos después de la última pantalla.
+- Toquen con calma y sin volver atrás. Si se equivocan, no paren: repitan el paso y se corta después.
+- Antes de empezar, borren las notificaciones del teléfono, suban el brillo y apaguen el ahorro de batería.
+- El mismo tamaño de letra y de pantalla en los dos teléfonos, desde los ajustes de pantalla del teléfono.
+- Graben en 1080p si el grabador lo permite, y hagan antes una prueba de 10 segundos para ver que se guarda bien.
+- Pasen los videos a la laptop por cable o por Google Drive. Por WhatsApp se comprimen y se ven borrosos.
+
+## Edición: herramientas y consejos
+
+### Herramientas
+
+- **CapCut de computadora.** Mejor que el del teléfono para este video: varias pistas, subtítulos importados y zoom preciso. Lo que más van a usar: **Velocidad** (la escritura ×2 a ×4), **Congelar** (el teléfono en pausa), **Fotogramas clave** (los acercamientos), **Máscara** con esquinas redondeadas (para que la grabación parezca un teléfono) y **Reducir ruido** en la voz.
+- **Canva, gratis.** Opcional, para diseñar las tarjetas de texto de las escenas 2, 3, 4 y 15 como imágenes de 1920 × 1080 y llevarlas a CapCut.
+- **El ícono de Cresco.** `movil/assets/icon.png`, en el repositorio, de 1024 × 1024. Es el de las escenas 4 y 15.
+- **Los colores de la app.** Azul oscuro **#002A5C** para las tarjetas de texto, azul **#00509E** para resaltar y celeste **#EBF4FA** detrás de los teléfonos. Letra blanca sobre el azul oscuro.
+- **La letra.** Una sola, sin serifa y en negrita para los subtítulos. La app usa Inter; si CapCut no la tiene, cualquier sans limpia.
+- **La música.** Opcional. Si la usan, de la Biblioteca de audio de YouTube, y tan baja que la voz se entienda siempre.
+
+### Cómo se arma
 
 1. Proyecto de 16:9, 1920 × 1080, 30 fps.
 2. Primero la voz: pongan la narración completa en la línea de tiempo y acomoden todo lo demás a ella.
-3. Los dos teléfonos lado a lado sobre el fondo #EBF4FA, a un 85 % del alto: docente a la izquierda, familia a la derecha. Arriba de cada uno, «TEACHER · Andrea» y «FAMILY · Rosa».
-4. El teléfono que no actúa, congelado en su último cuadro y un poco más tenue. En las escenas 11 a 14 puede salir de cuadro.
-5. Aceleren la escritura (×2 a ×4) y corten las esperas: pantallas cargando, avisos que tardan.
-6. Música opcional. Si la usan, de la Biblioteca de audio de YouTube y muy baja bajo la voz. La de CapCut puede recibir un reclamo de derechos en YouTube.
-7. Exporten en 1080p y 30 fps. En YouTube, confirmen que dura menos de 2:00.
-8. Súbanlo a YouTube como público o «No listado» y pongan el enlace en Devpost, y en `devpost.md` donde dice «[YouTube or Vimeo link]».
+3. Los dos teléfonos lado a lado sobre el fondo #EBF4FA, a un 75–80 % del alto: docente a la izquierda, familia a la derecha. Arriba de cada uno, «TEACHER · Andrea» y «FAMILY · Rosa».
+4. El teléfono que no actúa, congelado en su último cuadro y más tenue. En las escenas 11 a 14 puede salir de cuadro.
+5. Los subtítulos, en la franja de abajo, sin tapar las pantallas.
+6. Exporten en 1080p y 30 fps.
+
+El cuadro de las escenas 5 a 14:
+
+```
+┌────────────────────────── 1920 × 1080 ──────────────────────────┐
+│            TEACHER · Andrea           FAMILY · Rosa             │
+│               ┌────────┐               ┌────────┐               │
+│               │        │               │        │               │
+│               │   en   │               │ actúa  │               │
+│               │ pausa  │               │        │               │
+│               │ (50 %) │               │        │               │
+│               │        │               │        │               │
+│               └────────┘               └────────┘               │
+│          ▐ The family gets it instantly. The notification ▌     │
+│          ▐        never names the child.                  ▌     │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Consejos visuales
+
+- **Los primeros 5 segundos deciden.** Empiecen directo con la mochila y la voz. Sin intro de logo ni cuenta regresiva.
+- **Un protagonista a la vez.** El teléfono que actúa, completo; el otro, congelado y a media opacidad. El ojo va solo al que se mueve.
+- **Acérquense a la prueba.** Cuando la voz dice algo, hagan zoom de 1,3 a 1,5 veces a donde la pantalla lo demuestra: el aviso sin el nombre del niño, «Lo abrió Rosa Mendoza», «Anulada» y el 63, el precio, «Premium mensual». Medio segundo para entrar, quedarse, y medio para salir.
+- **Teléfonos grandes.** Que ocupen tres cuartas partes del alto. Entre los dos teléfonos, nada más que sus etiquetas.
+- **Todo siempre en el mismo sitio.** Docente a la izquierda, familia a la derecha, y etiquetas y subtítulos en el mismo lugar de principio a fin.
+- **Cortes simples.** Cortes directos o fundidos de 0,3 segundos como mucho. Sin transiciones llamativas, stickers ni efectos.
+- **Sin tiempos muertos.** Corten las cargas y las esperas. Que nunca pase más de un segundo sin voz ni movimiento.
+- **Tarjetas de texto cortas.** Pocas palabras y grandes, al menos 2,5 segundos en pantalla, que es lo que se tarda en leerlas dos veces.
+- **El cierre, más largo.** La última tarjeta, con la frase, el enlace de GitHub y el equipo, de 3 a 4 segundos. Ahí es donde el jurado pausa.
+- **La voz manda.** Voz clara y pareja, con «Normalizar volumen» de CapCut. Si hay música, que nunca compita con ella.
+- **Pruébenlo sin sonido.** Vean el video exportado en un teléfono, sin audio. Si se entiende solo con los subtítulos, está listo.
+
+### Antes de subir
+
+- [ ] Dura menos de 2:00 en el reproductor de YouTube.
+- [ ] Los subtítulos no tienen errores y no tapan nada importante.
+- [ ] No se ve nada personal: notificaciones, contactos, números.
+- [ ] Se oye bien en el teléfono y en la laptop.
+- [ ] En YouTube: título «Cresco — RevenueCat Shipaton 2026 (Next Gen)», público o «No listado». Abran el enlace en una ventana de incógnito para comprobar que se ve.
+- [ ] El enlace, en Devpost y en `devpost.md`, donde dice «[YouTube or Vimeo link]».
