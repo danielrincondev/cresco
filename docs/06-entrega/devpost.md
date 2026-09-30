@@ -94,7 +94,7 @@ limit is actually reached — never at launch.
   purchases are flagged as sandbox so the demo never mixes with pilot data.
 - **Prices live in RevenueCat offerings**, not in the app, so they can change
   or be localised without shipping an update. Initial reference prices: $1.99
-  a month or $2.99 for two months for families, and $4.99 a month for
+  a month or $2.99 for two months for families, and $3.99 a month for
   teachers.
 - We tested real purchases with RevenueCat's **Test Store** in an EAS
   development build, without a Play Console account.
