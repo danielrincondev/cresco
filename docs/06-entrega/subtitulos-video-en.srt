@@ -1,103 +1,136 @@
 1
 00:00:00,000 --> 00:00:06,000
-In Ecuador's public schools, news about
-a child travels on a scrap of paper.
+Why did I never find out my
+son was failing the year?
 
 2
-00:00:06,000 --> 00:00:08,000
-WhatsApp groups?
+00:00:06,000 --> 00:00:09,000
+Why didn't anyone tell me?
 
 3
-00:00:08,000 --> 00:00:14,000
-One school banned them: “they were
-taking the teachers' numbers.”
+00:00:09,000 --> 00:00:11,000
+I did tell her.
 
 4
-00:00:14,000 --> 00:00:19,000
-Teachers are left exposed, and
-families find out too late.
+00:00:11,000 --> 00:00:15,000
+Both are telling the truth.
+And neither can prove it.
 
 5
-00:00:19,000 --> 00:00:24,000
-Cresco is a safe bridge
-between school and family.
+00:00:15,000 --> 00:00:18,000
+It's not an isolated case.
 
 6
-00:00:24,000 --> 00:00:29,000
-The teacher writes down what
-happened, in her own words.
+00:00:18,000 --> 00:00:22,000
+In a single school year, 31,000
+students failed the year.
 
 7
-00:00:29,000 --> 00:00:33,000
-The behaviour score updates on its own.
+00:00:22,000 --> 00:00:25,000
+And to prove she warned them,
 
 8
-00:00:33,000 --> 00:00:39,000
-The family gets it instantly. The
-notification never names the child.
+00:00:25,000 --> 00:00:29,000
+the teacher needs a folder
+full of paper reports.
 
 9
-00:00:39,000 --> 00:00:44,000
-Disagree? She disputes it in
-writing, under her own name.
+00:00:29,000 --> 00:00:33,000
+What about a chat? In Ecuador,
+a teacher who shares her number
 
 10
-00:00:44,000 --> 00:00:50,000
-There are no anonymous messages in Cresco.
+00:00:33,000 --> 00:00:38,000
+can end up threatened or extorted,
+just for giving a fair grade.
 
 11
-00:00:50,000 --> 00:00:55,000
-The teacher has 30 days
-to answer in writing:
+00:00:39,000 --> 00:00:43,000
+No one should have to choose
+between warning in time
 
 12
-00:00:55,000 --> 00:01:00,000
-keep the entry, change it, or annul it.
+00:00:43,000 --> 00:00:45,000
+and protecting their family.
 
 13
-00:01:00,000 --> 00:01:05,000
-If she annuls it, the score is
-recalculated, and it all stays on record.
+00:00:45,000 --> 00:00:47,000
+That's why we built Cresco.
 
 14
-00:01:05,000 --> 00:01:10,000
-To talk, the family books a slot
-in the teacher's office hours.
+00:00:47,000 --> 00:00:51,000
+One: everything in writing, the same day.
 
 15
-00:01:10,000 --> 00:01:15,000
-She confirms, and never
-has to give out her number.
+00:00:51,000 --> 00:00:57,000
+The teacher records it; the family is
+notified instantly, without naming the child.
 
 16
-00:01:15,000 --> 00:01:22,000
-The essentials are free. Premium
-appears only when a family wants more.
+00:00:57,000 --> 00:01:03,000
+And she sees who opened it.
+Now the folder fills itself.
 
 17
-00:01:22,000 --> 00:01:26,000
-The purchase goes through RevenueCat,
+00:01:03,000 --> 00:01:07,000
+Two: no one is anonymous.
 
 18
-00:01:26,000 --> 00:01:30,000
-and its webhook tells our
-server to unlock the plan.
+00:01:07,000 --> 00:01:12,000
+Families dispute under their own
+name; the teacher answers in writing.
 
 19
-00:01:30,000 --> 00:01:35,000
-More history, a PDF report, and no ads.
+00:01:12,000 --> 00:01:15,000
+Three: the teacher never
+gives out her number.
 
 20
-00:01:35,000 --> 00:01:41,000
-Teachers with several classes
-get their own PRO plan.
+00:01:15,000 --> 00:01:19,000
+To talk, families book a
+meeting in her office hours.
 
 21
-00:01:41,000 --> 00:01:46,000
-Everything in writing. No one anonymous.
-Teachers never give out their number.
+00:01:19,000 --> 00:01:25,000
+Cresco isn't another chat. It's the
+record that today only exists on paper.
 
 22
-00:01:46,000 --> 00:01:50,000
+00:01:25,000 --> 00:01:31,000
+What keeps people safe is always free.
+Premium appears when a family wants more.
+
+23
+00:01:31,000 --> 00:01:34,000
+The purchase goes through RevenueCat,
+
+24
+00:01:34,000 --> 00:01:37,000
+and its webhook tells our
+server what to unlock.
+
+25
+00:01:37,000 --> 00:01:40,000
+More history, a PDF report, zero ads.
+
+26
+00:01:40,000 --> 00:01:45,000
+And teachers with several
+classes get their own PRO plan.
+
+27
+00:01:45,000 --> 00:01:47,000
+I did tell her.
+
+28
+00:01:47,000 --> 00:01:49,000
+And I saw it.
+
+29
+00:01:49,000 --> 00:01:52,000
+Built by students in Ecuador.
+
+30
+00:01:52,000 --> 00:01:55,000
 Cresco: so no warning
 sign arrives too late.
