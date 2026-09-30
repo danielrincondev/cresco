@@ -180,8 +180,9 @@ firebase-cloud-messaging · eas
 
 ## Testing instructions
 
-- **Video:** [YouTube or Vimeo link]. It shows the app on a real Android phone,
-  in Spanish with English subtitles.
+- **Video:** [YouTube or Vimeo link]. It shows the app on real Android phones,
+  in Spanish with English subtitles. The dramatized scenes are AI-generated and
+  labeled as such; every app screen is a real recording of the app running.
 - **Code:** https://github.com/danielrincondev/cresco — the README has an
   English "Run it yourself" section: Node.js 24, a free Clerk application and
   a free Convex account, no Docker.
