@@ -1,136 +1,137 @@
 1
-00:00:00,000 --> 00:00:06,000
-Why did I never find out my
+00:00:00,000 --> 00:00:05,000
+Why did no one tell me my
 son was failing the year?
 
 2
-00:00:06,000 --> 00:00:09,000
-Why didn't anyone tell me?
+00:00:05,000 --> 00:00:08,000
+I did tell her. Three times.
 
 3
-00:00:09,000 --> 00:00:11,000
-I did tell her.
+00:00:08,000 --> 00:00:10,000
+Both are telling the truth.
 
 4
-00:00:11,000 --> 00:00:15,000
-Both are telling the truth.
-And neither can prove it.
+00:00:10,000 --> 00:00:13,000
+But the warnings got lost along the way.
 
 5
-00:00:15,000 --> 00:00:18,000
-It's not an isolated case.
+00:00:13,000 --> 00:00:16,000
+A note in a backpack. A
+message half-delivered.
 
 6
-00:00:18,000 --> 00:00:22,000
-In a single school year, 31,000
-students failed the year.
+00:00:16,000 --> 00:00:20,000
+A meeting request nobody signed.
 
 7
-00:00:22,000 --> 00:00:25,000
-And to prove she warned them,
+00:00:20,000 --> 00:00:25,000
+Each one was a warning
+sign. None arrived in time.
 
 8
-00:00:25,000 --> 00:00:29,000
-the teacher needs a folder
-full of paper reports.
+00:00:25,000 --> 00:00:28,000
+Why not just a chat?
 
 9
-00:00:29,000 --> 00:00:33,000
-What about a chat? In Ecuador,
-a teacher who shares her number
+00:00:28,000 --> 00:00:35,000
+Because in Guayaquil, a teacher's number
+can end up in the hands of a gang.
 
 10
-00:00:33,000 --> 00:00:38,000
-can end up threatened or extorted,
-just for giving a fair grade.
+00:00:35,000 --> 00:00:39,000
+Teachers get threatened and
+extorted for giving a fair grade.
 
 11
 00:00:39,000 --> 00:00:43,000
+So many no longer give out their number.
+
+12
+00:00:43,000 --> 00:00:47,000
+Meanwhile, a kid drifting away from class
+
+13
+00:00:47,000 --> 00:00:51,000
+gets closer to the
+streets, and to the gangs.
+
+14
+00:00:52,000 --> 00:00:56,000
 No one should have to choose
 between warning in time
 
-12
-00:00:43,000 --> 00:00:45,000
+15
+00:00:56,000 --> 00:00:58,000
 and protecting their family.
 
-13
-00:00:45,000 --> 00:00:47,000
+16
+00:00:58,000 --> 00:01:00,000
 That's why we built Cresco.
 
-14
-00:00:47,000 --> 00:00:51,000
-One: everything in writing, the same day.
-
-15
-00:00:51,000 --> 00:00:57,000
-The teacher records it; the family is
-notified instantly, without naming the child.
-
-16
-00:00:57,000 --> 00:01:03,000
-And she sees who opened it.
-Now the folder fills itself.
-
 17
-00:01:03,000 --> 00:01:07,000
-Two: no one is anonymous.
+00:01:00,000 --> 00:01:04,000
+One: the teacher writes
+it down the same day.
 
 18
-00:01:07,000 --> 00:01:12,000
-Families dispute under their own
-name; the teacher answers in writing.
+00:01:04,000 --> 00:01:09,000
+The family is notified instantly,
+without naming the child.
 
 19
-00:01:12,000 --> 00:01:15,000
+00:01:09,000 --> 00:01:14,000
+And there's a record of who saw
+it. The folder fills itself.
+
+20
+00:01:14,000 --> 00:01:18,000
+Two: families take part,
+and no one is anonymous.
+
+21
+00:01:18,000 --> 00:01:22,000
+They reply by name; the
+teacher answers in writing.
+
+22
+00:01:22,000 --> 00:01:25,000
 Three: the teacher never
 gives out her number.
 
-20
-00:01:15,000 --> 00:01:19,000
-To talk, families book a
-meeting in her office hours.
+23
+00:01:25,000 --> 00:01:29,000
+To talk, families book a meeting.
 
-21
-00:01:19,000 --> 00:01:25,000
-Cresco isn't another chat. It's the
-record that today only exists on paper.
-
-22
-00:01:25,000 --> 00:01:31,000
+24
+00:01:29,000 --> 00:01:35,000
 What keeps people safe is always free.
 Premium appears when a family wants more.
 
-23
-00:01:31,000 --> 00:01:34,000
-The purchase goes through RevenueCat,
-
-24
-00:01:34,000 --> 00:01:37,000
-and its webhook tells our
-server what to unlock.
-
 25
-00:01:37,000 --> 00:01:40,000
-More history, a PDF report, zero ads.
+00:01:35,000 --> 00:01:39,000
+The purchase goes through RevenueCat;
+its webhook unlocks the plan.
 
 26
-00:01:40,000 --> 00:01:45,000
-And teachers with several
-classes get their own PRO plan.
+00:01:39,000 --> 00:01:43,000
+Teachers with several
+classes get their own PRO.
 
 27
-00:01:45,000 --> 00:01:47,000
+00:01:43,000 --> 00:01:45,000
 I did tell her.
 
 28
-00:01:47,000 --> 00:01:49,000
-And I saw it.
+00:01:45,000 --> 00:01:47,000
+And I got there in time.
 
 29
-00:01:49,000 --> 00:01:52,000
-Built by students in Ecuador.
+00:01:47,000 --> 00:01:51,000
+We're starting in Guayaquil.
+Next: every classroom in Ecuador.
 
 30
-00:01:52,000 --> 00:01:55,000
+00:01:51,000 --> 00:01:55,000
 Cresco: so no warning
 sign arrives too late.
