@@ -42,7 +42,7 @@ lo que se escribe en *«cursiva»* y los avisos del teléfono como «Cresco · t
 |---|---|
 | **Recreación con IA** | Rosa en penumbra, en la mesa de su casa, leyendo la libreta de calificaciones. Sin música. Arriba, pequeño: «Guayaquil · fin del año lectivo». Al ritmo de la voz se escribe, grande: «¿Por qué nadie me avisó?» |
 | **Se escucha** | **Madre:** ¿Por qué nadie me avisó que mi hijo estaba perdiendo el año? |
-| **Subtítulos** | `0:00–0:05` Why did no one tell me my son was failing the year? |
+| **Subtítulos** | `0:00–0:05` Why didn't anyone tell me my son was failing the school year? |
 
 **Se arma con:** IA + texto en CapCut. **Material:** El clip de IA de la escena 1 (Rosa en penumbra); 00-recreacion-ia.png.
 
@@ -64,7 +64,7 @@ lo que se escribe en *«cursiva»* y los avisos del teléfono como «Cresco · t
 1. Arrastra el clip a la pista principal en 0:00 y recórtalo a 5,0 s. Quédate con el tramo donde, al final, baja la libreta.
 2. **Ajustar:** baja el brillo hasta que la escena se vea en penumbra pero Rosa se reconozca (alrededor de −35), sube un poco el contraste y baja un poco la saturación. Agrega una **viñeta** suave.
 3. Al inicio del clip, un **fundido desde negro** de 0,5 s.
-4. **Texto 1:** «Guayaquil · fin del año lectivo» en Inter SemiBold, tamaño pequeño (unos 34), blanco al 80 %, centrado arriba. Entrada con fundido de 0,5 s, de 0:00,5 a 0:05,0.
+4. **Texto 1:** «Guayaquil · fin del año lectivo» en Inter SemiBold, tamaño pequeño (unos 34), blanco al 80 %, centrado arriba, y debajo, en una segunda línea más pequeña (unos 26), «Guayaquil · end of the school year». Entrada con fundido de 0,5 s, de 0:00,5 a 0:05,0.
 5. **Texto 2:** «¿Por qué nadie me avisó?» en Inter Bold, grande (unos 96), blanco, centrado en el tercio de arriba. Animación de entrada **máquina de escribir** de 2,5 s desde 0:01,0. Estíralo hasta **0:08,0** (sigue encima de la escena 2) y sácalo con un fundido de 0,4 s.
 6. `00-recreacion-ia.png` abajo a la izquierda, de 0:00,5 a 0:05,0.
 7. Voz **V01** en la pista de voces, desde 0:00,3.
@@ -164,7 +164,7 @@ lo que se escribe en *«cursiva»* y los avisos del teléfono como «Cresco · t
 |---|---|
 | **Recreación con IA** | Tres planos rápidos, uno por frase: un papel doblado en el fondo de una mochila; un mensaje con una sola palomita; una citación sin firmar sobre una mesa. |
 | **Se escucha** | **Narrador:** Un papelito en la mochila. Un mensaje que llega a medias. Una citación que nadie firmó. |
-| **Subtítulos** | `0:13–0:16` A note in a backpack. A message half-delivered.<br>`0:16–0:20` A meeting request nobody signed. |
+| **Subtítulos** | `0:13–0:15` A note in a backpack.<br>`0:15–0:17` A message half-delivered.<br>`0:17–0:20` A school summons no one signed. |
 | **Ojo** | El mensaje, en un teléfono con la app de mensajes del sistema, sin logos de marcas. |
 
 **Se arma con:** IA. **Material:** El clip de la escena 4 (la mesa de noche con los tres objetos); 00-recreacion-ia.png.
@@ -203,7 +203,7 @@ lo que se escribe en *«cursiva»* y los avisos del teléfono como «Cresco · t
 |---|---|
 | **Tarjeta de texto** | Fondo azul oscuro. Los tres objetos de la escena 4 se apagan uno por uno, como luces. Texto: «Cada aviso era una señal.» |
 | **Se escucha** | **Narrador:** Cada uno era una señal. Y ninguna llegó a tiempo. |
-| **Subtítulos** | `0:20–0:25` Each one was a warning sign. None arrived in time. |
+| **Subtítulos** | `0:20–0:23` Each one was a warning sign.<br>`0:23–0:25` And none arrived in time. |
 
 **Se arma con:** Hecha en CapCut. **Material:** Los tres cuadros congelados de la escena 4; 00-fondo-azul.png; 05-texto-senal.png.
 
@@ -243,10 +243,10 @@ lo que se escribe en *«cursiva»* y los avisos del teléfono como «Cresco · t
 |---|---|
 | **Recreación con IA** | Primer plano de un teléfono sobre un escritorio de aula. Llega un mensaje de un número desconocido: «Profe, sabemos dónde vive.» La pantalla se queda encendida. |
 | **Se escucha** | **Narrador:** ¿Y por qué no un chat? Porque en Guayaquil, el número de un profesor puede terminar en manos de una banda. |
-| **Subtítulos** | `0:25–0:28` Why not just a chat?<br>`0:28–0:35` Because in Guayaquil, a teacher's number can end up in the hands of a gang. |
+| **Subtítulos** | `0:25–0:27` Why not just a chat?<br>`0:27–0:35` Because in Guayaquil, a teacher's number can end up in the hands of a gang. |
 | **Ojo** | Es una recreación: el número y el mensaje son inventados. Sin nombres, sin caras y sin casos reales. |
 
-**Se arma con:** IA + notificación en CapCut. **Material:** El clip de la escena 6 (el teléfono de Andrea en el aula al anochecer); 06-notificacion.png; 00-recreacion-ia.png.
+**Se arma con:** IA + notificación en CapCut. **Material:** El clip de la escena 6 (el teléfono de Andrea en el aula al anochecer); 06-notificacion.png; 06-traduccion-en.png; 00-recreacion-ia.png.
 
 *Qué se ve, segundo a segundo*
 
@@ -264,7 +264,7 @@ lo que se escribe en *«cursiva»* y los avisos del teléfono como «Cresco · t
 *Paso a paso en CapCut*
 
 1. Pon el clip en 0:25,0. Si dura 8 s, **congela** el último cuadro hasta 0:35,0.
-2. Busca, cuadro por cuadro, el primer cuadro con la pantalla encendida. Desde ahí, superposición `06-notificacion.png` hasta 0:35,0.
+2. Busca, cuadro por cuadro, el primer cuadro con la pantalla encendida. Desde ahí, superposición `06-notificacion.png` hasta 0:35,0. Y `06-traduccion-en.png` (la traducción al inglés de la notificación) arriba al centro, desde 1 s después hasta 0:35,0, por encima del teléfono y lejos de los subtítulos.
 3. Escala la notificación al ancho de la pantalla del teléfono, rótala hasta que quede paralela a la pantalla, opacidad al 95 %, y ponle una entrada **deslizando hacia abajo** de 0,2 s.
 4. Selecciona el clip y la notificación → **Crear clip compuesto**. En ese clip, fotogramas clave de escala: 100 % en 0:31,0 y 115 % en 0:35,0, acercándose a la notificación.
 5. **Ajustar:** frío, el brillo un poco abajo.
@@ -285,9 +285,9 @@ lo que se escribe en *«cursiva»* y los avisos del teléfono como «Cresco · t
 |---|---|
 | **Tarjeta de texto** | Fondo oscuro. Los dígitos de un número de teléfono se rompen y se dispersan. Abajo, pequeño: «“Estaban tomando los números de los profesores.” · docente de un plantel fiscal, entrevista del 1 de septiembre de 2026». |
 | **Se escucha** | **Narrador:** Por poner una nota justa, hay profesores amenazados y extorsionados. Por eso muchos ya no dan su número. |
-| **Subtítulos** | `0:35–0:39` Teachers get threatened and extorted for giving a fair grade.<br>`0:39–0:43` So many no longer give out their number. |
+| **Subtítulos** | `0:35–0:40` Teachers get threatened and extorted for giving a fair grade.<br>`0:40–0:43` That's why many no longer give out their number. |
 
-**Se arma con:** CapCut (0:35–0:38) + IA (0:38–0:43). **Material:** 07-numero.png; 07-cita.png; El clip de la escena 7 (Andrea guarda el teléfono en el cajón); 00-recreacion-ia.png.
+**Se arma con:** CapCut (0:35–0:38) + IA (0:38–0:43). **Material:** 07-numero.png; 07-cita-bilingue.png; El clip de la escena 7 (Andrea guarda el teléfono en el cajón); 00-recreacion-ia.png.
 
 *Qué se ve, segundo a segundo*
 
@@ -304,7 +304,7 @@ lo que se escribe en *«cursiva»* y los avisos del teléfono como «Cresco · t
 *Paso a paso en CapCut*
 
 1. De 0:35,0 a 0:38,0, fondo negro, sin clip.
-2. `07-numero.png` al centro y `07-cita.png` debajo (a unos 120 px del borde de abajo, por encima de los subtítulos), de 0:35,0 a 0:38,0.
+2. `07-numero.png` al centro y `07-cita-bilingue.png` debajo (la cita en español con su traducción) (a unos 120 px del borde de abajo, por encima de los subtítulos), de 0:35,0 a 0:38,0.
 3. Animación de salida del número que lo **rompa o disperse** (en CapCut suele llamarse partículas, desintegrar o romper), de 0,8 s, empezando cuando se oye «amenazados». La cita sale con un fundido en 0:38,0.
 4. Clip de la escena 7 desde 0:38,0, recortado a 5 s. Si el cajón se cierra después de 0:43, acelera el clip un poco (hasta 1,15×).
 5. `00-recreacion-ia.png` de 0:38,0 a 0:43,0.
@@ -366,9 +366,9 @@ lo que se escribe en *«cursiva»* y los avisos del teléfono como «Cresco · t
 |---|---|
 | **Recreación con IA** | Un segundo de negro y silencio total. Luego se enciende un teléfono con el ícono de Cresco, y entra la música, suave y cálida. Texto: «Avisar a tiempo. Sin exponerse.» |
 | **Se escucha** | *1 s de silencio.* **Narrador:** Nadie debería elegir entre avisar a tiempo y proteger a su familia. Por eso creamos Cresco. |
-| **Subtítulos** | `0:52–0:56` No one should have to choose between warning in time<br>`0:56–0:58` and protecting their family.<br>`0:58–1:00` That's why we built Cresco. |
+| **Subtítulos** | `0:52–0:56` No one should have to choose between warning parents in time<br>`0:56–0:58` and keeping their own family safe.<br>`0:58–1:00` That's why we built Cresco. |
 
-**Se arma con:** IA + ícono en CapCut. **Material:** El clip de la escena 9 (el escritorio al amanecer); Cresco-icono.png (en Descargas); 09-lema.png.
+**Se arma con:** IA + ícono en CapCut. **Material:** El clip de la escena 9 (el escritorio al amanecer); Cresco-icono.png (en Descargas); 09-lema-bilingue.png.
 
 *Qué se ve, segundo a segundo*
 
@@ -389,7 +389,7 @@ lo que se escribe en *«cursiva»* y los avisos del teléfono como «Cresco · t
 2. Clip en 0:52,0. Busca el primer cuadro con la pantalla encendida (≈2 s del clip = 0:54,0).
 3. Superposición `Cresco-icono.png` desde ese cuadro: modo de fusión **Multiplicar**, unos dos tercios del ancho de la pantalla, girado unos grados para quedar paralelo al teléfono, alto al 90 % y una aparición de 0,4 s.
 4. Selecciona el clip y el ícono → **Crear clip compuesto**. Congela el último cuadro hasta 1:00,0. Fotogramas clave de escala: 100 % en 0:56,0 y 160 % en 1:00,0, centrados en la pantalla del teléfono.
-5. `09-lema.png` abajo, centrado, por encima de la franja de subtítulos, de 0:56,5 a 1:00,0, con un fundido de 0,4 s.
+5. `09-lema-bilingue.png` (el lema con su traducción) abajo, centrado, por encima de la franja de subtítulos, de 0:56,5 a 1:00,0, con un fundido de 0,4 s.
 6. Música desde 0:52,0 con un fundido de entrada de 1,5 s. Voz **V09** desde 0:52,3.
 
 *Resultado correcto*
@@ -407,7 +407,7 @@ lo que se escribe en *«cursiva»* y los avisos del teléfono como «Cresco · t
 | **Docente · Andrea (izquierda)** | `Anotar conducta` → Mateo: `Anotar` → escribe *«Conversó durante la evaluación.»* → `Indisciplina` → `Registrar la anotación` |
 | **Familia · Rosa (derecha)** | baja el aviso «Cresco · Tienes una novedad de tu representado» → lo toca → «Lo de hoy, contado por su docente», con la anotación |
 | **Se escucha** | **Narrador:** Uno: la docente anota el mismo día, y la familia recibe el aviso al instante, sin que nombre al niño. |
-| **Subtítulos** | `1:00–1:05` One: the teacher writes it down the same day.<br>`1:05–1:11` The family is notified instantly, without naming the child. |
+| **Subtítulos** | `1:00–1:04` One: the teacher writes it down the same day.<br>`1:04–1:11` And the family gets the alert instantly, without the child's name. |
 
 **Se arma con:** Grabación de pantalla de la app (sesión A: A1 y A2). **Material:** Grabación A1 (Andrea anota); Grabación A2 (a Rosa le llega el aviso); 00-fondo-celeste-2-fuerte.png; 10-etiqueta-teacher.png; 10-etiqueta-family.png; 10-rotulo-1.png.
 
@@ -451,7 +451,7 @@ lo que se escribe en *«cursiva»* y los avisos del teléfono como «Cresco · t
 | **Docente · Andrea (izquierda)** | `Reporte del día` → «Quién abrió los reportes»: «Lo abrieron … de 20 familias» → corte a `Historial de la familia` de Valentina: «En resumen» |
 | **Familia · Rosa (derecha)** | En pausa: congelado en su último cuadro. |
 | **Se escucha** | **Narrador:** Y queda constancia de quién lo vio: la carpeta se llena sola. |
-| **Subtítulos** | `1:11–1:17` And there's a record of who saw it. The folder fills itself. |
+| **Subtítulos** | `1:11–1:17` And there's a record of who saw it: the paper trail builds itself. |
 
 **Se arma con:** Grabación de pantalla de la app (sesión A: A3 y A4). **Material:** Grabación A3 (quién abrió los reportes); Grabación A4 (historial de la familia de Valentina).
 
@@ -486,7 +486,7 @@ lo que se escribe en *«cursiva»* y los avisos del teléfono como «Cresco · t
 | **Docente · Andrea (izquierda)** | «Reclamos»: «Lo abrió Rosa Mendoza» → `Responder` → `Se anula` → `Enviar respuesta` |
 | **Familia · Rosa (derecha)** | `Ver el acumulado del parcial` → `Ver y reclamar` → `Reclamar esta anotación` → `Falta contexto` → escribe *«Me dijo que le estaba preguntando algo a la profesora.»* → `Enviar el reclamo` |
 | **Se escucha** | **Narrador:** Dos: la familia es parte, y nadie es anónimo. Responde con su nombre, y la docente, por escrito. |
-| **Subtítulos** | `1:17–1:22` Two: families take part, and no one is anonymous.<br>`1:22–1:27` They reply by name; the teacher answers in writing. |
+| **Subtítulos** | `1:17–1:21` Two: families take part, and no one is anonymous.<br>`1:21–1:27` They reply by name; the teacher answers in writing. |
 
 **Se arma con:** Grabación de pantalla de la app (sesión A: A5 y A6). **Material:** Grabación A5 (Rosa reclama); Grabación A6 (Andrea responde); 12-rotulo-2.png.
 
@@ -564,7 +564,7 @@ lo que se escribe en *«cursiva»* y los avisos del teléfono como «Cresco · t
 | **Docente · Andrea (izquierda)** | «Cursos», sin anuncios: «Tu plan incluye un curso y ya lo estás usando» → `Ver el plan PRO` → toca el precio: la ventana de RevenueCat, la compra exitosa → «Tu plan hoy: Docente — PRO» |
 | **Familia · Rosa (derecha)** | `Reporte diario`, con el anuncio de prueba abajo → `Ver reportes anteriores`: «Tu plan muestra los últimos 2 reportes» → `Ver los planes` → toca el precio de Premium mensual: la ventana de RevenueCat, la compra exitosa → el reporte, ya sin anuncio |
 | **Se escucha** | **Narrador:** Cresco es gratis, con publicidad para las familias. Gracias a RevenueCat, cada uno tiene su extra: el docente, con PRO, llega a más cursos; y la familia, con Premium, entiende mejor cómo ayudar a su hijo. |
-| **Subtítulos** | `1:31–1:35` Cresco is free, with ads for families.<br>`1:35–1:38` Thanks to RevenueCat, each one gets an extra:<br>`1:38–1:41` teachers with PRO reach more classes;<br>`1:41–1:45` families with Premium better understand how to help their child. |
+| **Subtítulos** | `1:31–1:35` Cresco is free, with ads for families.<br>`1:35–1:38` Thanks to RevenueCat, each gets their own extra:<br>`1:38–1:41` teachers with PRO reach more classes;<br>`1:41–1:45` families with Premium better understand how to help their child. |
 | **Ojo** | Junta las antiguas escenas 14 y 15. Las grabaciones de pantalla de las escenas 10 a 14 tienen más tiempo, para ir a velocidad normal. |
 
 **Se arma con:** Grabación de pantalla de la app en Beta (Rosa: B1, B2 y B3; Andrea: C1). **Material:** Grabaciones B1, B2 y B3 (Rosa: el anuncio, el límite y la compra de Premium); Grabación C1 (Andrea: el límite y la compra de PRO); 15-revenuecat-test-store.png.
@@ -646,9 +646,9 @@ lo que se escribe en *«cursiva»* y los avisos del teléfono como «Cresco · t
 |---|---|
 | **Tarjeta de texto** | Fondo azul oscuro. Un mapa simple del Ecuador con un punto encendido en Guayaquil, que se multiplica por todo el país. Luego el ícono de Cresco y, en grande: «Que ninguna señal llegue tarde.» Debajo, pequeño: «Equipo Neofix · estudiantes en Guayaquil» · «Expo · Convex · Clerk · RevenueCat» · «Código abierto · github.com/danielrincondev/cresco». |
 | **Se escucha** | **Narrador:** Empezamos en Guayaquil. Queremos llegar a cada aula del Ecuador. Cresco: que ninguna señal llegue tarde. |
-| **Subtítulos** | `1:49–1:53` We're starting in Guayaquil. Next: every classroom in Ecuador.<br>`1:53–1:57` Cresco: so no warning sign arrives too late. |
+| **Subtítulos** | `1:49–1:54` We're starting in Guayaquil. Next: every classroom in Ecuador.<br>`1:54–1:57` Cresco: so no warning sign arrives too late. |
 
-**Se arma con:** Hecha en CapCut. **Material:** 00-fondo-azul.png; 17-punto.png; 17-guayaquil.png; 17-tarjeta-final.png.
+**Se arma con:** Hecha en CapCut. **Material:** 00-fondo-azul.png; 17-punto.png; 17-guayaquil.png; 17-tarjeta-final-en.png.
 
 *Qué se ve, segundo a segundo*
 
@@ -670,7 +670,7 @@ lo que se escribe en *«cursiva»* y los avisos del teléfono como «Cresco · t
 2. `17-punto.png` en 1:49,5, un poco a la izquierda y abajo del centro, con una aparición de 0,3 s. `17-guayaquil.png` a su derecha, al mismo tiempo.
 3. **Los puntos rápido:** copia el punto 5 veces, repártelo por la pantalla y haz que cada copia empiece 0,1 s después de la anterior. Selecciona esos 5 → **Crear clip compuesto**. Duplica el compuesto 5 veces, cambia la posición de cada copia y escalónalas 0,3 s. Son 30 puntos en un minuto de trabajo. Varía el tamaño (del 50 % al 120 %) para que no se vean iguales.
 4. Todos los puntos y «Guayaquil» salen con un fundido de 0,4 s en 1:53,0.
-5. `17-tarjeta-final.png` de 1:53,0 a 1:57,0, con un fundido de entrada de 0,6 s. Opcional: fotogramas clave de escala del 97 % al 100 % para que respire.
+5. `17-tarjeta-final-en.png` (los créditos en inglés) de 1:53,0 a 1:57,0, con un fundido de entrada de 0,6 s. Opcional: fotogramas clave de escala del 97 % al 100 % para que respire.
 6. Voz **V17** desde 1:49,5. En 1:57,0, corta todo en seco.
 
 *Resultado correcto*
@@ -777,6 +777,7 @@ Piezas listas en PNG, en `Descargas\Video Cresco\kit`.
 - `06-notificacion.png`: La notificación «Profe, sabemos dónde vive.» para pegar sobre la pantalla del teléfono.
 - `07-numero.png · 07-cita.png`: El número enmascarado que se rompe, y la cita de la entrevista.
 - `09-lema.png`: «Avisar a tiempo. Sin exponerse.»
+- `06-traduccion-en.png · 07-cita-bilingue.png · 09-lema-bilingue.png · 17-tarjeta-final-en.png`: Las versiones con inglés de los textos en pantalla que la voz no dice: las reglas piden todo en inglés o traducido. Úsalas en lugar de las de solo español.
 - `10-etiqueta-teacher.png · 10-etiqueta-family.png`: Las etiquetas que van encima de cada teléfono en las escenas 10 a 14.
 - `10-rotulo-1.png · 12-rotulo-2.png · 13-rotulo-3.png`: Los rótulos de las tres promesas.
 - `15-revenuecat-test-store.png`: La insignia de RevenueCat de la escena 14. (`15-linea-tecnica.png` ya no se usa.)
@@ -788,7 +789,7 @@ Piezas listas en PNG, en `Descargas\Video Cresco\kit`.
 
 | Opción | ¿Se ven siempre? | ¿Se corrigen después de subir? | Trabajo |
 |---|---|---|---|
-| **Pegados al video** (recomendada) | Sí, en cualquier reproductor y también sin sonido. | No: hay que exportar y subir el video otra vez. | Importar el `.srt` en CapCut, o escribir las 30 frases a mano. |
+| **Pegados al video** (recomendada) | Sí, en cualquier reproductor y también sin sonido. | No: hay que exportar y subir el video otra vez. | Importar el `.srt` en CapCut, o escribir las 32 frases a mano. |
 | Subtítulos de YouTube | Solo si quien mira los enciende. | Sí, desde YouTube Studio. | Subir el `.srt` en YouTube Studio. |
 | Los dos | Sí: los pegados, en inglés. | Solo los de YouTube. | Los dos pasos. Los de YouTube irían en español, para quien no oye bien. |
 
@@ -796,9 +797,9 @@ Piezas listas en PNG, en `Descargas\Video Cresco\kit`.
 
 **Cómo se hacen en CapCut**
 
-1. El archivo `.srt` con las 30 frases en inglés ya está listo, con los tiempos de este guion: `docs/06-entrega/subtitulos-video-en.srt`.
+1. El archivo `.srt` con las 32 frases en inglés ya está listo, con los tiempos de este guion: `docs/06-entrega/subtitulos-video-en.srt`.
 2. CapCut de computadora deja importar ese archivo como subtítulos. Después se mueve cada uno hasta que coincida con la voz.
-3. Si su versión de CapCut no lo deja, se copian a mano como texto: son 30 frases.
+3. Si su versión de CapCut no lo deja, se copian a mano como texto: son 32 frases.
 4. Los subtítulos automáticos de CapCut no hacen falta. Escriben el español que oyen, y habría que traducirlo y corregirlo igual.
 
 **Formato**
