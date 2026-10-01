@@ -70,58 +70,67 @@ and protecting their family.
 That's why we built Cresco.
 
 17
-00:01:00,000 --> 00:01:04,000
+00:01:00,000 --> 00:01:05,000
 One: the teacher writes
 it down the same day.
 
 18
-00:01:04,000 --> 00:01:09,000
+00:01:05,000 --> 00:01:11,000
 The family is notified instantly,
 without naming the child.
 
 19
-00:01:09,000 --> 00:01:14,000
+00:01:11,000 --> 00:01:17,000
 And there's a record of who saw
 it. The folder fills itself.
 
 20
-00:01:14,000 --> 00:01:18,000
+00:01:17,000 --> 00:01:22,000
 Two: families take part,
 and no one is anonymous.
 
 21
-00:01:18,000 --> 00:01:22,000
+00:01:22,000 --> 00:01:27,000
 They reply by name; the
 teacher answers in writing.
 
 22
-00:01:22,000 --> 00:01:26,000
+00:01:27,000 --> 00:01:31,000
 And three: all of it, without
 exposing personal information.
 
 23
-00:01:26,000 --> 00:01:29,000
-What keeps people safe is always free.
+00:01:31,000 --> 00:01:35,000
+Cresco is free, with ads for families.
 
 24
-00:01:29,000 --> 00:01:34,000
-Premium, and the teacher's PRO
-plan, are bought through RevenueCat.
+00:01:35,000 --> 00:01:38,000
+Thanks to RevenueCat,
+each one gets an extra:
 
 25
-00:01:34,000 --> 00:01:36,000
-I did tell her.
+00:01:38,000 --> 00:01:41,000
+teachers with PRO reach more classes;
 
 26
-00:01:36,000 --> 00:01:38,000
-And I got there in time.
+00:01:41,000 --> 00:01:45,000
+families with Premium better
+understand how to help their child.
 
 27
-00:01:38,000 --> 00:01:42,000
+00:01:45,000 --> 00:01:47,000
+I did tell her.
+
+28
+00:01:47,000 --> 00:01:49,000
+And I got there in time.
+
+29
+00:01:49,000 --> 00:01:53,000
 We're starting in Guayaquil.
 Next: every classroom in Ecuador.
 
-28
-00:01:42,000 --> 00:01:46,000
+30
+00:01:53,000 --> 00:01:57,000
 Cresco: so no warning
 sign arrives too late.
