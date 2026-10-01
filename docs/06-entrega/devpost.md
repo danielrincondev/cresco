@@ -2,8 +2,8 @@
 
 > **Estado:** Final, para pegar en Devpost · **Dueño:** Persona C · **Última revisión:** 2026-10-01
 >
-> Cada sección de abajo es un campo del formulario de Devpost. Lo que está entre
-> corchetes se completa al enviar (el enlace del video). Las citas son de las
+> Cada sección de abajo es un campo del formulario de Devpost, tal como se
+> envió el 1 de octubre de 2026. Las citas son de las
 > entrevistas del 1 de septiembre (`docs/05-validacion/hallazgos.md`),
 > traducidas del español. Cada cifra sale del repositorio: si algo cambia antes
 > de enviar, se corrige aquí primero.
@@ -98,8 +98,8 @@ firebase-cloud-messaging · eas · android · vitest
 
 ## Testing instructions
 
-- **Video:** [YouTube or Vimeo link]. It is narrated in English with
-  AI-generated voices, and every Spanish text on screen is translated. The
+- **Video:** https://www.youtube.com/watch?v=8HfhMLkCiP8
+  It is narrated in English with AI-generated voices, and every Spanish text on screen is translated. The
   dramatized scenes are AI-generated and labeled as such; every app screen is a
   real recording of the app running on Android phones.
 - **Code:** https://github.com/danielrincondev/cresco — the README has an
