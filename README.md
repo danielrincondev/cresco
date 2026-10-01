@@ -27,6 +27,8 @@ categoría Next Gen.
 > ads. Built with Expo (React Native), Clerk and Convex. The app is in
 > Spanish; the demo video is narrated in English, and every Spanish text on
 > screen is translated.
+>
+> **Demo video (under 2 minutes):** https://www.youtube.com/watch?v=8HfhMLkCiP8
 
 ### Run it yourself (English)
 
