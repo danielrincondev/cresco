@@ -25,7 +25,8 @@ categoría Next Gen.
 > unlock the PDF report by watching a rewarded ad; the revenue of both ads is
 > reported to RevenueCat through `Purchases.adTracker`. Teachers never see
 > ads. Built with Expo (React Native), Clerk and Convex. The app is in
-> Spanish; the demo video has English subtitles.
+> Spanish; the demo video is narrated in English, and every Spanish text on
+> screen is translated.
 
 ### Run it yourself (English)
 

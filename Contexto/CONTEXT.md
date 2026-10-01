@@ -161,7 +161,8 @@ numérico, para no depender solo del color.
 
 ### Monetización (DP-005)
 - Cinco planes: `REP_FREE`, `REP_PREMIUM_MENSUAL` ($1.99),
-  `REP_PREMIUM_BIMESTRAL` ($2.99), `DOC_FREE`, `DOC_PRO` ($4.99/mes).
+  `REP_PREMIUM_BIMESTRAL` ($2.99), `DOC_FREE`, `DOC_PRO` ($3.99/mes en el
+  Test Store; DP-005 decía $4.99, ver su actualización del 30-sep).
 - Dos entitlements separados: `premium` (representante) y `docente_pro`.
 - Premium del representante es **por cuenta** (cubre a todos sus hijos).
 - El docente **sí tiene límites de pago**: `DOC_FREE` = 1 curso activo y 40

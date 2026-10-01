@@ -8,6 +8,16 @@
 >
 > Las reglas pueden cambiar a discreción del patrocinador. Verificar la página
 > oficial antes de la entrega.
+>
+> **Estado al 1 de octubre de 2026, al enviar.** Lo que este extracto dejaba
+> pendiente quedó resuelto así:
+> - **Licencia (§11):** AGPL-3.0, con `LICENSE` en la raíz y licenciamiento
+>   comercial en paralelo (ver el `README.md`).
+> - **RevenueCat sin Play Console (§4):** compras reales con el Test Store en
+>   una build de desarrollo de EAS (ADR-008).
+> - **Idioma del video (§5.5):** narrado en inglés con voces generadas por IA;
+>   los textos en español que aparecen en pantalla llevan su traducción.
+> - **Guion (§13):** lo reemplaza `docs/06-entrega/guion-video.md`.
 
 ---
 
