@@ -95,43 +95,39 @@ They reply by name; the
 teacher answers in writing.
 
 22
-00:01:22,000 --> 00:01:25,000
-Three: the teacher never
-gives out her number.
+00:01:22,000 --> 00:01:26,000
+And three: all of it, without
+exposing personal information.
 
 23
-00:01:25,000 --> 00:01:29,000
-To talk, families book a meeting.
-
-24
-00:01:29,000 --> 00:01:35,000
+00:01:26,000 --> 00:01:32,000
 What keeps people safe is always free.
 Premium appears when a family wants more.
 
-25
-00:01:35,000 --> 00:01:39,000
+24
+00:01:32,000 --> 00:01:36,000
 The purchase goes through RevenueCat;
 its webhook unlocks the plan.
 
-26
-00:01:39,000 --> 00:01:43,000
+25
+00:01:36,000 --> 00:01:40,000
 Teachers with several
 classes get their own PRO.
 
-27
-00:01:43,000 --> 00:01:45,000
+26
+00:01:40,000 --> 00:01:42,000
 I did tell her.
 
-28
-00:01:45,000 --> 00:01:47,000
+27
+00:01:42,000 --> 00:01:44,000
 And I got there in time.
 
-29
-00:01:47,000 --> 00:01:51,000
+28
+00:01:44,000 --> 00:01:48,000
 We're starting in Guayaquil.
 Next: every classroom in Ecuador.
 
-30
-00:01:51,000 --> 00:01:55,000
+29
+00:01:48,000 --> 00:01:52,000
 Cresco: so no warning
 sign arrives too late.
