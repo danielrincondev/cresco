@@ -14,7 +14,7 @@
 
 | Duración | Límite | Lugar | Voces | Subtítulos | Edición |
 |---|---|---|---|---|---|
-| 1:52 | menos de 2:00 | Guayaquil | madre, docente y narrador | inglés, pegados al video | CapCut |
+| 1:46 | menos de 2:00 | Guayaquil | madre, docente y narrador | inglés, pegados al video | CapCut |
 
 ## La historia en cinco partes
 
@@ -23,10 +23,10 @@
 | El gancho | 0:00–0:13 | 1 a 3 | Guayaquil, fin de año. Una madre que nunca se enteró y una docente que sí avisó. Queda abierta la pregunta. |
 | El problema | 0:13–0:51 | 4 a 8 | Los avisos se pierden, y cada uno era una señal. Dar el número pone en peligro al docente, y un chico que se aleja del aula queda cerca de las bandas. |
 | La solución | 0:51–1:26 | 9 a 13 | Cresco: la señal llega el mismo día, la familia es parte, y nadie expone su información personal. |
-| RevenueCat, con propósito | 1:26–1:40 | 14 a 15 | Lo que protege es gratis; lo que suma se paga. Así se sostiene. |
-| El cierre | 1:40–1:52 | 16 a 17 | La madre llega a tiempo. Empezamos en Guayaquil, queremos cada aula del país, y el eslogan. |
+| RevenueCat, con propósito | 1:26–1:34 | 14 | Lo que protege es gratis; lo que suma se paga. Así se sostiene. |
+| El cierre | 1:34–1:46 | 16 a 17 | La madre llega a tiempo. Empezamos en Guayaquil, queremos cada aula del país, y el eslogan. |
 
-Termina en 1:52. Quedan 8 segundos de margen hasta el límite de 2:00.
+Termina en 1:46. Quedan 14 segundos de margen hasta el límite de 2:00.
 
 ## Guion segundo a segundo
 
@@ -555,114 +555,80 @@ lo que se escribe en *«cursiva»* y los avisos del teléfono como «Cresco · t
 
 *Transición a la siguiente:* Corte seco a la escena 14. El teléfono de Andrea sale por la izquierda y el de Rosa pasa al centro.
 
-### RevenueCat, con propósito · 1:26–1:40
+### RevenueCat, con propósito · 1:26–1:34
 
-#### 14 · Lo que protege es gratis · 1:26–1:32 (6 s) · Solo Beta
+#### 14 · Gratis lo que protege; Premium con RevenueCat · 1:26–1:34 (8 s) · Solo Beta
 
 | | |
 |---|---|
-| **Docente · Andrea (izquierda)** | En pausa, o fuera de cuadro. |
-| **Familia · Rosa (derecha)** | `Reporte diario`, con el anuncio de prueba abajo → `Ver reportes anteriores`: «Tu plan muestra los últimos 2 reportes» → `Ver los planes`: Premium, con su precio |
-| **Se escucha** | **Narrador:** Lo que protege es gratis, siempre. Cuando una familia quiere más, aparece Premium. |
-| **Subtítulos** | `1:26–1:32` What keeps people safe is always free. Premium appears when a family wants more. |
+| **Docente · Andrea (izquierda)** | «Cursos»: «Tu plan incluye un curso y ya lo estás usando» → `Ver el plan PRO`: Docente — PRO, con su precio |
+| **Familia · Rosa (derecha)** | «Ver los planes»: Premium, con su precio (el final de B1) → toca el precio de Premium mensual → la ventana de RevenueCat: la compra exitosa → «Tu plan hoy: Representante — Premium mensual»; el reporte ya sin anuncio |
+| **Se escucha** | **Narrador:** Lo que protege es gratis, siempre. Premium, y el plan PRO del docente, se compran con RevenueCat. |
+| **Subtítulos** | `1:26–1:29` What keeps people safe is always free.<br>`1:29–1:34` Premium, and the teacher's PRO plan, are bought through RevenueCat. |
+| **Ojo** | Junta las antiguas escenas 14 y 15: la 15 se quitó por tiempo y para no usar datos técnicos en el pitch. |
 
-**Se arma con:** Grabación de pantalla de la app en Beta (sesión B: B1). **Material:** Grabación B1 (el límite y los planes).
+**Se arma con:** Grabación de pantalla de la app en Beta (sesiones B y C: el final de B1, B2, B3 y C1). **Material:** Grabación B1 (solo su final: los planes con precio); Grabación B2 (la compra); Grabación B3 (el reporte sin anuncio); Grabación C1 (el plan PRO de Andrea); 15-revenuecat-test-store.png.
 
 *Qué se ve, segundo a segundo*
 
-- `1:26,0–1:27,0` El teléfono de Andrea sale por la izquierda; el de Rosa se desliza al centro, un poco más grande.
-- `1:27,0–1:29,5` Rosa: el reporte con el anuncio de prueba abajo → Ver reportes anteriores → el aviso «Tu plan muestra los últimos 2 reportes».
-- `1:29,5–1:32,0` Ver los planes: los dos Premium, con su precio. Zoom 1,3× a los precios.
+- `1:26,0–1:27,0` El teléfono de Andrea sale por la izquierda; el de Rosa se desliza al centro, un poco más grande, ya en «Ver los planes»: los dos Premium con su precio.
+- `1:26,5–1:34,0` Arriba al centro, la insignia «RevenueCat · Test Store». Es lo único escrito: nada técnico en pantalla.
+- `1:27,0–1:30,0` Rosa toca el precio → la ventana de compra de prueba de RevenueCat → compra exitosa → «Tu plan hoy: Representante — Premium mensual».
+- `1:30,0–1:31,0` El reporte de Rosa, ya sin anuncio.
+- `1:31,0–1:34,0` El teléfono de Andrea entra por la izquierda: Cursos → Ver el plan PRO → Docente — PRO, con su precio.
 
 *Sonido*
 
 - **Ambiente:** ninguno.
-- **Efectos:** un soplido suave cuando se mueven los teléfonos (whoosh soft, −28 dB).
+- **Efectos:** un soplido suave cuando se mueven los teléfonos (whoosh soft, −28 dB) y una campanita de éxito suave (success chime, −18 dB) cuando se confirma la compra. Nada de sonido de caja registradora.
 - **Música:** sube a −20 dB.
 
 *Paso a paso en CapCut*
 
 1. Fotogramas clave de posición: el teléfono de Andrea sale por la izquierda entre 1:26,0 y 1:26,6. El de Rosa va al centro y escala del 100 % al 110 % en el mismo tiempo.
-2. Grabación B1 en el lado de Rosa, con los mismos atributos de máscara.
-3. Zoom a los precios entre 1:29,5 y 1:32,0.
-4. Voz **V14** desde 1:26,3.
+2. En el lado de Rosa, de B1 usa **solo el último segundo** (los planes con precio), de 1:26,0 a 1:27,0. Después B2 de 1:27,0 a 1:30,0: corta la espera entre la compra y el plan activado, y acelera ×1,5 si no cabe. Después B3 de 1:30,0 a 1:31,0.
+3. En 1:31,0, el teléfono de Andrea vuelve a entrar por la izquierda (lo contrario de 1:26) con la grabación C1, y el de Rosa vuelve a su lugar y a su tamaño.
+4. `15-revenuecat-test-store.png` arriba al centro, de 1:26,5 a 1:34,0, con fundidos de 0,3 s. `15-linea-tecnica.png` **ya no se usa**.
+5. Voz **V14** desde 1:26,3.
 
 *Resultado correcto*
 
-- [ ] Se lee el aviso del límite y se ven los precios.
-- [ ] El cambio a un solo teléfono es suave, sin saltos.
-
-*Transición a la siguiente:* Corte seco a la escena 15, con el teléfono de Rosa en el mismo lugar.
-
-#### 15 · La compra · 1:32–1:40 (8 s) · Solo Beta
-
-| | |
-|---|---|
-| **Docente · Andrea (izquierda)** | «Cursos»: «Tu plan incluye un curso y ya lo estás usando» → `Ver el plan PRO`: Docente — PRO, con su precio |
-| **Familia · Rosa (derecha)** | toca el precio de Premium mensual → la ventana de RevenueCat: la compra exitosa → «Tu plan hoy: Representante — Premium mensual»; el reporte ya sin anuncio |
-| **Se escucha** | **Narrador:** La compra pasa por RevenueCat, y su webhook desbloquea el plan. El docente con varios cursos tiene su PRO. |
-| **Subtítulos** | `1:32–1:36` The purchase goes through RevenueCat; its webhook unlocks the plan.<br>`1:36–1:40` Teachers with several classes get their own PRO. |
-
-**Se arma con:** Grabación de pantalla de la app en Beta (sesiones B y C: B2, B3 y C1). **Material:** Grabación B2 (la compra); Grabación B3 (el reporte sin anuncio); Grabación C1 (el plan PRO de Andrea); 15-revenuecat-test-store.png; 15-linea-tecnica.png.
-
-*Qué se ve, segundo a segundo*
-
-- `1:32,0–1:40,0` Arriba al centro, la insignia «RevenueCat · Test Store». Debajo de ella, la línea técnica en inglés para el jurado.
-- `1:32,0–1:36,5` Rosa toca el precio → la ventana de compra de prueba de RevenueCat → compra exitosa → «Tu plan hoy: Representante — Premium mensual».
-- `1:36,5–1:37,5` El reporte de Rosa, ya sin anuncio.
-- `1:37,5–1:40,0` El teléfono de Andrea entra por la izquierda: Cursos → Ver el plan PRO → Docente — PRO, con su precio.
-
-*Sonido*
-
-- **Ambiente:** ninguno.
-- **Efectos:** una campanita de éxito suave (success chime, −18 dB) cuando se confirma la compra. Nada de sonido de caja registradora.
-- **Música:** a −20 dB.
-
-*Paso a paso en CapCut*
-
-1. `15-revenuecat-test-store.png` arriba al centro y `15-linea-tecnica.png` justo debajo, de 1:32,0 a 1:40,0, con fundidos de 0,3 s.
-2. B2 y después B3 en el lado de Rosa. Corta la espera entre la compra y el plan activado.
-3. En 1:37,5, el teléfono de Andrea vuelve a entrar por la izquierda (lo contrario de la escena 14) con la grabación C1, y el de Rosa vuelve a su lugar.
-4. Voz **V15** desde 1:32,3.
-
-*Resultado correcto*
-
-- [ ] Se ve la ventana de RevenueCat y el plan activado.
+- [ ] Se ve la ventana de RevenueCat y el plan activado, sin esperas.
 - [ ] El reporte aparece sin anuncio, y se ve el plan PRO con su precio.
-- [ ] La insignia y la línea técnica se leen y no tapan la pantalla.
+- [ ] Cuando la voz dice «se compran con RevenueCat», ya están los dos teléfonos en pantalla.
 
 *Transición a la siguiente:* Fundido cruzado de 0,3 s a la escena 16: volvemos a las recreaciones, ahora con luz de mañana.
 
-### El cierre · 1:40–1:52
+### El cierre · 1:34–1:46
 
-#### 16 · A tiempo · 1:40–1:44 (4 s)
+#### 16 · A tiempo · 1:34–1:38 (4 s)
 
 | | |
 |---|---|
 | **Recreación con IA** | Vuelve la pantalla partida del principio, con las mismas manos, pero ahora cada una mira su teléfono. Los zapatos y la mochila vuelven, y entran por la puerta de la escuela. |
 | **Se escucha** | **Docente:** Yo sí le avisé. **Madre:** Y llegué a tiempo. |
-| **Subtítulos** | `1:40–1:42` I did tell her.<br>`1:42–1:44` And I got there in time. |
+| **Subtítulos** | `1:34–1:36` I did tell her.<br>`1:36–1:38` And I got there in time. |
 
 **Se arma con:** IA (16A, 16B y 16C). **Material:** 16A (Andrea en calma); 16B (Rosa en calma); 16C (Mateo entra a la escuela); 00-recreacion-ia.png.
 
 *Qué se ve, segundo a segundo*
 
-- `1:40,0–1:42,0` Pantalla partida, igual que en la escena 2, pero con luz cálida de mañana. Andrea sostiene su teléfono y relaja los hombros; Rosa apoya la mano abierta sobre la libreta. Voz de la docente: «Yo sí le avisé.»
-- `1:42,0–1:44,0` A pantalla completa, Mateo cruza la reja abierta de la escuela en una mañana soleada. Voz de la madre: «Y llegué a tiempo.»
+- `1:34,0–1:36,0` Pantalla partida, igual que en la escena 2, pero con luz cálida de mañana. Andrea sostiene su teléfono y relaja los hombros; Rosa apoya la mano abierta sobre la libreta. Voz de la docente: «Yo sí le avisé.»
+- `1:36,0–1:38,0` A pantalla completa, Mateo cruza la reja abierta de la escuela en una mañana soleada. Voz de la madre: «Y llegué a tiempo.»
 
 *Sonido*
 
-- **Ambiente:** pájaros de mañana (−30 dB). En 1:42, un patio de escuela a lo lejos (school playground distant, −32 dB) y una campana escolar lejana (school bell distant, −24 dB).
+- **Ambiente:** pájaros de mañana (−30 dB). En 1:36, un patio de escuela a lo lejos (school playground distant, −32 dB) y una campana escolar lejana (school bell distant, −24 dB).
 - **Efectos:** ninguno más.
-- **Música:** **sube** de −20 a −14 dB entre 1:42 y 1:44. Es el momento emocional del video.
+- **Música:** **sube** de −20 a −14 dB entre 1:36 y 1:38. Es el momento emocional del video.
 
 *Paso a paso en CapCut*
 
 1. 16A y 16B como en la escena 2: **Copiar atributos** de 2A y 2B y **Pegar atributos** en 16A y 16B, para que la pantalla partida quede idéntica.
 2. **Ajustar:** las dos mitades cálidas (temperatura +10), para que se note el cambio respecto de la escena 2.
-3. 16C a pantalla completa, de 1:42,0 a 1:44,0.
-4. `00-recreacion-ia.png` de 1:40,0 a 1:44,0.
-5. Voces **V16a** desde 1:40,3 y **V16b** desde 1:42,2.
+3. 16C a pantalla completa, de 1:36,0 a 1:38,0.
+4. `00-recreacion-ia.png` de 1:34,0 a 1:38,0.
+5. Voces **V16a** desde 1:34,3 y **V16b** desde 1:36,2.
 
 *Resultado correcto*
 
@@ -670,48 +636,48 @@ lo que se escribe en *«cursiva»* y los avisos del teléfono como «Cresco · t
 - [ ] Mateo entra a la escuela justo cuando la madre dice «llegué a tiempo».
 - [ ] La música sube y se siente el cierre.
 
-*Transición a la siguiente:* Fundido a azul oscuro de 0,5 s (1:43,5–1:44,0) hacia la escena 17.
+*Transición a la siguiente:* Fundido a azul oscuro de 0,5 s (1:37,5–1:38,0) hacia la escena 17.
 
-#### 17 · Que ninguna señal llegue tarde · 1:44–1:52 (8 s)
+#### 17 · Que ninguna señal llegue tarde · 1:38–1:46 (8 s)
 
 | | |
 |---|---|
 | **Tarjeta de texto** | Fondo azul oscuro. Un mapa simple del Ecuador con un punto encendido en Guayaquil, que se multiplica por todo el país. Luego el ícono de Cresco y, en grande: «Que ninguna señal llegue tarde.» Debajo, pequeño: «Equipo Neofix · estudiantes en Guayaquil» · «Expo · Convex · Clerk · RevenueCat» · «Código abierto · github.com/danielrincondev/cresco». |
 | **Se escucha** | **Narrador:** Empezamos en Guayaquil. Queremos llegar a cada aula del Ecuador. Cresco: que ninguna señal llegue tarde. |
-| **Subtítulos** | `1:44–1:48` We're starting in Guayaquil. Next: every classroom in Ecuador.<br>`1:48–1:52` Cresco: so no warning sign arrives too late. |
+| **Subtítulos** | `1:38–1:42` We're starting in Guayaquil. Next: every classroom in Ecuador.<br>`1:42–1:46` Cresco: so no warning sign arrives too late. |
 
 **Se arma con:** Hecha en CapCut. **Material:** 00-fondo-azul.png; 17-punto.png; 17-guayaquil.png; 17-tarjeta-final.png.
 
 *Qué se ve, segundo a segundo*
 
-- `1:44,0–1:44,5` Fondo azul oscuro.
-- `1:44,5` Un punto de luz se enciende un poco a la izquierda y abajo del centro, con la palabra «Guayaquil» al lado. Voz: «Empezamos en Guayaquil».
-- `1:46,0–1:48,0` Voz: «Queremos llegar a cada aula del Ecuador». Aparecen unos 30 puntos más, uno tras otro, por toda la pantalla, como aulas que se encienden.
-- `1:48,0–1:48,6` Los puntos se desvanecen y entra la tarjeta final: el ícono de Cresco, «Que ninguna señal llegue tarde.» y los créditos.
-- `1:48,6–1:52,0` Voz: «Cresco: que ninguna señal llegue tarde». La tarjeta se queda quieta hasta el final. Corte seco a negro en 1:52,0.
+- `1:38,0–1:38,5` Fondo azul oscuro.
+- `1:38,5` Un punto de luz se enciende un poco a la izquierda y abajo del centro, con la palabra «Guayaquil» al lado. Voz: «Empezamos en Guayaquil».
+- `1:40,0–1:42,0` Voz: «Queremos llegar a cada aula del Ecuador». Aparecen unos 30 puntos más, uno tras otro, por toda la pantalla, como aulas que se encienden.
+- `1:42,0–1:42,6` Los puntos se desvanecen y entra la tarjeta final: el ícono de Cresco, «Que ninguna señal llegue tarde.» y los créditos.
+- `1:42,6–1:46,0` Voz: «Cresco: que ninguna señal llegue tarde». La tarjeta se queda quieta hasta el final. Corte seco a negro en 1:46,0.
 
 *Sonido*
 
 - **Ambiente:** ninguno.
 - **Efectos:** un brillo muy suave cuando se multiplican los puntos (shimmer, −26 dB).
-- **Música:** a −14 dB en el clímax. Termina con su propio final en 1:52 o con un fundido de salida entre 1:50,5 y 1:52,0.
+- **Música:** a −14 dB en el clímax. Termina con su propio final en 1:46 o con un fundido de salida entre 1:44,5 y 1:46,0.
 
 *Paso a paso en CapCut*
 
-1. `00-fondo-azul.png` de 1:44,0 a 1:48,6.
-2. `17-punto.png` en 1:44,5, un poco a la izquierda y abajo del centro, con una aparición de 0,3 s. `17-guayaquil.png` a su derecha, al mismo tiempo.
+1. `00-fondo-azul.png` de 1:38,0 a 1:42,6.
+2. `17-punto.png` en 1:38,5, un poco a la izquierda y abajo del centro, con una aparición de 0,3 s. `17-guayaquil.png` a su derecha, al mismo tiempo.
 3. **Los puntos rápido:** copia el punto 5 veces, repártelo por la pantalla y haz que cada copia empiece 0,1 s después de la anterior. Selecciona esos 5 → **Crear clip compuesto**. Duplica el compuesto 5 veces, cambia la posición de cada copia y escalónalas 0,3 s. Son 30 puntos en un minuto de trabajo. Varía el tamaño (del 50 % al 120 %) para que no se vean iguales.
-4. Todos los puntos y «Guayaquil» salen con un fundido de 0,4 s en 1:48,0.
-5. `17-tarjeta-final.png` de 1:48,0 a 1:52,0, con un fundido de entrada de 0,6 s. Opcional: fotogramas clave de escala del 97 % al 100 % para que respire.
-6. Voz **V17** desde 1:44,5. En 1:52,0, corta todo en seco.
+4. Todos los puntos y «Guayaquil» salen con un fundido de 0,4 s en 1:42,0.
+5. `17-tarjeta-final.png` de 1:42,0 a 1:46,0, con un fundido de entrada de 0,6 s. Opcional: fotogramas clave de escala del 97 % al 100 % para que respire.
+6. Voz **V17** desde 1:38,5. En 1:46,0, corta todo en seco.
 
 *Resultado correcto*
 
 - [ ] Se entiende la idea: empieza en un punto (Guayaquil) y se extiende a todo el país.
 - [ ] La tarjeta final se lee completa al menos 3 s.
-- [ ] El video termina en 1:52, con menos de 2:00 en YouTube.
+- [ ] El video termina en 1:46, con menos de 2:00 en YouTube.
 
-*Transición a la siguiente:* Corte seco a negro en 1:52,0. Fin.
+*Transición a la siguiente:* Corte seco a negro en 1:46,0. Fin.
 
 ## Hoja de voz
 
@@ -733,11 +699,10 @@ Para Kami y las otras dos voces. `/` es una pausa corta (≈0,3 s), `//` una pau
 | `V11-narrador` | Narrador | 1:09,3 | 4,4 s (4,5 s) | Y queda **constancia** de quién lo vio: / la carpeta se llena **sola**. | Ligero, con una media sonrisa en «sola». |
 | `V12-narrador` | Narrador | 1:14,3 | 7,2 s (7,5 s) | **Dos**: / la familia es parte, / y **nadie** es anónimo. // Responde con su nombre, / y la docente, por escrito. | Claro y cálido. Énfasis en «nadie es anónimo». |
 | `V13-narrador` | Narrador | 1:22,3 | 3,2 s (3,5 s) | Y **tres**: / todo esto, / sin exponer **información personal**. | Seguro y tranquilo, como quien cierra una lista. Énfasis en «información personal». |
-| `V14-narrador` | Narrador | 1:26,3 | 5,4 s (5,5 s) | Lo que protege es **gratis**, siempre. // Cuando una familia quiere más, aparece Premium. | Convencido en la primera frase. La segunda, más ligera. |
-| `V15-narrador` | Narrador | 1:32,3 | 7,4 s (7,5 s) | La compra pasa por **RevenueCat**, / y su webhook desbloquea el plan. // El docente con varios cursos tiene su PRO. | Seguro y claro, sin trabarse en los nombres en inglés. RevenueCat: «RÉ-ve-niu-cat». Webhook: «güeb-juk». PRO: «pro». |
-| `V16a-docente` | Docente | 1:40,3 | 1,5 s (1,7 s) | Yo sí le avisé. | La misma frase de la escena 2, pero ahora en calma y con alivio. Suave. |
-| `V16b-madre` | Madre | 1:42,2 | 1,6 s (1,8 s) | Y llegué a **tiempo**. | Aliviada y cálida, casi sonriendo. Es la respuesta a su pregunta del principio. |
-| `V17-narrador` | Narrador | 1:44,5 | 7,0 s (7,5 s) | Empezamos en **Guayaquil**. / Queremos llegar a **cada** aula del Ecuador. // **Cresco**: / que ninguna señal llegue tarde. | Esperanzado y pausado. La última frase, la más lenta del video: cada palabra clara y bajando al final. |
+| `V14-narrador` | Narrador | 1:26,3 | 6,8 s (7,5 s) | Lo que protege es **gratis**, siempre. // **Premium**, / y el plan PRO del docente, / se compran con **RevenueCat**. | Convencido en la primera frase. La segunda, segura y clara, sin trabarse en el nombre en inglés. RevenueCat: «RÉ-ve-niu-cat». PRO: «pro». |
+| `V16a-docente` | Docente | 1:34,3 | 1,5 s (1,7 s) | Yo sí le avisé. | La misma frase de la escena 2, pero ahora en calma y con alivio. Suave. |
+| `V16b-madre` | Madre | 1:36,2 | 1,6 s (1,8 s) | Y llegué a **tiempo**. | Aliviada y cálida, casi sonriendo. Es la respuesta a su pregunta del principio. |
+| `V17-narrador` | Narrador | 1:38,5 | 7,0 s (7,5 s) | Empezamos en **Guayaquil**. / Queremos llegar a **cada** aula del Ecuador. // **Cresco**: / que ninguna señal llegue tarde. | Esperanzado y pausado. La última frase, la más lenta del video: cada palabra clara y bajando al final. |
 
 **Cómo grabar**
 
@@ -754,7 +719,6 @@ Para Kami y las otras dos voces. `/` es una pausa corta (≈0,3 s), `//` una pau
 
 - Cresco: CRES-co
 - RevenueCat: RÉ-ve-niu-cat, como en inglés
-- webhook: güeb-juk
 - PDF: pe-de-efe
 - Premium: PRI-mium
 
@@ -778,7 +742,7 @@ Para Kami y las otras dos voces. `/` es una pausa corta (≈0,3 s), `//` una pau
 
 - **Voces:** 0 dB (normalizadas). Siempre por encima de todo.
 - **Música bajo la voz:** entre −22 y −20 dB.
-- **Música sin voz (1:50–1:52):** hasta −12 dB.
+- **Música sin voz (1:44–1:46):** hasta −12 dB.
 - **Ambientes:** entre −32 y −26 dB.
 - **Efectos:** entre −24 y −16 dB, según lo que marque cada escena.
 
@@ -786,7 +750,7 @@ Para Kami y las otras dos voces. `/` es una pausa corta (≈0,3 s), `//` una pau
 
 - De la **Biblioteca de audio de YouTube** (YouTube Studio → Biblioteca de audio), con el filtro «No se requiere atribución». Nada de música de CapCut ni canciones conocidas: YouTube puede reclamarlas.
 - Busca por estado de ánimo **Inspirational** o **Calm** y género **Cinematic** o **Ambient**: piano con cuerdas suaves, entre 70 y 90 pulsos por minuto, **sin letra**.
-- Que dure más de 1:10 y que **crezca poco a poco**. Ideal si tiene un final propio que puedas hacer caer en 1:52; si no, fundido de salida entre 1:50,5 y 1:52.
+- Que dure más de 1:10 y que **crezca poco a poco**. Ideal si tiene un final propio que puedas hacer caer en 1:46; si no, fundido de salida entre 1:44,5 y 1:46.
 - Entra en **0:52,0**, justo después del segundo de silencio, con un fundido de entrada de 1,5 s.
 
 **Los efectos**
@@ -797,7 +761,7 @@ Para Kami y las otras dos voces. `/` es una pausa corta (≈0,3 s), `//` una pau
 **Las transiciones**
 
 - **Casi todo es corte seco**, en el silencio justo después de una frase. Da ritmo y no distrae.
-- Solo hay **cuatro momentos especiales**: el fundido desde negro del principio (0:00), el fundido a negro con un segundo de silencio antes del giro (0:51), el zoom que entra en la pantalla del teléfono y se convierte en la app (1:00) y el fundido a azul antes del cierre (1:44).
+- Solo hay **cuatro momentos especiales**: el fundido desde negro del principio (0:00), el fundido a negro con un segundo de silencio antes del giro (0:51), el zoom que entra en la pantalla del teléfono y se convierte en la app (1:00) y el fundido a azul antes del cierre (1:38).
 - Nada de transiciones decorativas de CapCut (giros, destellos, deslizamientos): se ven amateurs.
 
 ## El kit
@@ -811,9 +775,9 @@ Piezas listas en PNG, en `Descargas\Video Cresco\kit`.
 - `06-notificacion.png`: La notificación «Profe, sabemos dónde vive.» para pegar sobre la pantalla del teléfono.
 - `07-numero.png · 07-cita.png`: El número enmascarado que se rompe, y la cita de la entrevista.
 - `09-lema.png`: «Avisar a tiempo. Sin exponerse.»
-- `10-etiqueta-teacher.png · 10-etiqueta-family.png`: Las etiquetas que van encima de cada teléfono en las escenas 10 a 15.
+- `10-etiqueta-teacher.png · 10-etiqueta-family.png`: Las etiquetas que van encima de cada teléfono en las escenas 10 a 14.
 - `10-rotulo-1.png · 12-rotulo-2.png · 13-rotulo-3.png`: Los rótulos de las tres promesas.
-- `15-revenuecat-test-store.png · 15-linea-tecnica.png`: La insignia de RevenueCat y la línea técnica, en inglés, para el jurado.
+- `15-revenuecat-test-store.png`: La insignia de RevenueCat de la escena 14. (`15-linea-tecnica.png` ya no se usa.)
 - `17-punto.png · 17-guayaquil.png · 17-tarjeta-final.png`: El punto de luz, la palabra Guayaquil y la tarjeta final con el ícono.
 - `Inter_400Regular.ttf · Inter_600SemiBold.ttf · Inter_700Bold.ttf`: La letra de la app. Doble clic → Instalar, y aparece en los textos de CapCut.
 - `subtitulos-video-en.srt`: Los 30 subtítulos en inglés.
@@ -822,7 +786,7 @@ Piezas listas en PNG, en `Descargas\Video Cresco\kit`.
 
 | Opción | ¿Se ven siempre? | ¿Se corrigen después de subir? | Trabajo |
 |---|---|---|---|
-| **Pegados al video** (recomendada) | Sí, en cualquier reproductor y también sin sonido. | No: hay que exportar y subir el video otra vez. | Importar el `.srt` en CapCut, o escribir las 29 frases a mano. |
+| **Pegados al video** (recomendada) | Sí, en cualquier reproductor y también sin sonido. | No: hay que exportar y subir el video otra vez. | Importar el `.srt` en CapCut, o escribir las 28 frases a mano. |
 | Subtítulos de YouTube | Solo si quien mira los enciende. | Sí, desde YouTube Studio. | Subir el `.srt` en YouTube Studio. |
 | Los dos | Sí: los pegados, en inglés. | Solo los de YouTube. | Los dos pasos. Los de YouTube irían en español, para quien no oye bien. |
 
@@ -830,9 +794,9 @@ Piezas listas en PNG, en `Descargas\Video Cresco\kit`.
 
 **Cómo se hacen en CapCut**
 
-1. El archivo `.srt` con las 29 frases en inglés ya está listo, con los tiempos de este guion: `docs/06-entrega/subtitulos-video-en.srt`.
+1. El archivo `.srt` con las 28 frases en inglés ya está listo, con los tiempos de este guion: `docs/06-entrega/subtitulos-video-en.srt`.
 2. CapCut de computadora deja importar ese archivo como subtítulos. Después se mueve cada uno hasta que coincida con la voz.
-3. Si su versión de CapCut no lo deja, se copian a mano como texto: son 29 frases.
+3. Si su versión de CapCut no lo deja, se copian a mano como texto: son 28 frases.
 4. Los subtítulos automáticos de CapCut no hacen falta. Escriben el español que oyen, y habría que traducirlo y corregirlo igual.
 
 **Formato**
@@ -863,7 +827,7 @@ Piezas listas en PNG, en `Descargas\Video Cresco\kit`.
 **Builds**
 
 6. Escenas 10 a 13: la **General 1.1.0** sirve en los dos teléfonos.
-7. Escenas 14 y 15: solo **Beta**, con la laptop corriendo `npm run dev` y el teléfono en la misma Wi-Fi. En General los planes salen sin precio.
+7. Escena 14: solo **Beta**, con la laptop corriendo `npm run dev` y el teléfono en la misma Wi-Fi. En General los planes salen sin precio.
 8. Prueben la compra antes con **otra cuenta de familia**, nunca con Rosa. Si Rosa compra antes de grabar, ya no vuelve a ver el muro de pago.
 9. Si en Beta aparece abajo un aviso amarillo o rojo de desarrollo, ciérrenlo antes de grabar.
 
@@ -899,21 +863,21 @@ se hacen en la edición.
 
 ### Sesión B · La compra
 
-*El teléfono de Rosa · Solo Beta · escenas 14 y 15 · unos 2 minutos.* La laptop con `npm run dev` y el teléfono en la misma Wi-Fi. Rosa sigue en el plan gratuito.
+*El teléfono de Rosa · Solo Beta · escena 14 · unos 2 minutos.* La laptop con `npm run dev` y el teléfono en la misma Wi-Fi. Rosa sigue en el plan gratuito.
 
 | Clip | Escena | Qué | Empieza en | Qué se hace | Quieto en |
 |---|---|---|---|---|---|
 | B1 | 14 | Familia · Rosa | `Reporte diario`, con el anuncio de prueba abajo | `Ver reportes anteriores` → 2 segundos en «Tu plan muestra los últimos 2 reportes» → `Ver los planes` | los dos planes Premium, con su precio |
-| B2 | 15 | Familia · Rosa | «Tu plan» | toca el precio de Premium mensual → en la ventana de RevenueCat, la compra exitosa → espera sin tocar nada | «Tu plan hoy: Representante — Premium mensual» |
-| B3 | 15 | Familia · Rosa | «Tu plan» | `Reporte diario`, ya sin anuncio | el reporte sin anuncio |
+| B2 | 14 | Familia · Rosa | «Tu plan» | toca el precio de Premium mensual → en la ventana de RevenueCat, la compra exitosa → espera sin tocar nada | «Tu plan hoy: Representante — Premium mensual» |
+| B3 | 14 | Familia · Rosa | «Tu plan» | `Reporte diario`, ya sin anuncio | el reporte sin anuncio |
 
 ### Sesión C · El plan PRO
 
-*La cuenta de Andrea · Solo Beta · escena 15 · 20 segundos.* En la Beta, se cierra la sesión de Rosa y se entra con la de Andrea.
+*La cuenta de Andrea · Solo Beta · escena 14 · 20 segundos.* En la Beta, se cierra la sesión de Rosa y se entra con la de Andrea.
 
 | Clip | Escena | Qué | Empieza en | Qué se hace | Quieto en |
 |---|---|---|---|---|---|
-| C1 | 15 | Docente · Andrea | «Cursos» | 2 segundos en «Tu plan incluye un curso y ya lo estás usando» → `Ver el plan PRO` | «Docente — PRO», con su precio |
+| C1 | 14 | Docente · Andrea | «Cursos» | 2 segundos en «Tu plan incluye un curso y ya lo estás usando» → `Ver el plan PRO` | «Docente — PRO», con su precio |
 
 ### Sesión D · Las recreaciones con IA
 
