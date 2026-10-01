@@ -1,9 +1,11 @@
 # Guion del video (Shipaton 2026)
 
-> **Estado:** Versión final para grabar · **Dueño:** Persona C · **Última revisión:** 2026-09-30
+> **Estado:** Vigente, el guion del video enviado · **Dueño:** Persona C · **Última revisión:** 2026-10-01
 >
-> El video de demostración para Devpost (#55): menos de 2 minutos, la app en
-> teléfonos Android reales, voces en español y subtítulos en inglés (DP-015).
+> El video de demostración para Devpost (#55): menos de 2 minutos y la app en
+> teléfonos Android reales. El guion se escribió en español; el video final se
+> narró en inglés con voces generadas por IA, y los textos en español de la
+> pantalla llevan su traducción. `subtitulos-video-en.srt` es el texto en inglés.
 > Usa los datos de demostración de `movil/convex/demo.ts`: la docente Andrea
 > Salazar, la representante Rosa Mendoza y su hijo Mateo, en una escuela
 > ficticia. Si una pantalla de la app cambia, se corrige aquí primero.

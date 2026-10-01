@@ -84,7 +84,8 @@ documentación del producto.
 | Documento | Estado | Dueño |
 |---|---|---|
 | `devpost.md` | ✅ texto final en inglés, campo por campo, para pegar en Devpost (#55) | Persona C |
-| `guion-video.md` | ✅ versión para grabar: el video segundo a segundo, la locución, los subtítulos, los clips que hay que grabar de la app y la edición (#55) | Persona C |
+| `guion-video.md` | ✅ guía de montaje del video: segundo a segundo, la locución, los clips de la app, el sonido y la edición en CapCut (#55) | Persona C |
+| `subtitulos-video-en.srt` | ✅ los subtítulos en inglés del video, con los tiempos de la guía | Persona C |
 
 ---
 
